@@ -66,6 +66,7 @@ public final class Entities {
         @Column(name = "email", nullable = false, length = 254) public String email;
         @Column(name = "ngay_sinh") public LocalDate ngaySinh;
         @Column(name = "ngay_het_han_bang_lai") public LocalDate ngayHetHanBangLai;
+        @Column(name = "so_bang_lai", length = 80) public String soBangLai;
         @Enumerated(EnumType.STRING) @Column(name = "loai_nhan_vien", nullable = false, length = 30)
         public LoaiNhanVien loaiNhanVien;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
@@ -95,6 +96,7 @@ public final class Entities {
         @Column(name = "so_cho_ngoi", nullable = false) public int soChoNgoi;
         @Column(name = "so_do_ngoi", nullable = false) public int soDoNgoi = 1;
         @Column(name = "toc_do_gio", precision = 10, scale = 2) public BigDecimal tocDoGio;
+        @Column(name = "dung_tich_xang", precision = 10, scale = 2) public BigDecimal dungTichXang;
         @Column(name = "nam_san_xuat") public Integer namSanXuat;
         @Column(name = "ngay_dang_kiem") public LocalDate ngayDangKiem;
         @Column(name = "han_dang_kiem") public LocalDate hanDangKiem;
@@ -189,6 +191,7 @@ public final class Entities {
         public NhanVien nhanVien;
         @Enumerated(EnumType.STRING) @Column(name = "vai_tro", nullable = false, length = 30)
         public VaiTroChuyen vaiTro;
+        @Column(name = "ghi_chu", length = 1000) public String ghiChu;
         public PhanCongChuyenXe() {}
     }
 

@@ -30,7 +30,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docs/database/schema/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
-      - ./docs/database/seed:/docker-entrypoint-initdb.d/seed:ro
+      - ./docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
+      - ./docs/database/seed/001_demo.sql:/docker-entrypoint-initdb.d/003_demo.sql:ro
+      - ./docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/004_fleet_demo.sql:ro
 
 volumes:
   postgres_data:
