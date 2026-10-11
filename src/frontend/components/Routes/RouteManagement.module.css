@@ -17,6 +17,8 @@
 .form label, .filters label { display: grid; gap: 6px; color: #34445b; font-size: 14px; font-weight: 650; }
 .form input, .form select, .form textarea, .filters select, .sectionTitle input, .tableWrap td select { width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid #cbd5e1; border-radius: 7px; background: white; color: #17243a; }
 .form textarea { min-height: 42px; resize: vertical; }
+.form .manualNumber { appearance: textfield; -moz-appearance: textfield; }
+.manualNumber::-webkit-inner-spin-button, .manualNumber::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .form button, .filters button, .actions button, .sectionTitle button { padding: 10px 13px; border: 0; border-radius: 7px; background: #e9f0ff; color: #1753aa; font-weight: 700; cursor: pointer; }
 .form button[type="submit"], .form > button:not([type]) { background: #2563eb; color: white; }
 .form button:disabled, .actions button:disabled { opacity: .5; cursor: not-allowed; }
