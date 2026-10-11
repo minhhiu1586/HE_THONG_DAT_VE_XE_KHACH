@@ -33,7 +33,7 @@ Nếu có thay đổi local, giữ lại trước khi chuyển nhánh/pull. Khô
 mvn -f src/backend/pom.xml -B clean verify
 ```
 
-Mong đợi `BUILD SUCCESS`. Khi chưa truyền cấu hình database test, 38 test thông thường chạy và 5 test PostgreSQL bị bỏ qua. Mục 13 hướng dẫn chạy đủ 43 test, không skip.
+Mong đợi `BUILD SUCCESS`. Khi chưa truyền cấu hình database test, 38 test thông thường chạy và 9 test PostgreSQL bị bỏ qua. Mục 13 hướng dẫn chạy 43 test với dữ liệu kiểm thử T07; 4 test bổ sung đối chiếu phân quyền trên dữ liệu mới chỉ chạy khi bật cấu hình riêng.
 
 WAR tạo tại `src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war`.
 
@@ -297,7 +297,7 @@ mvn -f src/backend/pom.xml -B \
   clean verify
 ```
 
-Mong đợi `Tests run: 43, Failures: 0, Errors: 0, Skipped: 0` và BUILD SUCCESS. Có23 test tài khoản/phân quyền và20 test hồi quy tuyến/xe. PostgreSQL bao phủ khóa tài khoản/thu hồi phân công/đổi phân công đồng thời. Báo cáo: `src/backend/target/surefire-reports`.
+Mong đợi `Tests run: 47, Failures: 0, Errors: 0, Skipped: 4` và BUILD SUCCESS: 43 test được chạy và đạt; 4 test bổ sung yêu cầu dữ liệu mới được bỏ qua trong cấu hình này. Có23 test tài khoản/phân quyền và20 test hồi quy tuyến/xe. PostgreSQL bao phủ khóa tài khoản/thu hồi phân công/đổi phân công đồng thời. Báo cáo: `src/backend/target/surefire-reports`.
 
 ## 14. Build frontend và đọc code
 
@@ -308,7 +308,7 @@ npm run build
 npm run lint
 ```
 
-Build thành công; lint0 lỗi, còn một warning cũ ở lib/mock-data.ts. Nếu backend đang chạy trong lúc clean verify, WAR bị thay nên cần restart backend và chờ sẵn sàng trước HTTP test.
+Build thành công; lint0 lỗi, còn3 warning có sẵn ở lib/api.ts và lib/mock-data.ts. Nếu backend đang chạy trong lúc clean verify, WAR bị thay nên cần restart backend và chờ sẵn sàng trước HTTP test.
 
 Java trong bảng nằm dưới `src/backend/src/main/java/com/datvexe/`:
 

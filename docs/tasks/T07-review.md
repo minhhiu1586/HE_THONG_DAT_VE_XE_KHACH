@@ -44,9 +44,21 @@
 
 ## Kết quả và giới hạn
 
-- Maven verify: **43 test đạt, 0 failures, 0 errors, 0 skipped**. Trong đó 23 test thuộc tài khoản/phân quyền; 20 test hồi quy module tuyến/xe. Có 5 test PostgreSQL thực, gồm 3 tình huống cạnh tranh quyền/phân công.
+- Maven verify: **47 test đạt, 0 failures, 0 errors, 0 skipped**. Trong đó 27 test thuộc tài khoản/phân quyền; 20 test hồi quy module tuyến/xe. Có 9 test PostgreSQL thực, gồm 3 tình huống cạnh tranh quyền/phân công.
 - HTTP tài khoản/phân quyền: **36** phản hồi; hồi quy tuyến/chuyến: **75**; xe/phân công: **28**. Tổng **139**.
 - Chromium: đăng ký/validation/đăng nhập, hồ sơ lưu và tải lại, password sai/xác nhận sai/đổi thành công, phiên cũ 401, khóa khi còn phiên có notice/redirect, thiếu quyền UI, ADMIN khóa/mở khóa, cấm tự khóa và logout.
-- Frontend production build đạt; lint **0 errors**, một warning cũ ở mock-data.ts. Migration003 chạy lại trên database test thành công. Các tham chiếu hai file OpenAPI được kiểm tra và resolve thành công.
+- Frontend production build đạt; lint **0 errors**, 3 warning có sẵn ở api.ts và mock-data.ts. Migration003 chạy lại trên database test thành công. Các tham chiếu hai file OpenAPI được kiểm tra và resolve thành công.
 
-Đây là bằng chứng cho module đã có và helper dùng chung. API hoàn tiền/kiểm vé nghiệp vụ chưa có trong nhánh: test ở mức helper, không khẳng định end-to-end module tương lai. SRS/use-case hiện là README khung, chưa có T01 được duyệt; đã đối chiếu seed và báo cáo demo có trong repo, chưa có ma trận T06 chính thức. PR chưa được review/chấp nhận; các điểm này không thể xác nhận chỉ bằng test tự động.
+Đây là bằng chứng cho module đã có và helper dùng chung. API hoàn tiền/kiểm vé nghiệp vụ chưa có trong nhánh: test ở mức helper, không khẳng định end-to-end module tương lai. SRS/use-case hiện là README khung, chưa có T01 được duyệt; đã đối chiếu quyền tài khoản và quan hệ sở hữu/phạm vi trên dữ liệu mới trong repo. PR chưa được review/chấp nhận; các điểm này không thể xác nhận chỉ bằng test tự động.
+
+## Kiểm tra lại T07/T07.1 sau cập nhật database
+
+Kiểm tra trên nhánh `feat/t07-account-auth-rbac`, nền `develop` tại `4072cc1`, ngày 11/10/2026, dùng database riêng để bảo vệ dữ liệu ứng dụng.
+
+- Maven verify đạt47/47, không skip. Bổ sung4 test phân quyền trên dữ liệu mới: tài khoản bị khóa dù có phiên; quyền sở hữu đơn/vé; phạm vi nhà xe của tuyến/chuyến/xe/nhân viên; phân công và thu hồi phân công. Các cập nhật trong nhóm này đều rollback.
+- API tài khoản/xác thực đạt36 kiểm tra. Kiểm tra hồi quy các API đã tích hợp guard đạt103 kiểm tra, tổng139.
+- Chromium kiểm tra thành công đăng ký, đăng nhập, hồ sơ, đổi mật khẩu, phiên bị khóa, thiếu quyền và ADMIN khóa/mở khóa. Script đã hỗ trợ tìm tài khoản qua nhiều trang.
+- Script HTTP và browser hỗ trợ `DB_NAME` để fixture SQL sử dụng đúng database của backend, mặc định `datvexe`. Biến này không tự thay đổi cấu hình database của backend.
+- Build frontend đạt; lint0 lỗi/3 warning có sẵn. Không phát hiện lỗi ứng dụng do thay đổi database lần này.
+
+Hướng dẫn VS Code chỉ bao gồm thiết lập và kiểm tra T07/T07.1, không bổ sung quy trình chạy nhiệm vụ khác. Kiểm tra hoàn tiền/kiểm vé hiện ở mức helper phân quyền vì API nghiệp vụ tương ứng chưa triển khai.
