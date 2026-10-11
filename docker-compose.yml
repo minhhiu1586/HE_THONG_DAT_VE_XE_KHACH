@@ -33,6 +33,8 @@ services:
       - ./docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
       - ./docs/database/seed/001_demo.sql:/docker-entrypoint-initdb.d/003_demo.sql:ro
       - ./docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/004_fleet_demo.sql:ro
+      - ./docs/database/seed/003_t06_transport.sql:/docker-entrypoint-initdb.d/005_transport.sql:ro
+      - ./docs/database/seed/005_t06_display_alignment.sql:/docker-entrypoint-initdb.d/006_display_alignment.sql:ro
 
 volumes:
   postgres_data:
