@@ -2,6 +2,8 @@
 
 Thư mục lưu kế hoạch triển khai và phân công công việc của nhóm.
 
+- [Hướng dẫn chạy và kiểm tra T08 trên VS Code](t08-vscode-guide.md).
+
 Nội dung gợi ý:
 
 - Danh sách thành viên.
