@@ -1,87 +1,91 @@
-'use client';
-
-import { useRef } from 'react';
 import Link from 'next/link';
-import { popularRoutes, busStationCards, formatPrice } from '../../lib/mock-data';
-import styles from './Home.module.css';
+import Image from 'next/image';
+import styles from './Home.module.css'; // Thay bằng đường dẫn CSS module thực tế của bạn
+import { PopularRoute, Station } from '@/lib/api'; 
 
-export default function PopularSection() {
-  const sliderRef = useRef<HTMLDivElement>(null);
+// Khai báo kiểu dữ liệu mà Component này sẽ nhận vào
+interface PopularSectionProps {
+  routes?: PopularRoute[];
+  stations?: Station[];
+}
 
-  const slideLeft = () => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollBy({ left: -300, behavior: 'smooth' });
-    }
-  };
-
-  const slideRight = () => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-    }
-  };
-
+// Nhận 2 props: routes và stations
+export default function PopularSection({ routes = [], stations = [] }: PopularSectionProps) {
   return (
-    <div className={styles.popularSection}>
-      <div className="container">
-        {/* Tuyến đường phổ biến */}
-        <div className={styles.sectionBlock}>
-          <h2 className="section-title">Tuyến đường phổ biến</h2>
-          
-          <div className={styles.sliderContainer}>
-            <button className={`${styles.sliderBtn} ${styles.sliderBtnLeft}`} onClick={slideLeft}>
-              ❮
-            </button>
-            
-            <div className={styles.routesGrid} ref={sliderRef}>
-              {popularRoutes.map((route) => (
-                <Link href={`/tim-chuyen?from=${encodeURIComponent(route.from)}&to=${encodeURIComponent(route.to)}`} key={route.id} className={styles.routeCard}>
-                  <div className={styles.routeImage}>
-                    <div style={{ width: '100%', height: '100%', background: 'linear-gradient(45deg, #1A5BB8, #2474E5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '2rem' }}>
-                      🚌
-                    </div>
-                  </div>
-                  <div className={styles.routeInfo}>
-                    <h3 className={styles.routeName}>{route.from} - {route.to}</h3>
-                    <div className={styles.routePricing}>
-                      <span className={styles.price}>{formatPrice(route.price)}</span>
-                      <span className={styles.originalPrice}>{formatPrice(route.originalPrice)}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-
-            <button className={`${styles.sliderBtn} ${styles.sliderBtnRight}`} onClick={slideRight}>
-              ❯
-            </button>
-          </div>
-        </div>
-
-        {/* Bến xe nổi bật*/}
-        <div className={styles.sectionBlock}>
-          <h2 className="section-title">Bến xe nổi bật</h2>
-          <div className={styles.stationsGrid}>
-            {busStationCards.map((station) => (
+    <div className="container">
+      {/* Tuyến đường phổ biến */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Tuyến đường phổ biến</h2>
+        <div className={styles.grid}>
+          {/* 3. Phải dùng biến routes ở đây thay vì popularRoutes */}
+          {routes.length > 0 ? (
+            routes.map((route) => (
               <Link 
-                href={`/tim-chuyen?from=${encodeURIComponent(station.city)}&station=${encodeURIComponent(station.name)}`}
+                href={`/tim-chuyen?from=${encodeURIComponent(route.from)}&to=${encodeURIComponent(route.to)}`} 
+                key={route.id} 
+                className={styles.routeCard}
+              >
+                <div className={styles.imageWrapper}>
+                  <Image 
+                    src={route.image} 
+                    alt={`${route.from} đi ${route.to}`} 
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                    className={styles.cardImage} 
+                  />
+                </div>
+                <div className={styles.routeInfo}>
+                  <h3 className={styles.routeName}>{route.from} ➔ {route.to}</h3>
+                  <div className={styles.routePricing}>
+                    <span className={styles.price}>
+                      Từ {route.price.toLocaleString('vi-VN')}đ
+                    </span>
+                    {route.originalPrice && (
+                      <span className={styles.originalPrice}>
+                        {route.originalPrice.toLocaleString('vi-VN')}đ
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))
+          ) : (
+            <p style={{ gridColumn: '1 / -1', textAlign: 'center' }}>Chưa có dữ liệu tuyến đường từ máy chủ.</p>
+          )}
+        </div>
+      </section>
+
+      {/* ---------- BẾN XE NỔI BẬT ---------- */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Bến xe nổi bật</h2>
+        <div className={styles.grid}>
+          {stations && stations.length > 0 ? (
+            stations.map((station) => (
+              <Link 
+                href={`/tim-chuyen?from=${encodeURIComponent(station.city)}`} 
                 key={station.id} 
                 className={styles.stationCard}
-                style={{ textDecoration: 'none' }}
               >
-                 <div className={styles.stationImage}>
-                   <div style={{ width: '100%', height: '100%', background: '#E8F0FE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
-                    🏢
-                   </div>
-                 </div>
-                 <div className={styles.stationInfo}>
-                    <h3 className={styles.stationName}>{station.name}</h3>
-                    <p className={styles.stationCity}>{station.city}</p>
-                 </div>
+                <div className={styles.imageWrapper}>
+                  <Image 
+                    src={station.image} 
+                    alt={station.name} 
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                    className={styles.cardImage} 
+                  />
+                </div>
+                <div className={styles.stationInfo}>
+                  <h3 className={styles.stationName}>{station.name}</h3>
+                  <p className={styles.stationCity}>{station.city}</p>
+                </div>
               </Link>
-            ))}
-          </div>
+            ))
+          ) : (
+            <p style={{ gridColumn: '1 / -1', textAlign: 'center' }}>Chưa có dữ liệu bến xe từ máy chủ.</p>
+          )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
