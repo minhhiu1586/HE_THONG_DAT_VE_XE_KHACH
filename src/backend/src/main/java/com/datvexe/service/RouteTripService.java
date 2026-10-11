@@ -3,6 +3,7 @@ package com.datvexe.service;
 import com.datvexe.domain.Entities.*;
 import com.datvexe.domain.States.*;
 import com.datvexe.dto.Inputs;
+import com.datvexe.security.*;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -16,13 +17,14 @@ public class RouteTripService {
     public RouteTripService(EntityManagerFactory factory) { this.factory = factory; }
 
     private <T> T read(Function<EntityManager, T> task) {
-        try (EntityManager em = factory.createEntityManager()) { return task.apply(em); }
+        return write(task);
     }
     private <T> T write(Function<EntityManager, T> task) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction tx = em.getTransaction();
             tx.begin();
             try {
+                AccessPolicy.guard(em);
                 T result = task.apply(em);
                 tx.commit();
                 return result;
@@ -191,8 +193,11 @@ public class RouteTripService {
     }
     public Map<String, Object> getTuyenXe(String id) { return read(em -> view(found(em, TuyenXe.class, id))); }
     public List<Map<String, Object>> listTuyenXe() {
-        return read(em -> em.createQuery("select x from TuyenXe x order by x.maTuyen", TuyenXe.class)
-            .getResultList().stream().map(RouteTripService::view).toList());
+        return read(em -> {
+            var query = em.createQuery("select x from TuyenXe x" + (RequestIdentity.operatorId() == null ? "" : " where x.nhaXe.maNhaXe = :owner") + " order by x.maTuyen", TuyenXe.class);
+            if (RequestIdentity.operatorId() != null) query.setParameter("owner", RequestIdentity.operatorId());
+            return query.getResultList().stream().map(RouteTripService::view).toList();
+        });
     }
     public void deleteTuyenXe(String id) {
         write(em -> {

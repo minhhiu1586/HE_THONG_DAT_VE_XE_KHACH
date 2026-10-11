@@ -4,6 +4,7 @@ import com.datvexe.domain.Entities.*;
 import com.datvexe.domain.States.*;
 import com.datvexe.dto.VehicleInputs;
 import com.datvexe.repository.*;
+import com.datvexe.security.*;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.*;
@@ -20,7 +21,7 @@ public final class VehicleService {
     private <T> T tx(Function<EntityManager,T> action) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction tx = em.getTransaction(); tx.begin();
-            try { T result = action.apply(em); tx.commit(); return result; }
+            try { AccessPolicy.guard(em); T result = action.apply(em); tx.commit(); return result; }
             catch (RuntimeException e) { if (tx.isActive()) tx.rollback(); throw e; }
         }
     }
@@ -54,8 +55,8 @@ public final class VehicleService {
 
     public List<Map<String,Object>> list(String kind) { return tx(em -> switch(kind) {
         case "loai-xe" -> new LoaiXeRepository(em).list().stream().map(VehicleService::view).toList();
-        case "xe" -> new XeRepository(em).list().stream().map(VehicleService::view).toList();
-        case "phan-cong" -> new PhanCongChuyenXeRepository(em).list().stream().map(VehicleService::view).toList();
+        case "xe" -> new XeRepository(em).list().stream().filter(x -> RequestIdentity.operatorId() == null || (x.nhaXe != null && x.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()))).map(VehicleService::view).toList();
+        case "phan-cong" -> new PhanCongChuyenXeRepository(em).list().stream().filter(x -> RequestIdentity.operatorId() == null || (x.chuyenXe.tuyenXe.nhaXe != null && x.chuyenXe.tuyenXe.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()) && x.nhanVien.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()))).map(VehicleService::view).toList();
         default -> throw new DomainException(404,"API không tồn tại");
     }); }
     public Map<String,Object> get(String kind, String id) { return tx(em -> switch(kind) {

@@ -10,6 +10,8 @@ Mục tiêu: thống nhất cách frontend gửi yêu cầu, backend trả dữ 
 
 Bộ tài liệu gồm:
 
+- **[account-auth.md](account-auth.md)** và **[account-openapi.yaml](account-openapi.yaml)**: hợp đồng tài khoản/xác thực đã triển khai trong T07.
+- **[T07.1-integration.md](../tasks/T07.1-integration.md)**: guard, helper và phạm vi quyền dùng chung.
 - **README.md**: quy ước chung, cách xử lý lỗi và các điểm cần thống nhất.
 - **[api-contract.md](api-contract.md)**: danh sách API, request/response và dữ liệu mẫu ngay trong từng nhóm.
 - **[openapi.yaml](openapi.yaml)**: kiểu dữ liệu, trường bắt buộc, giá trị null và ví dụ chi tiết để xem bằng công cụ hỗ trợ OpenAPI/Swagger. https://editor.swagger.io/
@@ -98,7 +100,7 @@ Timeout hoặc 5xx không đủ để kết luận thanh toán thất bại. N�
 
 `code`, `message`, `timestamp`, `traceId` là chuỗi; `details` là object, có thể rỗng. Lỗi validation dùng `details.fieldErrors`, ví dụ `[{"field":"maChuyen","code":"REQUIRED","message":"Vui lòng chọn chuyến."}]`. Không trả stack trace, SQL hoặc thông tin người đang giữ ghế.
 
-Header chung: `Content-Type: application/json`; các API liệt kê tại mục 8 cần `Idempotency-Key`; server trả `X-Trace-Id` để tra log. Cấu hình CORS theo frontend thực tế. Cơ chế đăng nhập chưa chốt nên tài liệu không tự chọn JWT hay session.
+Header chung: `Content-Type: application/json`; các API liệt kê tại mục 8 cần `Idempotency-Key`; server trả `X-Trace-Id` để tra log. Cấu hình CORS theo frontend thực tế. T07 dùng phiên cookie `datvexe_session` và CSRF theo [account-auth.md](account-auth.md).
 
 ## 7. Backend quyết định dữ liệu nghiệp vụ
 
@@ -130,7 +132,7 @@ Các điểm cần nhóm xác nhận:
 | Nội dung | Điểm chưa thống nhất |
 | --- | --- |
 | Trạng thái | Bảng chuyển trạng thái đơn, giữ, vé, thanh toán và hoàn; cách biểu diễn đơn hết hạn. |
-| Đăng nhập và quyền | Cơ chế xác thực, phạm vi nhân viên/nhà xe; có hỗ trợ khách không tài khoản hay không. |
+| Đăng nhập và quyền | T07 đã triển khai phiên cookie và helper phạm vi; nhóm đối chiếu T01, xác nhận quyền nghiệp vụ và việc hỗ trợ khách không tài khoản. |
 | Đơn nháp | Cách khởi tạo tên/số điện thoại người đặt tại B01, như mục 2. |
 | Giá và khuyến mãi | Quy tắc làm tròn, giữ/trả lượt mã; điều kiện sửa đơn hoặc chốt lại giá. |
 | Chuyến chưa gán xe | Đề xuất chi tiết cho phép null, từ chối giữ ghế; chưa có xe thì từ chối trả sơ đồ ghế. |

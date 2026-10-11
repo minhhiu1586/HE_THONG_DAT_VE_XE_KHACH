@@ -22,6 +22,7 @@
         <class>com.datvexe.domain.Entities$PhuongThucThanhToan</class>
         <class>com.datvexe.domain.Entities$ChinhSachHoanVe</class>
         <class>com.datvexe.domain.Entities$KhuyenMai</class>
+        <class>com.datvexe.domain.AuthSession</class>
         <properties>
             <property name="hibernate.hbm2ddl.auto" value="validate"/>
             <property name="hibernate.show_sql" value="false"/>

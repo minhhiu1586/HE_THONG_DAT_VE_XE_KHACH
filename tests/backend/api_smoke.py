@@ -10,6 +10,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from auth_fixture import AdminFixture
+AUTH = AdminFixture(os.environ.get("API_BASE_URL", "http://localhost:8080/api").rstrip("/"))
 
 BASE = os.environ.get("API_BASE_URL", "http://localhost:8080/api").rstrip("/")
 DB_CONTAINER = os.environ.get("DB_CONTAINER", "datvexe-postgres")
@@ -32,9 +34,9 @@ def call(method, path, data=None, expected=200, raw=None):
     global requests_checked
     payload = raw if raw is not None else (json.dumps(data).encode() if data is not None else None)
     request = urllib.request.Request(BASE + path, data=payload, method=method,
-                                    headers={"Content-Type": "application/json"})
+                                    headers=AUTH.headers())
     try:
-        with urllib.request.urlopen(request, timeout=15) as response:
+        with AUTH.opener.open(request, timeout=15) as response:
             status, body = response.status, response.read()
             content_type = response.headers.get("Content-Type", "")
     except urllib.error.HTTPError as error:
@@ -48,7 +50,7 @@ def call(method, path, data=None, expected=200, raw=None):
         assert "application/json" in content_type, (path, content_type)
         result = json.loads(body)
         if status >= 400:
-            assert isinstance(result.get("error"), str) and result["error"], result
+            assert isinstance(result.get("code"), str) and result["code"], result
     requests_checked += 1
     return result
 
@@ -190,9 +192,11 @@ def cleanup():
 
 if __name__ == "__main__":
     try:
+        AUTH.start()
         setup()
         for scenario in (crud, stops, trips, search_and_status, validation):
             scenario()
         print(f"PASS: 5 API scenarios, {requests_checked} HTTP responses checked")
     finally:
         cleanup()
+        AUTH.close()

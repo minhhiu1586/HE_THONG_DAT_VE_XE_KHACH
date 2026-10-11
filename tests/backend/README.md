@@ -34,3 +34,23 @@ Script HTTP chỉ dùng thư viện chuẩn Python và Docker CLI. Nó tạo d�
 Kết quả được xác minh ngày 08/10/2026: 13 test JUnit đạt, 0 thất bại/lỗi/bỏ qua; 5 kịch bản API đạt với 75 phản hồi HTTP được kiểm tra trên Tomcat 10.1.60/PostgreSQL 16.15. Hibernate cũng đã validate mapping đủ 20 entity với schema PostgreSQL mới. Lượt kiểm tra ban đầu phát hiện lỗi cursor PostgreSQL khi liệt kê tuyến; code đã chuyển sang lấy danh sách trước khi ánh xạ response và lượt kiểm tra sau đạt.
 
 Phạm vi tìm kiếm hiện dùng mã bến đầu/cuối hoặc mã tỉnh/thành của bến, không tìm theo tên tự do hay điểm dừng trung gian. Frontend vẫn dùng mock data; test này xác minh API backend. Mapping các entity khác cung cấp nền JPA/schema, còn API/service đặt vé, thanh toán, tài khoản, nhân viên và quản lý xe vẫn do các module phụ trách triển khai. Chưa kiểm tra tải lớn hoặc luồng đặt vé/thanh toán/phân quyền.
+
+## T07 / T07.1
+
+Chạy migration 003 trên database cũ trước khi chạy WAR mới. Các smoke cũ nay tạo ADMIN kiểm thử tạm qua `auth_fixture.py`, gửi cookie/CSRF và dọn tài khoản sau chạy. Chỉ chạy trên database phát triển, nơi người chạy có quyền SQL.
+
+```bash
+python3 tests/backend/account_auth_smoke.py
+python3 tests/backend/api_smoke.py
+python3 tests/backend/vehicle_api_smoke.py
+```
+
+Đăng ký/đăng nhập giới hạn 20 lần/phút/IP: khi lặp cả bộ liên tục, chờ hết cửa sổ một phút trước lần kế tiếp. Chạy Maven với `-Dvehicle.pg.url=jdbc:postgresql://localhost:5432/<database_test>` cùng `-Dvehicle.pg.user`/`-Dvehicle.pg.password` để bật các test PostgreSQL. Database này phải riêng, đã nạp schema 001/002/003 và seed 001/002. Không dùng database sản xuất. `PostgresAccessControlTest` kiểm tra cạnh tranh khóa tài khoản và thu hồi phân công.
+
+Kiểm tra trình duyệt: cài Playwright ngoài thư mục ứng dụng hoặc dùng runner sẵn có, rồi chạy:
+
+```bash
+NODE_PATH=/duong/dan/node_modules node tests/frontend/account_smoke.cjs
+```
+
+Yêu cầu frontend localhost:3000, backend localhost:8080, Chromium `/usr/bin/chromium` (hoặc `CHROMIUM_PATH`), PostgreSQL container phát triển. Có thể thay `FRONTEND_URL`, `API_BASE_URL`, `DB_CONTAINER`. Test chỉ tạo/xóa tài khoản riêng. Xem [ma trận](../../docs/tasks/T07-test-matrix.md) và [hướng dẫn tích hợp](../../docs/tasks/T07.1-integration.md).
