@@ -5,7 +5,7 @@ Tài liệu mô tả hợp đồng mục tiêu cho 29 API A01–F03. Bản mô t
 ## Cách đọc
 
 - Trường bắt buộc, tùy chọn và nullable được ghi riêng theo API; thiếu trường khác với `null`. JSON thành công là object/array trực tiếp, không bọc thêm `data`.
-- Quyền: `P` công khai; `KH` khách đã đăng nhập và là chủ tài nguyên; `NV` nhân viên có quyền/được phân công; `NX` nhà xe trong phạm vi của mình; `AD` quản trị có quyền; `CG` cổng thanh toán đã được xác minh. Backend phải kiểm tra chủ tài nguyên và phạm vi; cơ chế xác thực và phân quyền chưa được chốt.
+- Quyền: `P` công khai; `KH` khách đã đăng nhập và là chủ tài nguyên; `NV` nhân viên có quyền/được phân công; `NX` nhà xe trong phạm vi của mình; `AD` quản trị có quyền; `CG` cổng thanh toán đã được xác minh. Backend phải kiểm tra chủ tài nguyên và phạm vi; T07 dùng phiên cookie/CSRF và T07.1 cung cấp helper phạm vi theo [account-auth.md](account-auth.md) và [hướng dẫn tích hợp](../tasks/T07.1-integration.md). Vai trò cho từng hành động nghiệp vụ vẫn phải đối chiếu T01.
 - Quy ước chung về kiểu dữ liệu, phân trang, lỗi và idempotency nằm trong [README](README.md). Các API cần `Idempotency-Key`: **B01, B03, B07, C02, D01, E02, E03, F02**; các mã lỗi 409 dùng chung được mô tả tại [mục 8](README.md#8-chống-xử-lý-lặp). Bảng dưới đây chỉ liệt kê lỗi nghiệp vụ chính.
 
 ## A — Tìm chuyến và xem ghế

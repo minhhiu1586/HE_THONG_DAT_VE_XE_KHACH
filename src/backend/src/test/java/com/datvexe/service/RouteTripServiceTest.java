@@ -63,8 +63,8 @@ class RouteTripServiceTest {
             () -> service.setTramDauCuoi("R", new Inputs.TramDauCuoi("MD", "MD"))).status());
     }
 
-    @Test void persistenceUnitMapsAllTwentyEntitiesFromTheClassDiagram() {
-        assertEquals(20, factory.getMetamodel().getEntities().size());
+    @Test void persistenceUnitMapsDomainEntitiesAndAuthSession() {
+        assertEquals(21, factory.getMetamodel().getEntities().size());
         assertNotNull(factory.getMetamodel().entity(NguoiDung.class).getAttribute("danhSachDonDat"));
         assertNotNull(factory.getMetamodel().entity(PhanCongChuyenXe.class).getAttribute("nhanVien"));
         assertNotNull(factory.getMetamodel().entity(VeXe.class).getAttribute("chuyenXe"));

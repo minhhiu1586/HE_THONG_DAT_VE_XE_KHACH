@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "../components/Account/AuthProvider";
 import Header from "../components/Header/Header";
 import Footer from "../components/Footer/Footer";
 
@@ -16,11 +17,13 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body>
+        <AuthProvider>
         <Header />
         <main style={{ minHeight: "calc(100vh - 300px)" }}>
           {children}
         </main>
         <Footer />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -7,8 +7,8 @@ info:
     đang chờ nhóm thống nhất. Đây là bản nháp cập nhật ngày 2026-10-11, chưa khẳng
     định API đã triển khai hoặc được duyệt. Tên enum từ States.java được giữ nguyên.
     Những lựa chọn chưa chốt, gồm trạng thái khả dụng ghế và quy trình hoàn tiền,
-    được đánh dấu trong tài liệu. Cơ chế xác thực/phiên/token chưa được chọn;
-    quyền truy cập chỉ được mô tả, chưa định nghĩa security scheme.
+    được đánh dấu trong tài liệu. T07 bổ sung phiên cookie datvexe_session;
+    xem account-auth.md và account-openapi.yaml. Quyền nghiệp vụ A–F cần tích hợp T07.1.
   contact:
     name: Nhóm T05
 servers:
@@ -336,9 +336,11 @@ paths:
       x-api-id: B01
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chủ đơn lấy từ danh tính đã xác thực; không nhận maNguoiDung từ body.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
         required: true
@@ -424,6 +426,7 @@ paths:
       x-api-id: B02
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ đơn; có thể trả 404 ngoài phạm vi nếu chính sách che giấu tài nguyên.
       parameters:
@@ -460,6 +463,7 @@ paths:
       x-api-id: B05
       x-contract-status: proposed
       x-roles: [KH, NX, AD]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: KH chỉ đọc đơn của mình; NX theo nhà xe trong phạm vi; AD theo quyền quản trị.
       parameters:
@@ -526,9 +530,11 @@ paths:
       x-api-id: B03
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ đơn; mã đơn trên đường dẫn là tài nguyên được cập nhật.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaDon'}
         - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -595,6 +601,7 @@ paths:
       x-api-id: B06
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Kết quả chỉ gồm đơn thuộc danh tính hiện tại; không nhận maNguoiDung.
       parameters:
@@ -657,9 +664,11 @@ paths:
       x-api-id: B07
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ đơn; máy chủ kiểm tra trạng thái và quyền trên tài nguyên.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaDon'}
         - {$ref: '#/components/parameters/IdempotencyKey'}
       responses:
@@ -688,9 +697,11 @@ paths:
       x-api-id: B04
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ đơn; danh sách ghế phải khớp các ghế đang giữ.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaDon'}
       requestBody:
         required: true
@@ -757,9 +768,11 @@ paths:
       x-api-id: C01
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ đơn; không nhận giá do client tính.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaDon'}
       requestBody:
         required: true
@@ -843,9 +856,11 @@ paths:
       x-api-id: C02
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ đơn; cập nhật snapshot nguyên tử theo đề xuất đang chờ xác nhận.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaDon'}
         - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -940,9 +955,11 @@ paths:
       x-api-id: D01
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ đơn; máy chủ xác nhận giá đã chốt và phương thức hợp lệ.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaDon'}
         - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -1010,6 +1027,7 @@ paths:
       x-api-id: D03
       x-contract-status: proposed
       x-roles: [KH, NX, AD]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Giới hạn theo maDon trên đường dẫn và quyền sở hữu/phạm vi.
       parameters:
@@ -1066,6 +1084,7 @@ paths:
       x-api-id: D02
       x-contract-status: proposed
       x-roles: [KH, NX, AD]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: KH theo chủ đơn; NX theo nhà xe trong phạm vi; AD theo quyền quản trị.
       parameters:
@@ -1102,6 +1121,7 @@ paths:
       x-api-id: D05
       x-contract-status: proposed
       x-roles: [KH, NV, NX, AD]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: KH theo chủ đơn; NV theo chuyến được phân công; NX theo phạm vi; AD theo quyền quản trị.
       parameters:
@@ -1131,6 +1151,7 @@ paths:
       x-api-id: E01
       x-contract-status: proposed
       x-roles: [KH]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Chỉ chủ vé; máy chủ tính tiền và khả năng hoàn theo chính sách.
       parameters:
@@ -1160,9 +1181,11 @@ paths:
       x-api-id: E02
       x-contract-status: proposed
       x-roles: [KH, NV, NX]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: KH theo chủ vé; NV/NX theo phạm vi và chính sách được duyệt.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaVe'}
         - {$ref: '#/components/parameters/IdempotencyKey'}
       responses:
@@ -1191,9 +1214,11 @@ paths:
       x-api-id: E03
       x-contract-status: proposed
       x-roles: [KH, NV, NX]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: KH theo chủ vé; NV/NX theo phạm vi và chính sách được duyệt.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaVe'}
         - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -1234,6 +1259,7 @@ paths:
       x-api-id: E05
       x-contract-status: proposed
       x-roles: [KH, NX, AD]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Giới hạn theo vé trên đường dẫn và quyền sở hữu/phạm vi.
       parameters:
@@ -1281,6 +1307,7 @@ paths:
       x-api-id: E04
       x-contract-status: proposed
       x-roles: [KH, NX, AD]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: KH theo chủ vé; NX theo phạm vi; AD theo quyền quản trị.
       parameters:
@@ -1310,6 +1337,9 @@ paths:
       x-api-id: F01
       x-contract-status: proposed
       x-roles: [NV, NX, AD]
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: NV theo chuyến được phân công; NX theo phạm vi; AD theo quyền vận hành.
       requestBody:
@@ -1366,9 +1396,11 @@ paths:
       x-api-id: F02
       x-contract-status: proposed
       x-roles: [NV]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: Nhân viên phải được phân công trên maChuyen trong body.
       parameters:
+        - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaVe'}
         - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -1436,6 +1468,7 @@ paths:
       x-api-id: F03
       x-contract-status: proposed
       x-roles: [NV, NX]
+      security: [{cookieAuth: []}]
       x-authentication-required: true
       x-ownership: NV theo phân công chuyến; NX theo nhà xe trong phạm vi.
       parameters:
@@ -1491,6 +1524,11 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: datvexe_session
   headers:
     TraceId:
       description: Mã truy vết do máy chủ tạo hoặc kiểm soát; có cùng giá trị với traceId trong phản hồi lỗi.
@@ -1509,6 +1547,13 @@ components:
       description: URI tra cứu yêu cầu hoàn đã nhận.
       schema: {type: string, format: uri-reference, example: /api/hoan-tien/HT01}
   parameters:
+    CsrfToken:
+      in: header
+      name: X-CSRF-Token
+      required: true
+      description: Lấy từ đăng nhập hoặc GET /api/tai-khoan/me.
+      schema:
+        type: string
     Page:
       name: page
       in: query
@@ -1574,7 +1619,7 @@ components:
                 timestamp: '2026-10-11T09:30:00+07:00'
                 traceId: req-validation-001
     Unauthenticated:
-      description: Chưa xác thực; cơ chế xác thực cụ thể chưa được chọn.
+      description: Chưa đăng nhập, phiên hết hạn/thu hồi hoặc tài khoản không hoạt động; xác thực cookie theo T07.
       headers:
         X-Trace-Id: {$ref: '#/components/headers/TraceId'}
       content:

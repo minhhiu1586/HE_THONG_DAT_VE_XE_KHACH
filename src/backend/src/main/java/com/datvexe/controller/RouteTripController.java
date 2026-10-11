@@ -1,6 +1,7 @@
 package com.datvexe.controller;
 
 import com.datvexe.config.Jpa;
+import com.datvexe.security.ApiErrors;
 import com.datvexe.domain.States.TrangThaiChuyen;
 import com.datvexe.dto.Inputs;
 import com.datvexe.service.*;
@@ -24,12 +25,6 @@ public class RouteTripController extends HttpServlet {
     @Override protected void service(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json; charset=UTF-8");
-        if ("http://localhost:3000".equals(request.getHeader("Origin"))) {
-            response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-            response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-            response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        }
-        if ("OPTIONS".equals(request.getMethod())) { response.setStatus(204); return; }
         try {
             String[] p = (request.getPathInfo() == null ? "" : request.getPathInfo()).replaceFirst("^/", "").split("/");
             String method = request.getMethod();
@@ -87,9 +82,9 @@ public class RouteTripController extends HttpServlet {
             response.setStatus(status);
             if (result != null) json.writeValue(response.getOutputStream(), result);
         } catch (DomainException e) {
-            error(response, e.status(), e.getMessage());
+            ApiErrors.write(response, e);
         } catch (com.fasterxml.jackson.core.JsonProcessingException | java.time.format.DateTimeParseException | IllegalArgumentException e) {
-            error(response, 400, "Dữ liệu yêu cầu không hợp lệ: " + e.getMessage());
+            error(response, 400, "Dữ liệu yêu cầu không hợp lệ");
         } catch (jakarta.persistence.PersistenceException e) {
             getServletContext().log("Database failure on " + request.getRequestURI(), e);
             boolean constraint = false;
@@ -106,7 +101,6 @@ public class RouteTripController extends HttpServlet {
         return value;
     }
     private void error(HttpServletResponse response, int code, String message) throws IOException {
-        response.setStatus(code);
-        json.writeValue(response.getOutputStream(), Map.of("error", message));
+        ApiErrors.write(response, new DomainException(code, message));
     }
 }

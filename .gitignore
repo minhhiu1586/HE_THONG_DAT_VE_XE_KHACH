@@ -41,3 +41,7 @@ docker-data/
 tmp/
 temp/
 *.tmp
+
+# Python test runners
+__pycache__/
+*.pyc

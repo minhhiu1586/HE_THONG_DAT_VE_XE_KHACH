@@ -1,0 +1,633 @@
+openapi: 3.1.0
+info:
+  title: T07 — Tài khoản và xác thực
+  version: 1.0.0
+  description: Đã triển khai; xem account-auth.md và hướng dẫn T07.1. Mutation cần
+    CSRF/header chỉ rõ trong endpoint.
+servers:
+- url: /
+paths:
+  /api/auth/dang-ky:
+    post:
+      summary: Đăng ký khách hàng
+      security: []
+      parameters:
+      - in: header
+        name: X-Requested-With
+        required: true
+        schema:
+          type: string
+          const: datvexe
+      responses:
+        '201':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '403':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '409':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '413':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '415':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '429':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangKy'
+  /api/auth/dang-nhap:
+    post:
+      summary: Đăng nhập
+      security: []
+      parameters:
+      - in: header
+        name: X-Requested-With
+        required: true
+        schema:
+          type: string
+          const: datvexe
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '401':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '403':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '413':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '415':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '429':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DangNhap'
+  /api/auth/dang-xuat:
+    post:
+      summary: Đăng xuất
+      security:
+      - cookieAuth: []
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Thành công
+        '400':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '401':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '403':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '413':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '415':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+  /api/tai-khoan/me:
+    get:
+      summary: Hồ sơ và CSRF phiên
+      security:
+      - cookieAuth: []
+      parameters: []
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+    put:
+      summary: Cập nhật hồ sơ chính mình
+      security:
+      - cookieAuth: []
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '401':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '403':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '409':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '413':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '415':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoSo'
+  /api/tai-khoan/me/mat-khau:
+    put:
+      summary: Đổi mật khẩu và thu hồi tất cả phiên
+      security:
+      - cookieAuth: []
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Thành công
+        '400':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '401':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '403':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '413':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '415':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoiMatKhau'
+  /api/quan-tri/tai-khoan:
+    get:
+      summary: 'ADMIN: danh sách tài khoản'
+      security:
+      - cookieAuth: []
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: size
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountPage'
+        '400':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '401':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '403':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+  /api/quan-tri/tai-khoan/{maNguoiDung}/trang-thai:
+    put:
+      summary: 'ADMIN: khóa hoặc mở khóa tài khoản khác'
+      security:
+      - cookieAuth: []
+      parameters:
+      - in: header
+        name: X-CSRF-Token
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: maNguoiDung
+        required: true
+        schema: &id005
+          type: string
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '401':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '403':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '404':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '409':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '413':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '415':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+        '500':
+          description: Xem account-auth.md; lỗi thống nhất
+          content:
+            application/json:
+              schema:
+                $ref: ./openapi.yaml#/components/schemas/ErrorResponse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrangThai'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: datvexe_session
+  schemas:
+    Profile:
+      type: object
+      required:
+      - maNguoiDung
+      - hoTen
+      - email
+      - soDienThoai
+      - loaiTaiKhoan
+      - trangThai
+      properties:
+        maNguoiDung:
+          type: string
+        hoTen:
+          type: string
+        email:
+          type: string
+        soDienThoai: &id001
+          type: string
+        gioiTinh: &id002
+          type:
+          - string
+          - 'null'
+          enum:
+          - NAM
+          - NU
+          - KHAC
+          - null
+        ngaySinh: &id003
+          type:
+          - string
+          - 'null'
+          format: date
+        cccd: &id004
+          type:
+          - string
+          - 'null'
+        loaiTaiKhoan:
+          type: string
+          enum:
+          - KHACH_HANG
+          - NHA_XE
+          - NHAN_VIEN
+          - ADMIN
+        trangThai:
+          type: string
+          enum:
+          - HOAT_DONG
+          - KHOA
+          - CHO_XAC_THUC
+    DangKy:
+      type: object
+      additionalProperties: false
+      required:
+      - hoTen
+      - email
+      - soDienThoai
+      - matKhau
+      properties:
+        hoTen: &id006
+          type: string
+          minLength: 1
+          maxLength: 160
+        email: &id007
+          type: string
+          format: email
+          maxLength: 254
+        soDienThoai: *id001
+        gioiTinh: *id002
+        ngaySinh: *id003
+        cccd: *id004
+        matKhau: &id008
+          type: string
+          minLength: 10
+          maxLength: 128
+          writeOnly: true
+          description: Có chữ và số.
+    DangNhap:
+      type: object
+      additionalProperties: false
+      required:
+      - email
+      - matKhau
+      properties:
+        email: *id005
+        matKhau:
+          type: string
+          maxLength: 128
+          writeOnly: true
+    HoSo:
+      type: object
+      additionalProperties: false
+      required:
+      - hoTen
+      - email
+      - soDienThoai
+      properties:
+        hoTen: *id006
+        email: *id007
+        soDienThoai: *id001
+        gioiTinh: *id002
+        ngaySinh: *id003
+        cccd: *id004
+    DoiMatKhau:
+      type: object
+      additionalProperties: false
+      required:
+      - matKhauHienTai
+      - matKhauMoi
+      properties:
+        matKhauHienTai:
+          type: string
+          writeOnly: true
+        matKhauMoi: *id008
+    TrangThai:
+      type: object
+      additionalProperties: false
+      required:
+      - trangThai
+      properties:
+        trangThai:
+          type: string
+          enum:
+          - KHOA
+          - HOAT_DONG
+    Session:
+      type: object
+      required:
+      - nguoiDung
+      - csrfToken
+      - hetHan
+      properties:
+        nguoiDung:
+          $ref: '#/components/schemas/Profile'
+        csrfToken: *id005
+        hetHan:
+          type: string
+          format: date-time
+    AccountPage:
+      type: object
+      required:
+      - items
+      - page
+      - size
+      - totalItems
+      - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Profile'
+        page:
+          type: integer
+          minimum: 0
+        size:
+          type: integer
+          minimum: 0
+        totalItems:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0

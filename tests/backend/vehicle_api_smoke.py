@@ -6,11 +6,13 @@ Run: py -3 tests/backend/vehicle_api_smoke.py
 import json
 import os
 import uuid
+from auth_fixture import AdminFixture
 from datetime import date, timedelta
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 BASE = os.environ.get("VEHICLE_API_URL", "http://localhost:8080/api").rstrip("/")
+AUTH = AdminFixture(BASE)
 checks = 0
 
 
@@ -18,9 +20,9 @@ def call(method, path, body=None, expected=200):
     global checks
     data = None if body is None else json.dumps(body).encode("utf-8")
     request = Request(BASE + path, data=data, method=method,
-                      headers={"Content-Type": "application/json"})
+                      headers=AUTH.headers())
     try:
-        response = urlopen(request, timeout=30)
+        response = AUTH.opener.open(request, timeout=30)
     except HTTPError as error:
         response = error
     with response:
@@ -83,4 +85,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        AUTH.start()
+        main()
+    finally:
+        AUTH.close()
