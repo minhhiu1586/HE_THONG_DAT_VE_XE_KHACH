@@ -3,6 +3,8 @@ package com.datvexe.controller;
 import com.datvexe.config.Jpa;
 import com.datvexe.security.ApiErrors;
 import com.datvexe.domain.States.TrangThaiChuyen;
+import com.datvexe.domain.States.TrangThaiBenXe;
+import com.datvexe.domain.States.TrangThaiTuyenXe;
 import com.datvexe.dto.Inputs;
 import com.datvexe.service.*;
 import com.fasterxml.jackson.databind.*;
@@ -31,28 +33,40 @@ public class RouteTripController extends HttpServlet {
             Object result;
             int status = 200;
             if (p.length == 1 && p[0].equals("tinh-thanh")) {
-                if (method.equals("GET")) result = service.listTinhThanh();
+                if (method.equals("GET")) result = service.listTinhThanh(request.getParameter("q"));
                 else if (method.equals("POST")) { result = service.createTinhThanh(body(request, Inputs.TinhThanh.class)); status = 201; }
                 else throw new DomainException(405, "Phương thức không được hỗ trợ");
+            } else if (p[0].equals("tinh-thanh") && p.length == 2) {
+                if (method.equals("GET")) result = service.getTinhThanh(p[1]);
+                else if (method.equals("PUT")) result = service.updateTinhThanh(p[1], body(request, Inputs.CapNhatTinhThanh.class));
+                else if (method.equals("DELETE")) { service.deleteTinhThanh(p[1]); result = null; status = 204; }
+                else throw new DomainException(405, "Phương thức không được hỗ trợ");
             } else if (p[0].equals("ben-xe")) {
-                if (p.length == 1 && method.equals("GET")) result = service.listBenXe();
+                if (p.length == 1 && method.equals("GET")) result = service.listBenXe(request.getParameter("maTinhThanh"),
+                    request.getParameter("q"), enumQuery(request.getParameter("trangThai"), TrangThaiBenXe.class));
                 else if (p.length == 1 && method.equals("POST")) { result = service.createBenXe(body(request, Inputs.BenXe.class)); status = 201; }
                 else if (p.length == 2 && method.equals("GET")) result = service.getBenXe(p[1]);
                 else if (p.length == 2 && method.equals("PUT")) result = service.updateBenXe(p[1], body(request, Inputs.BenXe.class));
                 else if (p.length == 2 && method.equals("DELETE")) { service.deleteBenXe(p[1]); result = null; status = 204; }
                 else throw new DomainException(404, "API không tồn tại");
             } else if (p[0].equals("tuyen-xe")) {
-                if (p.length == 1 && method.equals("GET")) result = service.listTuyenXe();
+                if (p.length == 1 && method.equals("GET")) result = service.listTuyenXe(request.getParameter("tramKhoiHanh"),
+                    request.getParameter("tramDen"), request.getParameter("maNhaXe"),
+                    enumQuery(request.getParameter("trangThai"), TrangThaiTuyenXe.class));
                 else if (p.length == 1 && method.equals("POST")) { result = service.createTuyenXe(body(request, Inputs.TuyenXe.class)); status = 201; }
                 else if (p.length == 2 && method.equals("GET")) result = service.getTuyenXe(p[1]);
                 else if (p.length == 2 && method.equals("PUT")) result = service.updateTuyenXe(p[1], body(request, Inputs.TuyenXe.class));
                 else if (p.length == 2 && method.equals("DELETE")) { service.deleteTuyenXe(p[1]); result = null; status = 204; }
                 else if (p.length == 3 && p[2].equals("tram-dau-cuoi") && method.equals("PUT"))
                     result = service.setTramDauCuoi(p[1], body(request, Inputs.TramDauCuoi.class));
+                else if (p.length == 3 && p[2].equals("trang-thai") && method.equals("PUT"))
+                    result = service.setTrangThaiTuyenXe(p[1], body(request, Inputs.TrangThaiTuyen.class).trangThai());
                 else if (p.length == 3 && p[2].equals("diem-dung") && method.equals("POST")) {
                     result = service.addDiemDung(p[1], body(request, Inputs.DiemDung.class)); status = 201;
                 } else if (p.length == 4 && p[2].equals("diem-dung") && p[3].equals("sap-xep") && method.equals("PUT"))
                     result = service.reorderDiemDung(p[1], body(request, Inputs.SapXepDiemDung.class));
+                else if (p.length == 4 && p[2].equals("diem-dung") && method.equals("PUT"))
+                    result = service.updateDiemDung(p[1], p[3], body(request, Inputs.CapNhatDiemDung.class));
                 else if (p.length == 4 && p[2].equals("diem-dung") && method.equals("DELETE")) {
                     service.deleteDiemDung(p[1], p[3]); result = null; status = 204;
                 } else throw new DomainException(404, "API không tồn tại");
@@ -99,6 +113,11 @@ public class RouteTripController extends HttpServlet {
         T value = json.readValue(request.getInputStream(), type);
         if (value == null) throw new DomainException(400, "Nội dung yêu cầu là bắt buộc");
         return value;
+    }
+    private static <E extends Enum<E>> E enumQuery(String value, Class<E> type) {
+        if (value == null || value.isBlank()) return null;
+        try { return Enum.valueOf(type, value.trim()); }
+        catch (IllegalArgumentException e) { throw new DomainException(400, "Giá trị bộ lọc không hợp lệ"); }
     }
     private void error(HttpServletResponse response, int code, String message) throws IOException {
         ApiErrors.write(response, new DomainException(code, message));

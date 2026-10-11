@@ -105,9 +105,33 @@ public class RouteTripService {
             return view(x);
         });
     }
-    public List<Map<String, Object>> listTinhThanh() {
-        return read(em -> em.createQuery("select x from TinhThanh x order by x.tenTinhThanh", TinhThanh.class)
-            .getResultList().stream().map(RouteTripService::view).toList());
+    public Map<String, Object> updateTinhThanh(String id, Inputs.CapNhatTinhThanh input) {
+        return write(em -> {
+            TinhThanh x = found(em, TinhThanh.class, id);
+            x.tenTinhThanh = text(input.tenTinhThanh(), "Tên tỉnh thành", 120, true);
+            x.khuVuc = text(input.khuVuc(), "Khu vực", 80, false);
+            return view(x);
+        });
+    }
+    public Map<String, Object> getTinhThanh(String id) { return read(em -> view(found(em, TinhThanh.class, id))); }
+    public List<Map<String, Object>> listTinhThanh(String search) {
+        return read(em -> {
+            String value = search == null || search.isBlank() ? null : "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
+            var query = em.createQuery("select x from TinhThanh x" + (value == null ? "" :
+                " where lower(x.maTinhThanh) like :search or lower(x.tenTinhThanh) like :search") + " order by x.tenTinhThanh", TinhThanh.class);
+            if (value != null) query.setParameter("search", value);
+            return query.getResultList().stream().map(RouteTripService::view).toList();
+        });
+    }
+    public void deleteTinhThanh(String id) {
+        write(em -> {
+            TinhThanh x = found(em, TinhThanh.class, id);
+            long refs = em.createQuery("select count(b) from BenXe b where b.tinhThanh = :x", Long.class)
+                .setParameter("x", x).getSingleResult();
+            if (refs > 0) throw new DomainException(409, "Tỉnh/thành phố đang được bến xe sử dụng");
+            em.remove(x);
+            return null;
+        });
     }
 
     private static void apply(BenXe x, Inputs.BenXe input, EntityManager em) {
@@ -130,14 +154,30 @@ public class RouteTripService {
     public Map<String, Object> updateBenXe(String id, Inputs.BenXe input) {
         return write(em -> {
             BenXe x = found(em, BenXe.class, id);
+            boolean usedByTrip = em.createQuery("select count(c) from ChuyenXe c where c.tuyenXe.tramKhoiHanh = :x or c.tuyenXe.tramDen = :x", Long.class)
+                .setParameter("x", x).getSingleResult() > 0;
+            if (usedByTrip && (!Objects.equals(x.tenBenXe, input.tenBenXe() == null ? null : input.tenBenXe().trim())
+                    || !Objects.equals(x.diaChi, input.diaChi() == null ? null : input.diaChi().trim())
+                    || !Objects.equals(x.tinhThanh.maTinhThanh, input.maTinhThanh())))
+                throw new DomainException(409, "Không thể đổi tên, địa chỉ hoặc tỉnh của bến đã có chuyến sử dụng; thao tác này sẽ làm sai lệch lịch sử");
             apply(x, input, em);
             return view(x);
         });
     }
     public Map<String, Object> getBenXe(String id) { return read(em -> view(found(em, BenXe.class, id))); }
-    public List<Map<String, Object>> listBenXe() {
-        return read(em -> em.createQuery("select x from BenXe x order by x.tenBenXe", BenXe.class)
-            .getResultList().stream().map(RouteTripService::view).toList());
+    public List<Map<String, Object>> listBenXe(String cityId, String search, TrangThaiBenXe status) {
+        return read(em -> {
+            List<String> where = new ArrayList<>();
+            if (cityId != null && !cityId.isBlank()) where.add("x.tinhThanh.maTinhThanh = :city");
+            if (search != null && !search.isBlank()) where.add("(lower(x.maBenXe) like :search or lower(x.tenBenXe) like :search)");
+            if (status != null) where.add("x.trangThai = :status");
+            String jpql = "select x from BenXe x" + (where.isEmpty() ? "" : " where " + String.join(" and ", where)) + " order by x.tenBenXe";
+            var query = em.createQuery(jpql, BenXe.class);
+            if (cityId != null && !cityId.isBlank()) query.setParameter("city", cityId.trim());
+            if (search != null && !search.isBlank()) query.setParameter("search", "%" + search.trim().toLowerCase(Locale.ROOT) + "%");
+            if (status != null) query.setParameter("status", status);
+            return query.getResultList().stream().map(RouteTripService::view).toList();
+        });
     }
     public void deleteBenXe(String id) {
         write(em -> {
@@ -156,13 +196,17 @@ public class RouteTripService {
         x.tramDen = found(em, BenXe.class, input.tramDen());
         if (x.tramKhoiHanh.maBenXe.equals(x.tramDen.maBenXe))
             throw new DomainException(400, "Trạm khởi hành và trạm đến phải khác nhau");
+        if (x.tramKhoiHanh.trangThai != TrangThaiBenXe.HOAT_DONG || x.tramDen.trangThai != TrangThaiBenXe.HOAT_DONG)
+            throw new DomainException(409, "Bến khởi hành và bến đến phải đang hoạt động để cấu hình tuyến");
         x.thoiGianKhoiHanh = input.thoiGianKhoiHanh();
         x.khoangCachKM = input.khoangCachKM() == null ? null : decimal(input.khoangCachKM(), "Khoảng cách", 10, false);
-        x.thoiGianDuKien = input.thoiGianDuKien() == null ? null : decimal(input.thoiGianDuKien(), "Thời gian dự kiến", 8, false);
+        x.thoiGianDuKien = decimal(input.thoiGianDuKien(), "Thời gian dự kiến", 8, false);
         x.giaCoBan = decimal(input.giaCoBan(), "Giá cơ bản", 12, true);
         x.moTa = text(input.moTa(), "Mô tả", 1000, false);
         if (input.trangThai() != null) x.trangThai = input.trangThai();
-        x.nhaXe = input.maNhaXe() == null ? null : found(em, NhaXe.class, input.maNhaXe());
+        String operatorId = RequestIdentity.operatorId();
+        x.nhaXe = operatorId != null ? found(em, NhaXe.class, operatorId)
+            : input.maNhaXe() == null ? x.nhaXe : found(em, NhaXe.class, input.maNhaXe());
     }
     public Map<String, Object> createTuyenXe(Inputs.TuyenXe input) {
         return write(em -> {
@@ -177,6 +221,7 @@ public class RouteTripService {
     public Map<String, Object> updateTuyenXe(String id, Inputs.TuyenXe input) {
         return write(em -> {
             TuyenXe x = found(em, TuyenXe.class, id);
+            if (hasTrips(em, x)) throw new DomainException(409, "Không thể sửa cấu hình tuyến đã có chuyến; hãy tạo tuyến mới để giữ nguyên lịch sử");
             apply(x, input, em);
             return view(x);
         });
@@ -184,6 +229,7 @@ public class RouteTripService {
     public Map<String, Object> setTramDauCuoi(String id, Inputs.TramDauCuoi input) {
         return write(em -> {
             TuyenXe x = found(em, TuyenXe.class, id);
+            if (hasTrips(em, x)) throw new DomainException(409, "Không thể đổi bến của tuyến đã có chuyến; hãy tạo tuyến mới để giữ nguyên lịch sử");
             x.tramKhoiHanh = found(em, BenXe.class, input.tramKhoiHanh());
             x.tramDen = found(em, BenXe.class, input.tramDen());
             if (x.tramKhoiHanh.maBenXe.equals(x.tramDen.maBenXe))
@@ -192,19 +238,47 @@ public class RouteTripService {
         });
     }
     public Map<String, Object> getTuyenXe(String id) { return read(em -> view(found(em, TuyenXe.class, id))); }
-    public List<Map<String, Object>> listTuyenXe() {
+    public Map<String, Object> setTrangThaiTuyenXe(String id, TrangThaiTuyenXe status) {
+        return write(em -> {
+            if (status == null) throw new DomainException(400, "Trạng thái tuyến là bắt buộc");
+            TuyenXe x = found(em, TuyenXe.class, id);
+            if (status == TrangThaiTuyenXe.DANG_KHAI_THAC) {
+                if (x.thoiGianDuKien == null || x.thoiGianDuKien.signum() <= 0)
+                    throw new DomainException(409, "Tuyến cần có thời lượng dự kiến hợp lệ trước khi khai thác");
+                if (x.tramKhoiHanh.trangThai != TrangThaiBenXe.HOAT_DONG || x.tramDen.trangThai != TrangThaiBenXe.HOAT_DONG)
+                    throw new DomainException(409, "Hai bến của tuyến phải đang hoạt động");
+            }
+            x.trangThai = status;
+            return view(x);
+        });
+    }
+    public List<Map<String, Object>> listTuyenXe(String start, String end, String operator, TrangThaiTuyenXe status) {
         return read(em -> {
-            var query = em.createQuery("select x from TuyenXe x" + (RequestIdentity.operatorId() == null ? "" : " where x.nhaXe.maNhaXe = :owner") + " order by x.maTuyen", TuyenXe.class);
-            if (RequestIdentity.operatorId() != null) query.setParameter("owner", RequestIdentity.operatorId());
+            List<String> where = new ArrayList<>();
+            String scopedOperator = RequestIdentity.operatorId();
+            if (scopedOperator != null) where.add("x.nhaXe.maNhaXe = :owner");
+            if (start != null && !start.isBlank()) where.add("x.tramKhoiHanh.maBenXe = :start");
+            if (end != null && !end.isBlank()) where.add("x.tramDen.maBenXe = :end");
+            if (status != null) where.add("x.trangThai = :status");
+            if (scopedOperator == null && operator != null && !operator.isBlank()) where.add("x.nhaXe.maNhaXe = :operator");
+            var query = em.createQuery("select x from TuyenXe x" + (where.isEmpty() ? "" : " where " + String.join(" and ", where)) + " order by x.maTuyen", TuyenXe.class);
+            if (scopedOperator != null) query.setParameter("owner", scopedOperator);
+            if (start != null && !start.isBlank()) query.setParameter("start", start.trim());
+            if (end != null && !end.isBlank()) query.setParameter("end", end.trim());
+            if (status != null) query.setParameter("status", status);
+            if (scopedOperator == null && operator != null && !operator.isBlank()) query.setParameter("operator", operator.trim());
             return query.getResultList().stream().map(RouteTripService::view).toList();
         });
+    }
+    public List<Map<String, Object>> listTuyenXe() { return listTuyenXe(null, null, null, null); }
+    private static boolean hasTrips(EntityManager em, TuyenXe route) {
+        return em.createQuery("select count(c) from ChuyenXe c where c.tuyenXe = :x", Long.class)
+            .setParameter("x", route).getSingleResult() > 0;
     }
     public void deleteTuyenXe(String id) {
         write(em -> {
             TuyenXe x = found(em, TuyenXe.class, id);
-            long count = em.createQuery("select count(c) from ChuyenXe c where c.tuyenXe = :x", Long.class)
-                .setParameter("x", x).getSingleResult();
-            if (count > 0) throw new DomainException(409, "Tuyến đã có chuyến xe");
+            if (hasTrips(em, x)) throw new DomainException(409, "Tuyến đã có chuyến xe");
             em.remove(x);
             return null;
         });
@@ -227,6 +301,7 @@ public class RouteTripService {
     public Map<String, Object> addDiemDung(String routeId, Inputs.DiemDung input) {
         return write(em -> {
             TuyenXe route = found(em, TuyenXe.class, routeId);
+            if (hasTrips(em, route)) throw new DomainException(409, "Không thể sửa điểm dừng của tuyến đã có chuyến");
             newId(em, DiemDung.class, input.maDiemDung());
             List<DiemDung> items = stops(em, route);
             int position = input.thuTu() == null ? items.size() + 1 : input.thuTu();
@@ -253,15 +328,32 @@ public class RouteTripService {
             TuyenXe route = found(em, TuyenXe.class, routeId);
             DiemDung x = found(em, DiemDung.class, stopId);
             if (!x.tuyenXe.maTuyen.equals(route.maTuyen)) throw new DomainException(404, "Điểm dừng không thuộc tuyến");
+            if (hasTrips(em, route)) throw new DomainException(409, "Không thể sửa điểm dừng của tuyến đã có chuyến");
             em.remove(x);
             em.flush();
             renumber(em, stops(em, route));
             return null;
         });
     }
+    public Map<String, Object> updateDiemDung(String routeId, String stopId, Inputs.CapNhatDiemDung input) {
+        return write(em -> {
+            TuyenXe route = found(em, TuyenXe.class, routeId);
+            DiemDung stop = found(em, DiemDung.class, stopId);
+            if (!stop.tuyenXe.maTuyen.equals(route.maTuyen)) throw new DomainException(404, "Điểm dừng không thuộc tuyến");
+            if (hasTrips(em, route)) throw new DomainException(409, "Không thể sửa điểm dừng của tuyến đã có chuyến");
+            stop.tenDiemDung = text(input.tenDiemDung(), "Tên điểm dừng", 160, true);
+            stop.diaChi = text(input.diaChi(), "Địa chỉ", 255, true);
+            if (input.thoiGianDung() == null || input.thoiGianDung() < 0)
+                throw new DomainException(400, "Thời gian dừng không hợp lệ");
+            stop.thoiGianDung = input.thoiGianDung();
+            stop.loaiDiemDung = Objects.requireNonNullElse(input.loaiDiemDung(), LoaiDiemDung.CA_HAI);
+            return view(stop);
+        });
+    }
     public List<Map<String, Object>> reorderDiemDung(String routeId, Inputs.SapXepDiemDung input) {
         return write(em -> {
             TuyenXe route = found(em, TuyenXe.class, routeId);
+            if (hasTrips(em, route)) throw new DomainException(409, "Không thể sửa điểm dừng của tuyến đã có chuyến");
             List<DiemDung> current = stops(em, route);
             List<String> ids = input.maDiemDungTheoThuTu();
             if (ids == null || ids.size() != current.size() || new HashSet<>(ids).size() != ids.size())
@@ -293,6 +385,8 @@ public class RouteTripService {
             TuyenXe route = found(em, TuyenXe.class, input.maTuyen());
             if (route.trangThai != TrangThaiTuyenXe.DANG_KHAI_THAC)
                 throw new DomainException(409, "Tuyến chưa hoạt động");
+            if (route.tramKhoiHanh.trangThai != TrangThaiBenXe.HOAT_DONG || route.tramDen.trangThai != TrangThaiBenXe.HOAT_DONG)
+                throw new DomainException(409, "Không thể tạo chuyến mới cho tuyến có bến đã ngừng hoạt động");
             LocalTime time = input.gioKhoiHanh() == null ? route.thoiGianKhoiHanh : input.gioKhoiHanh();
             ChuyenXe x = new ChuyenXe();
             x.maChuyen = required(input.maChuyen(), "Mã chuyến");

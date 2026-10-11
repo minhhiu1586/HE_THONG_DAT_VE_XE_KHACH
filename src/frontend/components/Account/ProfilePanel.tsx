@@ -59,6 +59,7 @@ export default function ProfilePanel() {
         <button className={styles.primary} disabled={busy}>{busy ? 'Đang xử lý…' : 'Đổi mật khẩu'}</button>
       </form>
     </section>
-    {user.loaiTaiKhoan === 'ADMIN' && <Link href="/quan-tri/tai-khoan">Quản lý trạng thái tài khoản</Link>}
+    {user.loaiTaiKhoan === 'ADMIN' && <div className={styles.links}><Link href="/quan-tri/tai-khoan">Quản lý trạng thái tài khoản</Link><Link href="/quan-tri/tuyen-duong">Quản lý tuyến, bến xe và tỉnh thành</Link></div>}
+    {user.loaiTaiKhoan === 'NHA_XE' && <div className={styles.links}><Link href="/quan-tri/tuyen-duong">Quản lý tuyến xe và điểm dừng</Link></div>}
   </div>;
 }

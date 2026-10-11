@@ -82,14 +82,21 @@ def setup():
 
 
 def crud():
+    city = call("GET", "/tinh-thanh/" + ident("CITY_A"))
+    assert city["maTinhThanh"] == ident("CITY_A")
+    assert any(x["maTinhThanh"] == ident("CITY_A") for x in call("GET", "/tinh-thanh?q=CITY_A"))
+    call("POST", "/tinh-thanh", {"maTinhThanh": ident("FREE_CITY"), "tenTinhThanh": "Tỉnh thử"}, 201)
+    assert call("PUT", "/tinh-thanh/" + ident("FREE_CITY"), {"tenTinhThanh": "Tỉnh đã sửa", "khuVuc": "Miền thử"})["tenTinhThanh"] == "Tỉnh đã sửa"
+    call("DELETE", "/tinh-thanh/" + ident("FREE_CITY"), expected=204)
     call("POST", "/ben-xe", station("FREE"), 201)
     updated = station("FREE") | {"tenBenXe": "Đổi tên"}
     assert call("PUT", "/ben-xe/" + ident("FREE"), updated)["tenBenXe"] == "Đổi tên"
-    assert any(x["maBenXe"] == ident("FREE") for x in call("GET", "/ben-xe"))
+    assert any(x["maBenXe"] == ident("FREE") for x in call("GET", "/ben-xe?maTinhThanh=" + ident("CITY_A") + "&q=FREE"))
     call("DELETE", "/ben-xe/" + ident("FREE"), expected=204)
     call("GET", "/ben-xe/" + ident("FREE"), expected=404)
     call("POST", "/tuyen-xe", route(), 201)
     call("POST", "/tuyen-xe", route("FREE_R"), 201)
+    assert any(x["maTuyen"] == ident("R") for x in call("GET", "/tuyen-xe?tramKhoiHanh=" + ident("A") + "&tramDen=" + ident("B") + "&trangThai=DANG_KHAI_THAC"))
     call("DELETE", "/tuyen-xe/" + ident("FREE_R"), expected=204)
     call("GET", "/tuyen-xe/" + ident("FREE_R"), expected=404)
     update = route() | {"tenTuyen": "Tuyến mới", "giaCoBan": 260000}
@@ -111,6 +118,10 @@ def stops():
                            "thuTu": position, "thoiGianDung": 5, "loaiDiemDung": "CA_HAI"}, 201)
     items = call("GET", "/tuyen-xe/" + ident("R"))["tramTrungGian"]
     assert [x["maDiemDung"] for x in items] == [ident(x) for x in ("S1", "S2", "S3")]
+    updated = call("PUT", path + "/" + ident("S2"), {"tenDiemDung": "S2 đã sửa", "diaChi": "Địa chỉ mới",
+        "thoiGianDung": 10, "loaiDiemDung": "DIEM_TRA"})
+    assert updated["tenDiemDung"] == "S2 đã sửa" and updated["thoiGianDung"] == 10
+    call("PUT", path + "/" + ident("S2"), {"tenDiemDung": "Sai", "diaChi": "X", "thoiGianDung": -1}, 400)
     result = call("PUT", path + "/sap-xep", {"maDiemDungTheoThuTu": [ident(x) for x in ("S3", "S2", "S1")]})
     assert [x["thuTu"] for x in result] == [1, 2, 3]
     call("PUT", path + "/sap-xep", {"maDiemDungTheoThuTu": [ident("S1")]}, 400)
@@ -120,6 +131,7 @@ def stops():
     assert [x["maDiemDung"] for x in items] == [ident("S3"), ident("S1")]
     assert [x["thuTu"] for x in items] == [1, 2]
     call("POST", path, {"maDiemDung": ident("BAD"), "tenDiemDung": "Test", "diaChi": "X", "thuTu": 0}, 400)
+    call("POST", path, {"maDiemDung": ident("BAD_TIME"), "tenDiemDung": "Test", "diaChi": "X", "thoiGianDung": -1}, 400)
     print("PASS: stop insert/reorder/delete and invalid lists")
 
 
@@ -143,6 +155,15 @@ def trips():
     assert call("GET", "/chuyen-xe/" + ident("C2"))["gioKhoiHanh"] == "14:30:00"
     call("PUT", "/chuyen-xe/" + ident("C2"), {"ngayKhoiHanh": "2030-01-02", "gioKhoiHanh": "08:00:00"})
     call("DELETE", "/tuyen-xe/" + ident("R"), expected=409)
+    call("PUT", "/tuyen-xe/" + ident("R"), route() | {"tenTuyen": "Đổi sau chuyến"}, expected=409)
+    call("PUT", "/tuyen-xe/" + ident("R") + "/tram-dau-cuoi", {"tramKhoiHanh": ident("B"), "tramDen": ident("A")}, expected=409)
+    call("PUT", "/tuyen-xe/" + ident("R") + "/diem-dung/sap-xep",
+         {"maDiemDungTheoThuTu": [ident(x) for x in ("S1", "S2", "S3")]}, expected=409)
+    call("PUT", "/tuyen-xe/" + ident("R") + "/diem-dung/" + ident("S1"),
+         {"tenDiemDung": "Không sửa lịch sử", "diaChi": "X", "thoiGianDung": 10}, expected=409)
+    call("PUT", "/tuyen-xe/" + ident("R") + "/trang-thai", {"trangThai": "TAM_NGUNG"})
+    call("POST", "/chuyen-xe", {"maChuyen": ident("CLOSED_ROUTE"), "maTuyen": ident("R"), "ngayKhoiHanh": "2030-01-03"}, expected=409)
+    call("PUT", "/tuyen-xe/" + ident("R") + "/trang-thai", {"trangThai": "DANG_KHAI_THAC"})
     print("PASS: trip create, overnight, vehicle assignment/conflicts, reschedule rollback")
 
 
@@ -167,6 +188,7 @@ def search_and_status():
 
 
 def validation():
+    call("POST", "/tinh-thanh", {"maTinhThanh": ident("CITY_A"), "tenTinhThanh": "Trùng tỉnh"}, 409)
     call("POST", "/ben-xe", station("A"), 409)
     call("POST", "/ben-xe", station("BAD") | {"tenBenXe": " "}, 400)
     call("POST", "/ben-xe", station("BAD") | {"tenBenXe": "X" * 161}, 400)
@@ -179,6 +201,7 @@ def validation():
     call("POST", "/ben-xe", raw=b"null", expected=400)
     call("POST", "/ben-xe", raw=b"{broken", expected=400)
     call("POST", "/ben-xe", station("BAD") | {"trangThai": "INVALID"}, 400)
+    call("DELETE", "/tinh-thanh/" + ident("CITY_A"), expected=409)
     print("PASS: validation/404/409 and JSON error responses")
 
 

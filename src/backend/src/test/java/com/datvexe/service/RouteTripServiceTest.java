@@ -74,6 +74,8 @@ class RouteTripServiceTest {
     @Test void stationAndRouteCanBeUpdatedAndDeletedWhenUnused() {
         service.updateBenXe("MD", new Inputs.BenXe(null, "Miền Đông mới", "Địa chỉ mới", "123", "HCM", TrangThaiBenXe.TAM_NGUNG));
         assertEquals(TrangThaiBenXe.TAM_NGUNG, service.getBenXe("MD").get("trangThai"));
+        assertEquals(409, assertThrows(DomainException.class, () -> service.createTuyenXe(route("INACTIVE"))).status());
+        service.updateBenXe("MD", new Inputs.BenXe(null, "Miền Đông mới", "Địa chỉ mới", "123", "HCM", TrangThaiBenXe.HOAT_DONG));
         service.createTuyenXe(route("R"));
         service.updateTuyenXe("R", new Inputs.TuyenXe(null, "Tuyến mới", "MD", "DL", LocalTime.of(8, 0),
             BigDecimal.valueOf(300), BigDecimal.valueOf(6.5), BigDecimal.valueOf(260000),
@@ -87,11 +89,53 @@ class RouteTripServiceTest {
         assertEquals(404, assertThrows(DomainException.class, () -> service.getBenXe("MD")).status());
     }
 
+    @Test void citiesCanBeSearchedUpdatedAndCannotBeDeletedWhileReferenced() {
+        assertEquals(List.of("HCM"), service.listTinhThanh("hồ chí").stream().map(x -> x.get("maTinhThanh")).toList());
+        assertEquals(409, assertThrows(DomainException.class, () -> service.createTinhThanh(
+            new Inputs.TinhThanh("HCM", "Trùng mã", null))).status());
+        service.updateTinhThanh("HCM", new Inputs.CapNhatTinhThanh("TP HCM", "Miền Đông Nam Bộ"));
+        assertEquals("TP HCM", service.getTinhThanh("HCM").get("tenTinhThanh"));
+        assertEquals(409, assertThrows(DomainException.class, () -> service.deleteTinhThanh("HCM")).status());
+        assertEquals(400, assertThrows(DomainException.class, () -> service.updateTinhThanh("HCM",
+            new Inputs.CapNhatTinhThanh(" ", null))).status());
+        service.createTinhThanh(new Inputs.TinhThanh("FREE", "Tỉnh chưa dùng", null));
+        service.deleteTinhThanh("FREE");
+        assertEquals(404, assertThrows(DomainException.class, () -> service.getTinhThanh("FREE")).status());
+    }
+
+    @Test void stationsCanBeFilteredByProvinceNameAndStatus() {
+        assertEquals(List.of("MD"), service.listBenXe("HCM", "MIỀN", TrangThaiBenXe.HOAT_DONG)
+            .stream().map(x -> x.get("maBenXe")).toList());
+        assertTrue(service.listBenXe("LD", null, null).stream().anyMatch(x -> x.get("maBenXe").equals("DL")));
+        assertTrue(service.listBenXe("UNKNOWN", null, null).isEmpty());
+    }
+    @Test void inactiveTerminalCannotBeUsedToCreateANewTrip() {
+        service.createTuyenXe(route("R"));
+        service.updateBenXe("MD", new Inputs.BenXe(null, "Miền Đông", "HCM", null, "HCM", TrangThaiBenXe.TAM_NGUNG));
+        assertEquals(409, assertThrows(DomainException.class, () -> service.createChuyenXe(
+            new Inputs.ChuyenXe("C", "R", LocalDate.of(2030, 1, 1), null, null))).status());
+        service.updateBenXe("MD", new Inputs.BenXe(null, "Miền Đông", "HCM", null, "HCM", TrangThaiBenXe.HOAT_DONG));
+        service.createChuyenXe(new Inputs.ChuyenXe("C", "R", LocalDate.of(2030, 1, 1), null, null));
+    }
+
+    @Test void routeSearchFiltersAndOperatorScopeAreAppliedTogether() {
+        service.createTuyenXe(route("R1"));
+        service.createTuyenXe(new Inputs.TuyenXe("R2", "Tuyến khác", "MD", "DL", LocalTime.NOON,
+            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, null, TrangThaiTuyenXe.TAM_NGUNG, null));
+        assertEquals(List.of("R1"), service.listTuyenXe("MD", "DL", null, TrangThaiTuyenXe.DANG_KHAI_THAC)
+            .stream().map(x -> x.get("maTuyen")).toList());
+        assertTrue(service.listTuyenXe("DL", "MD", null, null).isEmpty());
+    }
+
     @Test void stopsCanBeInsertedReorderedAndRemovedWithoutDuplicatePositions() {
         service.createTuyenXe(route("R"));
         service.addDiemDung("R", new Inputs.DiemDung("A", "A", "A", null, 5, LoaiDiemDung.DIEM_DON));
         service.addDiemDung("R", new Inputs.DiemDung("C", "C", "C", null, 5, LoaiDiemDung.DIEM_TRA));
         service.addDiemDung("R", new Inputs.DiemDung("B", "B", "B", 2, 5, LoaiDiemDung.CA_HAI));
+        assertEquals("Bến dừng đã sửa", service.updateDiemDung("R", "B",
+            new Inputs.CapNhatDiemDung("Bến dừng đã sửa", "Địa chỉ mới", 10, LoaiDiemDung.DIEM_TRA)).get("tenDiemDung"));
+        assertEquals(400, assertThrows(DomainException.class, () -> service.updateDiemDung("R", "B",
+            new Inputs.CapNhatDiemDung("Sai", "Địa chỉ", -1, LoaiDiemDung.CA_HAI))).status());
         var reordered = service.reorderDiemDung("R", new Inputs.SapXepDiemDung(List.of("C", "B", "A")));
         assertEquals(List.of("C", "B", "A"), reordered.stream().map(x -> x.get("maDiemDung")).toList());
         assertEquals(List.of(1, 2, 3), reordered.stream().map(x -> x.get("thuTu")).toList());
@@ -184,11 +228,33 @@ class RouteTripServiceTest {
         service.createTuyenXe(route("R"));
         LocalDate date = LocalDate.of(2030, 1, 1);
         service.createChuyenXe(new Inputs.ChuyenXe("C", "R", date, null, null));
-        service.updateTuyenXe("R", new Inputs.TuyenXe(null, "Test", "MD", "DL", LocalTime.NOON,
-            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, null, TrangThaiTuyenXe.TAM_NGUNG, null));
+        service.setTrangThaiTuyenXe("R", TrangThaiTuyenXe.TAM_NGUNG);
         assertTrue(service.searchChuyenXe("MD", "DL", date).isEmpty());
         assertEquals(409, assertThrows(DomainException.class, () -> service.createChuyenXe(
             new Inputs.ChuyenXe("C2", "R", date, null, null))).status());
+    }
+
+    @Test void routeAndStopsCannotBeChangedAfterTripsExistButStatusCanChange() {
+        service.createTuyenXe(route("R"));
+        service.addDiemDung("R", new Inputs.DiemDung("A", "A", "A", null, 0, null));
+        service.createChuyenXe(new Inputs.ChuyenXe("C", "R", LocalDate.of(2030, 1, 1), null, null));
+        assertEquals(409, assertThrows(DomainException.class, () -> service.updateBenXe("MD",
+            new Inputs.BenXe(null, "Bến đổi tên", "Địa chỉ mới", null, "LD", TrangThaiBenXe.HOAT_DONG))).status());
+        assertEquals(409, assertThrows(DomainException.class, () -> service.updateTuyenXe("R", route("R"))).status());
+        assertEquals(409, assertThrows(DomainException.class,
+            () -> service.setTramDauCuoi("R", new Inputs.TramDauCuoi("MD", "DL"))).status());
+        assertEquals(409, assertThrows(DomainException.class,
+            () -> service.addDiemDung("R", new Inputs.DiemDung("B", "B", "B", null, 0, null))).status());
+        assertEquals(409, assertThrows(DomainException.class, () -> service.deleteDiemDung("R", "A")).status());
+        assertEquals(409, assertThrows(DomainException.class, () -> service.updateDiemDung("R", "A",
+            new Inputs.CapNhatDiemDung("A", "Địa chỉ", 1, LoaiDiemDung.CA_HAI))).status());
+        assertEquals(409, assertThrows(DomainException.class,
+            () -> service.reorderDiemDung("R", new Inputs.SapXepDiemDung(List.of("A")))).status());
+        assertEquals(409, assertThrows(DomainException.class, () -> service.deleteTuyenXe("R")).status());
+        service.setTrangThaiTuyenXe("R", TrangThaiTuyenXe.TAM_NGUNG);
+        assertEquals(1, service.getTuyenXe("R").get("tramTrungGian") instanceof List<?> l ? l.size() : -1);
+        assertEquals(409, assertThrows(DomainException.class,
+            () -> service.createChuyenXe(new Inputs.ChuyenXe("C2", "R", LocalDate.of(2030, 1, 1), null, null))).status());
     }
 
     @Test void invalidStopOperationsDoNotChangeExistingOrder() {
@@ -229,13 +295,11 @@ class RouteTripServiceTest {
     }
 
     @Test void routeNeedsDurationAndDepartureTimeAndFailedCreationRollsBack() {
+        assertEquals(400, assertThrows(DomainException.class, () -> service.createTuyenXe(new Inputs.TuyenXe("R", "Test", "MD", "DL", null, null,
+            null, BigDecimal.TEN, null, TrangThaiTuyenXe.DANG_KHAI_THAC, null))).status());
         service.createTuyenXe(new Inputs.TuyenXe("R", "Test", "MD", "DL", null, null,
-            null, BigDecimal.TEN, null, TrangThaiTuyenXe.DANG_KHAI_THAC, null));
+            BigDecimal.ONE, BigDecimal.TEN, null, TrangThaiTuyenXe.DANG_KHAI_THAC, null));
         LocalDate date = LocalDate.of(2030, 1, 1);
-        assertEquals(400, assertThrows(DomainException.class, () -> service.createChuyenXe(
-            new Inputs.ChuyenXe("C", "R", date, LocalTime.NOON, null))).status());
-        service.updateTuyenXe("R", new Inputs.TuyenXe(null, "Test", "MD", "DL", null, null,
-            BigDecimal.ONE, BigDecimal.TEN, null, null, null));
         assertEquals(400, assertThrows(DomainException.class, () -> service.createChuyenXe(
             new Inputs.ChuyenXe("C", "R", date, null, null))).status());
         assertEquals(404, assertThrows(DomainException.class, () -> service.createChuyenXe(
