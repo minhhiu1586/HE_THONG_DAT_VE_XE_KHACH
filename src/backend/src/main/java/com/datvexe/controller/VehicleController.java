@@ -1,6 +1,7 @@
 package com.datvexe.controller;
 
 import com.datvexe.config.Jpa;
+import com.datvexe.security.ApiErrors;
 import com.datvexe.dto.VehicleInputs;
 import com.datvexe.service.*;
 import com.fasterxml.jackson.databind.*;
@@ -22,12 +23,6 @@ public class VehicleController extends HttpServlet {
     }
     @Override protected void service(HttpServletRequest req,HttpServletResponse res) throws IOException {
         res.setCharacterEncoding("UTF-8"); res.setContentType("application/json; charset=UTF-8");
-        if("http://localhost:3000".equals(req.getHeader("Origin"))) {
-            res.setHeader("Access-Control-Allow-Origin","http://localhost:3000");
-            res.setHeader("Access-Control-Allow-Methods","GET, POST, PUT, DELETE, OPTIONS");
-            res.setHeader("Access-Control-Allow-Headers","Content-Type");
-        }
-        if(req.getMethod().equals("OPTIONS")) { res.setStatus(204); return; }
         try {
             String kind=req.getServletPath().substring("/api/".length());
             String path=req.getPathInfo();
@@ -57,7 +52,7 @@ public class VehicleController extends HttpServlet {
                 else throw new DomainException(405,"Phương thức không được hỗ trợ");
             } else throw new DomainException(404,"API không tồn tại");
             res.setStatus(status); if(result!=null) json.writeValue(res.getOutputStream(),result);
-        } catch(DomainException e) { error(res,e.status(),e.getMessage()); }
+        } catch(DomainException e) { ApiErrors.write(res,e); }
         catch(com.fasterxml.jackson.core.JsonProcessingException | IllegalArgumentException e) { error(res,400,"Dữ liệu yêu cầu không hợp lệ"); }
         catch(jakarta.persistence.PersistenceException e) {
             getServletContext().log("Vehicle database failure",e);
@@ -67,6 +62,6 @@ public class VehicleController extends HttpServlet {
         }
     }
     private void error(HttpServletResponse res,int status,String message) throws IOException {
-        res.setStatus(status); json.writeValue(res.getOutputStream(),Map.of("error",message));
+        ApiErrors.write(res, new DomainException(status, message));
     }
 }

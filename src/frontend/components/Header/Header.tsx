@@ -3,9 +3,25 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import styles from './Header.module.css';
+import { useAuth } from '../Account/AuthProvider';
+import { errorMessage } from '@/lib/account-api';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, loading, notice, request } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+  async function logout() {
+    if (loggingOut) return;
+    setLoggingOut(true); setLogoutError('');
+    try { await request('/auth/dang-xuat', 'POST'); setMobileMenuOpen(false); window.location.replace('/'); }
+    catch (error) { setLogoutError(errorMessage(error)); }
+    finally { setLoggingOut(false); }
+  }
+  const accountActions = loading ? <span className={styles.actionLink}>Đang kiểm tra…</span> : user ? <>
+    <Link href="/tai-khoan" className={styles.loginBtn}>👤 {user.hoTen}</Link>
+    <button className={styles.loginBtn} onClick={logout} disabled={loggingOut}>{loggingOut ? 'Đang đăng xuất…' : 'Đăng xuất'}</button>
+  </> : <Link href="/dang-nhap" className={styles.loginBtn}>👤 Đăng nhập</Link>;
 
   return (
     <header>
@@ -37,9 +53,7 @@ export default function Header() {
             </div>
           </div>  
           <div className={styles.headerRight}>
-            <button className={styles.loginBtn}>
-              👤 Đăng nhập
-            </button>
+            {accountActions}
           </div>
 
           <button
@@ -58,10 +72,14 @@ export default function Header() {
           <button className={`${styles.navTab} ${styles.navTabActive}`}>
             🚌 Xe khách
           </button>
-          <button className={styles.navTab}>👤 Đăng nhập</button>
+          {user ? <>
+            <Link href="/tai-khoan" onClick={() => setMobileMenuOpen(false)}>Hồ sơ cá nhân</Link>
+            <button className={styles.navTab} onClick={logout} disabled={loggingOut}>Đăng xuất</button>
+          </> : <Link href="/dang-nhap" onClick={() => setMobileMenuOpen(false)}>Đăng nhập / Đăng ký</Link>}
         </div>
       )}
 
+      {(logoutError || notice) && <p role="status" style={{ padding: '12px', background: 'var(--warning-light)', textAlign: 'center' }}>{logoutError || notice}</p>}
       {/* Trust Badges */}
       <div className={styles.trustBar}>
         <div className={styles.trustBarInner}>

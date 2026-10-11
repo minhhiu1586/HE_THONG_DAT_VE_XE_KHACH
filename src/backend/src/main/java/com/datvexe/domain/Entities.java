@@ -232,6 +232,8 @@ public final class Entities {
         public LoaiTaiKhoan loaiTaiKhoan = LoaiTaiKhoan.KHACH_HANG;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
         public TrangThaiTaiKhoan trangThai = TrangThaiTaiKhoan.CHO_XAC_THUC;
+        @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "ma_nha_xe") public NhaXe nhaXe;
+        @OneToOne(fetch = FetchType.EAGER) @JoinColumn(name = "ma_nhan_vien", unique = true) public NhanVien nhanVien;
         @OneToMany(mappedBy = "nguoiDat") public List<DonDatVe> danhSachDonDat = new ArrayList<>();
         @OneToMany(mappedBy = "nguoiDung") public List<DanhGia> danhSachDanhGia = new ArrayList<>();
         public NguoiDung() {}
