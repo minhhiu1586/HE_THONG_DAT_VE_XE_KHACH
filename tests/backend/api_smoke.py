@@ -26,7 +26,7 @@ def ident(name):
 def sql(statement):
     subprocess.run([
         "docker", "exec", "-i", DB_CONTAINER, "psql", "-U", "datvexe_user",
-        "-d", "datvexe", "-v", "ON_ERROR_STOP=1", "-c", statement,
+        "-d", os.environ.get("DB_NAME", "datvexe"), "-v", "ON_ERROR_STOP=1", "-c", statement,
     ], check=True, stdout=subprocess.DEVNULL)
 
 

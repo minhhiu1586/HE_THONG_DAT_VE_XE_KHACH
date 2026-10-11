@@ -8,7 +8,24 @@ const tag = crypto.randomBytes(8).toString('hex');
 const email = `qa_browser_${tag}@example.test`, password = crypto.randomBytes(20).toString('hex') + 'Aa1';
 let userId, targetId, browser;
 const changedPassword = crypto.randomBytes(20).toString("hex") + "Aa2";
-function sql(statement) { execFileSync('docker', ['exec', '-i', process.env.DB_CONTAINER || 'datvexe-postgres', 'psql', '-U', 'datvexe_user', '-d', 'datvexe', '-v', 'ON_ERROR_STOP=1', '-c', statement], { stdio: ['ignore', 'ignore', 'pipe'] }); }
+function sql(statement) { execFileSync('docker', ['exec', '-i', process.env.DB_CONTAINER || 'datvexe-postgres', 'psql', '-U', 'datvexe_user', '-d', process.env.DB_NAME || 'datvexe', '-v', 'ON_ERROR_STOP=1', '-c', statement], { stdio: ['ignore', 'ignore', 'pipe'] }); }
+// Seeded databases have several account pages; locate fixtures without assuming page one.
+async function accountRow(page, email) {
+  async function turn(name) {
+    const responsePromise = page.waitForResponse(r => r.url().includes('/api/quan-tri/tai-khoan?') && r.status() === 200);
+    await page.getByRole('button', {name, exact:true}).click();
+    const data = await (await responsePromise).json();
+    if (data.items.length) await shown(page.getByRole('row').filter({hasText:data.items[0].email}));
+  }
+  while (!(await page.getByRole('button',{name:'Trang trước',exact:true}).isDisabled())) await turn('Trang trước');
+  for (let attempt=0; attempt<100; attempt++) {
+    const row=page.getByRole('row').filter({hasText:email});
+    if (await row.count()) { await shown(row); return row; }
+    if (await page.getByRole('button',{name:'Trang sau',exact:true}).isDisabled()) break;
+    await turn('Trang sau');
+  }
+  throw new Error('Không tìm thấy tài khoản fixture qua phân trang');
+}
 async function shown(locator) { await locator.waitFor({ state: 'visible', timeout: 15000 }); }
 (async () => {
   try {
@@ -74,15 +91,18 @@ async function shown(locator) { await locator.waitFor({ state: 'visible', timeou
     const registered = await targetContext.request.post(base+'/api/auth/dang-ky',{headers:{'X-Requested-With':'datvexe'},data:{hoTen:'Tài khoản kiểm thử khóa',email:targetEmail,soDienThoai:'09'+crypto.randomInt(10000000,99999999),matKhau:password}});
     assert.equal(registered.status(),201); targetId=(await registered.json()).maNguoiDung;
     assert.equal((await targetContext.request.post(base+'/api/auth/dang-nhap',{headers:{'X-Requested-With':'datvexe'},data:{email:targetEmail,matKhau:password}})).status(),200);
+    const loaded = page.waitForResponse(r=>r.url().includes('/api/quan-tri/tai-khoan?') && r.status()===200);
     await page.reload();
-    const row = page.getByRole('row').filter({hasText:targetEmail});
+    const firstPage=await (await loaded).json();
+    await shown(page.getByRole('row').filter({hasText:firstPage.items[0].email}));
+    const row = await accountRow(page, targetEmail);
     await shown(row); await row.getByRole('button',{name:'Khóa',exact:true}).click();
     await shown(page.getByText('Đã khóa tài khoản và thu hồi các phiên đăng nhập.',{exact:true}));
     assert.equal((await targetContext.request.get(base+'/api/tai-khoan/me')).status(),401);
     await row.getByRole('button',{name:'Mở khóa',exact:true}).click();
     await shown(page.getByText('Đã mở khóa tài khoản.',{exact:true}));
     assert.equal((await targetContext.request.post(base+'/api/auth/dang-nhap',{headers:{'X-Requested-With':'datvexe'},data:{email:targetEmail,matKhau:password}})).status(),200);
-    const selfRow = page.getByRole('row').filter({hasText:email});
+    const selfRow = await accountRow(page, email);
     assert.equal(await selfRow.getByRole('button',{name:'Khóa',exact:true}).isDisabled(),true);
     await targetContext.close();
     await page.getByRole('button',{name:'Đăng xuất',exact:true}).first().click(); await page.waitForURL(base + '/');
