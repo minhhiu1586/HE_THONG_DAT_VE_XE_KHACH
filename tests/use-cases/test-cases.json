@@ -1,0 +1,2060 @@
+{
+  "sources": {
+    "T01": "https://app.plane.so/he_thong_dat_ve_xe_khach/browse/DATVEXE-8/",
+    "T02": "https://app.plane.so/he_thong_dat_ve_xe_khach/browse/DATVEXE-9/",
+    "T05": "docs/api/api-contract.md",
+    "T06": "https://app.plane.so/he_thong_dat_ve_xe_khach/browse/DATVEXE-13/"
+  },
+  "use_cases": [
+    {
+      "id": "UC-01",
+      "name": "Đăng ký tài khoản",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-02",
+      "name": "Đăng nhập và đăng xuất",
+      "actor": "Người dùng"
+    },
+    {
+      "id": "UC-03",
+      "name": "Quản lý thông tin cá nhân",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-04",
+      "name": "Tìm kiếm chuyến xe",
+      "actor": "Khách truy cập, khách hàng"
+    },
+    {
+      "id": "UC-05",
+      "name": "Xem chi tiết chuyến xe và sơ đồ ghế",
+      "actor": "Khách truy cập, khách hàng"
+    },
+    {
+      "id": "UC-06",
+      "name": "Chọn ghế và giữ ghế",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-07",
+      "name": "Tạo và cập nhật đơn đặt vé",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-08",
+      "name": "Áp dụng mã khuyến mãi",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-09",
+      "name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-10",
+      "name": "Xem vé điện tử và lịch sử đặt vé",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-11",
+      "name": "Hủy đơn đặt vé chưa thanh toán",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-12",
+      "name": "Yêu cầu hủy vé và hoàn tiền",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-13",
+      "name": "Đánh giá nhà xe/chuyến xe",
+      "actor": "Khách hàng"
+    },
+    {
+      "id": "UC-14",
+      "name": "Quản lý tài khoản và phân quyền",
+      "actor": "Quản trị viên"
+    },
+    {
+      "id": "UC-15",
+      "name": "Quản lý nhà xe",
+      "actor": "Quản trị viên"
+    },
+    {
+      "id": "UC-16",
+      "name": "Quản lý tỉnh/thành phố và bến xe",
+      "actor": "Quản trị viên"
+    },
+    {
+      "id": "UC-17",
+      "name": "Quản lý tuyến xe và điểm dừng",
+      "actor": "Quản trị viên"
+    },
+    {
+      "id": "UC-18",
+      "name": "Quản lý loại xe, xe và ghế",
+      "actor": "Quản trị viên, nhà xe"
+    },
+    {
+      "id": "UC-19",
+      "name": "Quản lý chuyến xe",
+      "actor": "Nhà xe, quản trị viên"
+    },
+    {
+      "id": "UC-20",
+      "name": "Quản lý nhân viên và phân công chuyến",
+      "actor": "Nhà xe, quản trị viên"
+    },
+    {
+      "id": "UC-21",
+      "name": "Kiểm vé và xác nhận hành khách lên xe",
+      "actor": "Nhân viên được phân công"
+    },
+    {
+      "id": "UC-22",
+      "name": "Quản lý chính sách hoàn vé, giao dịch thanh toán và hoàn tiền",
+      "actor": "Quản trị viên, nhân sự có quyền"
+    },
+    {
+      "id": "UC-23",
+      "name": "Xem báo cáo, thống kê doanh thu",
+      "actor": "Quản trị viên, nhà xe"
+    }
+  ],
+  "test_cases": [
+    {
+      "test_case_id": "TC-UC01-01",
+      "use_case_id": "UC-01",
+      "use_case_name": "Đăng ký tài khoản",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Đăng ký dữ liệu hợp lệ",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Đăng ký dữ liệu hợp lệ",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Tài khoản được tạo theo cơ chế auth đã chốt",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/hash tài khoản demo",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC01-02",
+      "use_case_id": "UC-01",
+      "use_case_name": "Đăng ký tài khoản",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Đăng ký email đã dùng",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Đăng ký email đã dùng",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối, không tạo tài khoản trùng",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/hash tài khoản demo",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC01-03",
+      "use_case_id": "UC-01",
+      "use_case_name": "Đăng ký tài khoản",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Thiếu trường bắt buộc hoặc sát giới hạn độ dài",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Thiếu trường bắt buộc hoặc sát giới hạn độ dài",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Validation theo hợp đồng auth",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/hash tài khoản demo",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC02-01",
+      "use_case_id": "UC-02",
+      "use_case_name": "Đăng nhập và đăng xuất",
+      "actor": "Người dùng",
+      "group": "Positive",
+      "objective": "Đăng nhập và đăng xuất tài khoản mẫu",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Đăng nhập và đăng xuất tài khoản mẫu",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Phiên hợp lệ được tạo rồi vô hiệu hóa",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/API phiên",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC02-02",
+      "use_case_id": "UC-02",
+      "use_case_name": "Đăng nhập và đăng xuất",
+      "actor": "Người dùng",
+      "group": "Negative",
+      "objective": "Sai mật khẩu/tài khoản bị khóa",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Sai mật khẩu/tài khoản bị khóa",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối đăng nhập",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/API phiên",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC02-03",
+      "use_case_id": "UC-02",
+      "use_case_name": "Đăng nhập và đăng xuất",
+      "actor": "Người dùng",
+      "group": "Boundary",
+      "objective": "Phiên vừa hết hạn",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Phiên vừa hết hạn",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Backend từ chối phiên hết hạn",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/API phiên",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC03-01",
+      "use_case_id": "UC-03",
+      "use_case_name": "Quản lý thông tin cá nhân",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Xem/cập nhật hồ sơ của mình",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Xem/cập nhật hồ sơ của mình",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Lưu đúng trường được phép",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hồ sơ và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC03-02",
+      "use_case_id": "UC-03",
+      "use_case_name": "Quản lý thông tin cá nhân",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Sửa hồ sơ người khác",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Sửa hồ sơ người khác",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Backend từ chối",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hồ sơ và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC03-03",
+      "use_case_id": "UC-03",
+      "use_case_name": "Quản lý thông tin cá nhân",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Giá trị rỗng và sát độ dài cho phép",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Giá trị rỗng và sát độ dài cho phép",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Validation không làm hỏng hồ sơ",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hồ sơ và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC04-01",
+      "use_case_id": "UC-04",
+      "use_case_name": "Tìm kiếm chuyến xe",
+      "actor": "Khách truy cập, khách hàng",
+      "group": "Positive",
+      "objective": "Tìm HCM–Đà Lạt theo ngày T06_C_1_1",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Tìm HCM–Đà Lạt theo ngày T06_C_1_1",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Kết quả có T06_C_1_1 đúng ngày/bến",
+      "actual_result": "API tìm thấy T06_C_1_1 theo ngày/bến",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC04-02",
+      "use_case_id": "UC-04",
+      "use_case_name": "Tìm kiếm chuyến xe",
+      "actor": "Khách truy cập, khách hàng",
+      "group": "Negative",
+      "objective": "date=not-a-date",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "date=not-a-date",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "HTTP 400",
+      "actual_result": "API localhost ??t ki?m tra t??ng ?ng ng?y 11/10/2026.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC04-03",
+      "use_case_id": "UC-04",
+      "use_case_name": "Tìm kiếm chuyến xe",
+      "actor": "Khách truy cập, khách hàng",
+      "group": "Boundary",
+      "objective": "Chuyến T06_C_3_1 qua đêm",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Chuyến T06_C_3_1 qua đêm",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Tìm theo ngày khởi hành, không theo ngày đến",
+      "actual_result": "API localhost ??t ki?m tra t??ng ?ng ng?y 11/10/2026.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC05-01",
+      "use_case_id": "UC-05",
+      "use_case_name": "Xem chi tiết chuyến xe và sơ đồ ghế",
+      "actor": "Khách truy cập, khách hàng",
+      "group": "Positive",
+      "objective": "Đọc T06_C_1_1 và /xe/T06_X_1/ghe",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Đọc T06_C_1_1 và /xe/T06_X_1/ghe",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Chi tiết trỏ xe đúng; có 22 ghế vật lý",
+      "actual_result": "API đọc chuyến và ghế đúng",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC05-02",
+      "use_case_id": "UC-05",
+      "use_case_name": "Xem chi tiết chuyến xe và sơ đồ ghế",
+      "actor": "Khách truy cập, khách hàng",
+      "group": "Negative",
+      "objective": "Mã chuyến không tồn tại",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Mã chuyến không tồn tại",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "HTTP 404",
+      "actual_result": "API localhost ??t ki?m tra t??ng ?ng ng?y 11/10/2026.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC05-03",
+      "use_case_id": "UC-05",
+      "use_case_name": "Xem chi tiết chuyến xe và sơ đồ ghế",
+      "actor": "Khách truy cập, khách hàng",
+      "group": "Boundary",
+      "objective": "T06_C_NO_VEHICLE",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "T06_C_NO_VEHICLE",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Đọc chi tiết với maXe null; hành vi API sơ đồ theo chuyến chờ duyệt",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "API ghế theo chuyến chưa có; hành vi chưa gán xe đang là đề xuất",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC06-01",
+      "use_case_id": "UC-06",
+      "use_case_name": "Chọn ghế và giữ ghế",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Giữ T06_X_2_G010 trên T06_C_2_20",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Giữ T06_X_2_G010 trên T06_C_2_20",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Transaction tạo giữ/đơn nháp nhất quán, hạn 15 phút",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API giữ ghế/transaction cạnh tranh",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC06-02",
+      "use_case_id": "UC-06",
+      "use_case_name": "Chọn ghế và giữ ghế",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Giữ ghế đã có vé T06_V_1_1",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Giữ ghế đã có vé T06_V_1_1",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối, không tạo giữ/đơn dở dang",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API giữ ghế/transaction cạnh tranh",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC06-03",
+      "use_case_id": "UC-06",
+      "use_case_name": "Chọn ghế và giữ ghế",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Clock tại T06_H_BOUNDARY hạn -1s/0/+1s",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Clock tại T06_H_BOUNDARY hạn -1s/0/+1s",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Trước hạn hợp lệ; tại/sau hạn hết hiệu lực",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API giữ ghế/transaction cạnh tranh",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC07-01",
+      "use_case_id": "UC-07",
+      "use_case_name": "Tạo và cập nhật đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Đơn nhiều người đi T06_O_2",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Đơn nhiều người đi T06_O_2",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Mỗi vé có hành khách riêng; đơn một chuyến",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API đơn đặt vé",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC07-02",
+      "use_case_id": "UC-07",
+      "use_case_name": "Tạo và cập nhật đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Gộp ghế thuộc hai chuyến",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Gộp ghế thuộc hai chuyến",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối toàn bộ",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API đơn đặt vé",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC07-03",
+      "use_case_id": "UC-07",
+      "use_case_name": "Tạo và cập nhật đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Số ghế tại giới hạn cho phép",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Số ghế tại giới hạn cho phép",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Validation theo hợp đồng, không vượt sức chứa",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API đơn đặt vé",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC08-01",
+      "use_case_id": "UC-08",
+      "use_case_name": "Áp dụng mã khuyến mãi",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "T06_KM_ACTIVE và đơn đủ điều kiện fixture",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "T06_KM_ACTIVE và đơn đủ điều kiện fixture",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Giảm giá theo quy tắc chính thức khi được duyệt",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API khuyến mãi; chính sách fixture chưa được duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC08-02",
+      "use_case_id": "UC-08",
+      "use_case_name": "Áp dụng mã khuyến mãi",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "T06_KM_EXPIRED/FUTURE/FULL, đơn dưới mức tối thiểu",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "T06_KM_EXPIRED/FUTURE/FULL, đơn dưới mức tối thiểu",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối mã không áp dụng",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API khuyến mãi; chính sách fixture chưa được duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC08-03",
+      "use_case_id": "UC-08",
+      "use_case_name": "Áp dụng mã khuyến mãi",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "T06_KM_LAST/BOUNDARY",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "T06_KM_LAST/BOUNDARY",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Không vượt quota; thời điểm biên theo quyết định nhóm",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API khuyến mãi; chính sách fixture chưa được duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-01",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Thanh toán đơn T06_O_WAIT",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Thanh toán đơn T06_O_WAIT",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Số tiền backend xác định; chỉ xuất vé sau xác minh thành công",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-02",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Callback chữ ký hoặc số tiền sai",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Callback chữ ký hoặc số tiền sai",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối xác nhận; không xuất vé",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-03",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Thanh toán sát hạn giữ",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Thanh toán sát hạn giữ",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Kết quả nhất quán với quy tắc T02 đã duyệt",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC10-01",
+      "use_case_id": "UC-10",
+      "use_case_name": "Xem vé điện tử và lịch sử đặt vé",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Xem T06_O_1/2/5",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Xem T06_O_1/2/5",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Đúng vé và lịch sử của chủ đơn",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API vé/lịch sử và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC10-02",
+      "use_case_id": "UC-10",
+      "use_case_name": "Xem vé điện tử và lịch sử đặt vé",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Khách khác truy cập T06_O_1",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Khách khác truy cập T06_O_1",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API vé/lịch sử và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC10-03",
+      "use_case_id": "UC-10",
+      "use_case_name": "Xem vé điện tử và lịch sử đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Danh sách không có vé/trang cuối",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Danh sách không có vé/trang cuối",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Kết quả rỗng và tổng/phân trang đúng contract",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API vé/lịch sử và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC11-01",
+      "use_case_id": "UC-11",
+      "use_case_name": "Hủy đơn đặt vé chưa thanh toán",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Hủy đơn T06_O_WAIT chưa thanh toán",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hủy đơn T06_O_WAIT chưa thanh toán",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Hủy và giải phóng giữ đúng một lần",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hủy đơn",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC11-02",
+      "use_case_id": "UC-11",
+      "use_case_name": "Hủy đơn đặt vé chưa thanh toán",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Hủy đơn đã thanh toán T06_O_1 qua luồng hủy đơn chưa trả",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hủy đơn đã thanh toán T06_O_1 qua luồng hủy đơn chưa trả",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hủy đơn",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC11-03",
+      "use_case_id": "UC-11",
+      "use_case_name": "Hủy đơn đặt vé chưa thanh toán",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Hủy cùng lúc callback thanh toán",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hủy cùng lúc callback thanh toán",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Không phát sinh trạng thái đơn/vé/giao dịch mâu thuẫn",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hủy đơn",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC12-01",
+      "use_case_id": "UC-12",
+      "use_case_name": "Yêu cầu hủy vé và hoàn tiền",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Hoàn một vé trong đơn nhiều vé T06_O_4",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hoàn một vé trong đơn nhiều vé T06_O_4",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Chỉ vé được hoàn đổi trạng thái; vé khác hợp lệ",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hoàn và chính sách đã duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC12-02",
+      "use_case_id": "UC-12",
+      "use_case_name": "Yêu cầu hủy vé và hoàn tiền",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Hoàn vé đã hoàn T06_O_3",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hoàn vé đã hoàn T06_O_3",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Không hoàn tiền hai lần",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hoàn và chính sách đã duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC12-03",
+      "use_case_id": "UC-12",
+      "use_case_name": "Yêu cầu hủy vé và hoàn tiền",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Mốc 12/24 giờ của fixture T06_CS_12/24",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Mốc 12/24 giờ của fixture T06_CS_12/24",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Chờ chính sách chính thức; không áp dụng fixture tạm ngừng",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hoàn và chính sách đã duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC13-01",
+      "use_case_id": "UC-13",
+      "use_case_name": "Đánh giá nhà xe/chuyến xe",
+      "actor": "Khách hàng",
+      "group": "Positive",
+      "objective": "Đánh giá chuyến hoàn tất T06_C_DONE",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Đánh giá chuyến hoàn tất T06_C_DONE",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Lưu đúng khách đã đi, điểm hợp lệ",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API đánh giá và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC13-02",
+      "use_case_id": "UC-13",
+      "use_case_name": "Đánh giá nhà xe/chuyến xe",
+      "actor": "Khách hàng",
+      "group": "Negative",
+      "objective": "Đánh giá chuyến chưa đi hoặc gửi trùng",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Đánh giá chuyến chưa đi hoặc gửi trùng",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối theo nghiệp vụ duyệt",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API đánh giá và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC13-03",
+      "use_case_id": "UC-13",
+      "use_case_name": "Đánh giá nhà xe/chuyến xe",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Điểm 1/5 và ngoài 1–5",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Điểm 1/5 và ngoài 1–5",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Chấp nhận giới hạn, từ chối ngoài giới hạn",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API đánh giá và auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC14-01",
+      "use_case_id": "UC-14",
+      "use_case_name": "Quản lý tài khoản và phân quyền",
+      "actor": "Quản trị viên",
+      "group": "Positive",
+      "objective": "Quản trị quản lý tài khoản/quyền",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Quản trị quản lý tài khoản/quyền",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Quyền được áp dụng đúng",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API quản trị tài khoản/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC14-02",
+      "use_case_id": "UC-14",
+      "use_case_name": "Quản lý tài khoản và phân quyền",
+      "actor": "Quản trị viên",
+      "group": "Negative",
+      "objective": "Khách gọi API quản trị",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Khách gọi API quản trị",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "HTTP 403 sau khi cơ chế auth được chốt",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API quản trị tài khoản/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC14-03",
+      "use_case_id": "UC-14",
+      "use_case_name": "Quản lý tài khoản và phân quyền",
+      "actor": "Quản trị viên",
+      "group": "Boundary",
+      "objective": "Đổi quyền/khóa khi phiên còn hiệu lực",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Đổi quyền/khóa khi phiên còn hiệu lực",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Hành vi thu hồi quyền theo thiết kế auth",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API quản trị tài khoản/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC15-01",
+      "use_case_id": "UC-15",
+      "use_case_name": "Quản lý nhà xe",
+      "actor": "Quản trị viên",
+      "group": "Positive",
+      "objective": "Quản lý T06_NX_A/B",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Quản lý T06_NX_A/B",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Lưu đúng nhà xe và trạng thái",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API CRUD nhà xe/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC15-02",
+      "use_case_id": "UC-15",
+      "use_case_name": "Quản lý nhà xe",
+      "actor": "Quản trị viên",
+      "group": "Negative",
+      "objective": "Người không có quyền sửa nhà xe",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Người không có quyền sửa nhà xe",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API CRUD nhà xe/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC15-03",
+      "use_case_id": "UC-15",
+      "use_case_name": "Quản lý nhà xe",
+      "actor": "Quản trị viên",
+      "group": "Boundary",
+      "objective": "Nhà xe có xe/tuyến/nhân viên được tham chiếu",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Nhà xe có xe/tuyến/nhân viên được tham chiếu",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Xử lý xóa/ngừng theo contract quản trị",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API CRUD nhà xe/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC16-01",
+      "use_case_id": "UC-16",
+      "use_case_name": "Quản lý tỉnh/thành phố và bến xe",
+      "actor": "Quản trị viên",
+      "group": "Positive",
+      "objective": "Đọc danh sách bến T06_",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Đọc danh sách bến T06_",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Có 7 bến và trường maBenXe/tenBenXe/maTinhThanh",
+      "actual_result": "API trả 7 bến T06_",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC16-02",
+      "use_case_id": "UC-16",
+      "use_case_name": "Quản lý tỉnh/thành phố và bến xe",
+      "actor": "Quản trị viên",
+      "group": "Negative",
+      "objective": "Xóa T06_BX_HCM_E đang có tuyến",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Xóa T06_BX_HCM_E đang có tuyến",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "HTTP 409, bến giữ nguyên",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC16-03",
+      "use_case_id": "UC-16",
+      "use_case_name": "Quản lý tỉnh/thành phố và bến xe",
+      "actor": "Quản trị viên",
+      "group": "Boundary",
+      "objective": "Tên bến sát giới hạn 160 ký tự",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Tên bến sát giới hạn 160 ký tự",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "Validation theo DTO hiện tại",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC17-01",
+      "use_case_id": "UC-17",
+      "use_case_name": "Quản lý tuyến xe và điểm dừng",
+      "actor": "Quản trị viên",
+      "group": "Positive",
+      "objective": "Đọc danh sách tuyến T06_",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Đọc danh sách tuyến T06_",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Có 12 tuyến và mã bến đầu/cuối",
+      "actual_result": "API trả 12 tuyến T06_",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC17-02",
+      "use_case_id": "UC-17",
+      "use_case_name": "Quản lý tuyến xe và điểm dừng",
+      "actor": "Quản trị viên",
+      "group": "Negative",
+      "objective": "Tạo tuyến cùng bến đầu/cuối",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Tạo tuyến cùng bến đầu/cuối",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "HTTP 400, không lưu",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC17-03",
+      "use_case_id": "UC-17",
+      "use_case_name": "Quản lý tuyến xe và điểm dừng",
+      "actor": "Quản trị viên",
+      "group": "Boundary",
+      "objective": "Đổi thứ tự điểm dừng/tuyến không có điểm dừng",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Đổi thứ tự điểm dừng/tuyến không có điểm dừng",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "Thứ tự hợp lệ; tuyến không điểm dừng vẫn đọc được",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC18-01",
+      "use_case_id": "UC-18",
+      "use_case_name": "Quản lý loại xe, xe và ghế",
+      "actor": "Quản trị viên, nhà xe",
+      "group": "Positive",
+      "objective": "Đọc ghế T06_X_1/2/3",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Đọc ghế T06_X_1/2/3",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Đủ 22/29/40 ghế, thuộc đúng xe",
+      "actual_result": "API trả đúng 22/29/40 ghế theo xe",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC18-02",
+      "use_case_id": "UC-18",
+      "use_case_name": "Quản lý loại xe, xe và ghế",
+      "actor": "Quản trị viên, nhà xe",
+      "group": "Negative",
+      "objective": "Sửa ghế T06_X_1_G001 có lịch sử vé",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Sửa ghế T06_X_1_G001 có lịch sử vé",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "HTTP 409, không đổi ghế",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC18-03",
+      "use_case_id": "UC-18",
+      "use_case_name": "Quản lý loại xe, xe và ghế",
+      "actor": "Quản trị viên, nhà xe",
+      "group": "Boundary",
+      "objective": "Đọc trạng thái ghế cuối T06_X_1/2",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Đọc trạng thái ghế cuối T06_X_1/2",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Một ghế BAO_TRI và một ghế NGUNG_SU_DUNG",
+      "actual_result": "API trả đúng BAO_TRI/NGUNG_SU_DUNG",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC19-01",
+      "use_case_id": "UC-19",
+      "use_case_name": "Quản lý chuyến xe",
+      "actor": "Nhà xe, quản trị viên",
+      "group": "Positive",
+      "objective": "Đọc T06_C_1_1",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Đọc T06_C_1_1",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Chuyến trỏ maXe T06_X_1",
+      "actual_result": "API chi tiết trỏ T06_X_1",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC19-02",
+      "use_case_id": "UC-19",
+      "use_case_name": "Quản lý chuyến xe",
+      "actor": "Nhà xe, quản trị viên",
+      "group": "Negative",
+      "objective": "Gán xe thuộc nhà xe khác",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Gán xe thuộc nhà xe khác",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "HTTP 409, chuyến giữ nguyên",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC19-03",
+      "use_case_id": "UC-19",
+      "use_case_name": "Quản lý chuyến xe",
+      "actor": "Nhà xe, quản trị viên",
+      "group": "Boundary",
+      "objective": "T06_C_3_1 qua đêm",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "T06_C_3_1 qua đêm",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Giờ đến sang ngày hôm sau",
+      "actual_result": "API chuyến đêm đến ngày hôm sau",
+      "status": "Pass",
+      "executor": "tests/backend/t06_transport_api.ps1",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/use-cases/results.md",
+        "tests/backend/t06_transport_api.ps1"
+      ],
+      "notes": "Kiểm tra API, chưa kiểm tra giao diện/phân quyền",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC20-01",
+      "use_case_id": "UC-20",
+      "use_case_name": "Quản lý nhân viên và phân công chuyến",
+      "actor": "Nhà xe, quản trị viên",
+      "group": "Positive",
+      "objective": "CRUD phân công cùng nhà xe/nhân viên hợp lệ",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "CRUD phân công cùng nhà xe/nhân viên hợp lệ",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "Lưu đúng chuyến/nhân viên/vai trò",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC20-02",
+      "use_case_id": "UC-20",
+      "use_case_name": "Quản lý nhân viên và phân công chuyến",
+      "actor": "Nhà xe, quản trị viên",
+      "group": "Negative",
+      "objective": "Phân công nhân viên khác nhà xe",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Phân công nhân viên khác nhà xe",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "HTTP 409, không lưu",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC20-03",
+      "use_case_id": "UC-20",
+      "use_case_name": "Quản lý nhân viên và phân công chuyến",
+      "actor": "Nhà xe, quản trị viên",
+      "group": "Boundary",
+      "objective": "Hai yêu cầu phân công cùng nhân viên/chuyến",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Hai yêu cầu phân công cùng nhân viên/chuyến",
+      "steps": [
+        "Run python tests/backend/t06_remaining_api.py",
+        "Match this case to the corresponding HTTP assertions in the script",
+        "Check response, unchanged rejected data and cleanup result"
+      ],
+      "expected_result": "Một thành công; không có bản ghi trùng",
+      "actual_result": "Passed live HTTP assertions; test records cleaned.",
+      "status": "Pass",
+      "executor": "tests/backend/t06_remaining_api.py",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [
+        "tests/backend/t06_remaining_api.py",
+        "tests/use-cases/results.md"
+      ],
+      "notes": "",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC21-01",
+      "use_case_id": "UC-21",
+      "use_case_name": "Kiểm vé và xác nhận hành khách lên xe",
+      "actor": "Nhân viên được phân công",
+      "group": "Positive",
+      "objective": "Kiểm vé hợp lệ và xác nhận lên xe",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Kiểm vé hợp lệ và xác nhận lên xe",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Chỉ nhân viên được phân công; cập nhật đúng vé",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API kiểm vé/auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC21-02",
+      "use_case_id": "UC-21",
+      "use_case_name": "Kiểm vé và xác nhận hành khách lên xe",
+      "actor": "Nhân viên được phân công",
+      "group": "Negative",
+      "objective": "Vé khác chuyến/đã hoàn hoặc nhân viên ngoài phân công",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Vé khác chuyến/đã hoàn hoặc nhân viên ngoài phân công",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API kiểm vé/auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC21-03",
+      "use_case_id": "UC-21",
+      "use_case_name": "Kiểm vé và xác nhận hành khách lên xe",
+      "actor": "Nhân viên được phân công",
+      "group": "Boundary",
+      "objective": "Quét lại vé đã lên xe",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Quét lại vé đã lên xe",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Không xác nhận hai lần",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API kiểm vé/auth",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC22-01",
+      "use_case_id": "UC-22",
+      "use_case_name": "Quản lý chính sách hoàn vé, giao dịch thanh toán và hoàn tiền",
+      "actor": "Quản trị viên, nhân sự có quyền",
+      "group": "Positive",
+      "objective": "Tra cứu giao dịch T06_PAY_1/3/4 và chính sách",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Tra cứu giao dịch T06_PAY_1/3/4 và chính sách",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Đúng quyền; phân biệt tiền thanh toán gốc và tiền hoàn",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API quản lý giao dịch/hoàn; thiếu nơi lưu số tiền hoàn",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC22-02",
+      "use_case_id": "UC-22",
+      "use_case_name": "Quản lý chính sách hoàn vé, giao dịch thanh toán và hoàn tiền",
+      "actor": "Quản trị viên, nhân sự có quyền",
+      "group": "Negative",
+      "objective": "Hoàn vượt số tiền đã thu",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hoàn vượt số tiền đã thu",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API quản lý giao dịch/hoàn; thiếu nơi lưu số tiền hoàn",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC22-03",
+      "use_case_id": "UC-22",
+      "use_case_name": "Quản lý chính sách hoàn vé, giao dịch thanh toán và hoàn tiền",
+      "actor": "Quản trị viên, nhân sự có quyền",
+      "group": "Boundary",
+      "objective": "Hoàn đang xử lý/thất bại và tổng nhiều lần hoàn",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hoàn đang xử lý/thất bại và tổng nhiều lần hoàn",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Chờ nơi lưu số tiền/mốc xử lý; không vượt thực thu",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API quản lý giao dịch/hoàn; thiếu nơi lưu số tiền hoàn",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC23-01",
+      "use_case_id": "UC-23",
+      "use_case_name": "Xem báo cáo, thống kê doanh thu",
+      "actor": "Quản trị viên, nhà xe",
+      "group": "Positive",
+      "objective": "Báo cáo theo nhà xe/khoảng ngày",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Báo cáo theo nhà xe/khoảng ngày",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Số liệu khớp đơn/vé/giao dịch thực tế",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API báo cáo và quyền phạm vi",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC23-02",
+      "use_case_id": "UC-23",
+      "use_case_name": "Xem báo cáo, thống kê doanh thu",
+      "actor": "Quản trị viên, nhà xe",
+      "group": "Negative",
+      "objective": "Nhà xe A xem báo cáo B",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Nhà xe A xem báo cáo B",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Từ chối",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API báo cáo và quyền phạm vi",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC23-03",
+      "use_case_id": "UC-23",
+      "use_case_name": "Xem báo cáo, thống kê doanh thu",
+      "actor": "Quản trị viên, nhà xe",
+      "group": "Boundary",
+      "objective": "Khoảng ngày rỗng, biên ngày/múi giờ",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Khoảng ngày rỗng, biên ngày/múi giờ",
+      "steps": [
+        "Chuẩn bị dữ liệu nêu trong đầu vào",
+        "Thực hiện thao tác hoặc API theo mục tiêu",
+        "Đối chiếu phản hồi và dữ liệu với kết quả mong đợi"
+      ],
+      "expected_result": "Tổng và phạm vi ngày đúng quy tắc báo cáo",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API báo cáo và quyền phạm vi",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC06-04",
+      "use_case_id": "UC-06",
+      "use_case_name": "Chọn ghế và giữ ghế",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Hai khách tranh một ghế",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hai khách tranh một ghế",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Chỉ một quyền giữ hợp lệ; request thua rollback",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API giữ ghế/transaction cạnh tranh",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC06-05",
+      "use_case_id": "UC-06",
+      "use_case_name": "Chọn ghế và giữ ghế",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Giữ nhiều ghế có một ghế không khả dụng",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Giữ nhiều ghế có một ghế không khả dụng",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Rollback toàn bộ, không giữ một phần",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API giữ ghế/transaction cạnh tranh",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC06-06",
+      "use_case_id": "UC-06",
+      "use_case_name": "Chọn ghế và giữ ghế",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Refresh/gửi lại cùng request giữ",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Refresh/gửi lại cùng request giữ",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Không gia hạn quá 15 phút",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API giữ ghế/transaction cạnh tranh",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC08-04",
+      "use_case_id": "UC-08",
+      "use_case_name": "Áp dụng mã khuyến mãi",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Hai request sử dụng T06_KM_LAST đồng thời",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hai request sử dụng T06_KM_LAST đồng thời",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Không vượt quota; cách giữ/trả lượt chờ duyệt",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API khuyến mãi; chính sách fixture chưa được duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-04",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Callback trùng",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Callback trùng",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Không thu tiền/xuất vé hai lần",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-05",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Callback sau khi đóng trình duyệt",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Callback sau khi đóng trình duyệt",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Xử lý độc lập trình duyệt sau xác minh",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-06",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Callback muộn sau hết hạn",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Callback muộn sau hết hạn",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Chờ quyết định chính thức",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-07",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Callback khi chuyến đã hủy",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Callback khi chuyến đã hủy",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Chờ quy tắc tài chính chính thức",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC09-08",
+      "use_case_id": "UC-09",
+      "use_case_name": "Thanh toán đơn đặt vé",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Cùng Idempotency-Key, khác nội dung",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Cùng Idempotency-Key, khác nội dung",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "409 IDEMPOTENCY_KEY_REUSED theo draft",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API thanh toán/cổng sandbox/callback; T02 chưa chốt đầy đủ",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC12-04",
+      "use_case_id": "UC-12",
+      "use_case_name": "Yêu cầu hủy vé và hoàn tiền",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Gửi hoàn tiền lặp lại",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Gửi hoàn tiền lặp lại",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Không hoàn vượt thực thu",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hoàn và chính sách đã duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC12-05",
+      "use_case_id": "UC-12",
+      "use_case_name": "Yêu cầu hủy vé và hoàn tiền",
+      "actor": "Khách hàng",
+      "group": "Boundary",
+      "objective": "Hoàn thất bại/đang xử lý",
+      "preconditions": "Schema/seed 001/002/003/004; chức năng liên quan đã triển khai và quy tắc đã duyệt",
+      "input": "Hoàn thất bại/đang xử lý",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Chờ schema/quy tắc trạng thái",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có API hoàn và chính sách đã duyệt",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC18-04",
+      "use_case_id": "UC-18",
+      "use_case_name": "Quản lý loại xe, xe và ghế",
+      "actor": "Quản trị viên, nhà xe",
+      "group": "Negative",
+      "objective": "Nhà xe A sửa xe B",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Nhà xe A sửa xe B",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Từ chối sau khi quyền phạm vi được triển khai",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/phân quyền theo phạm vi",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    },
+    {
+      "test_case_id": "TC-UC20-04",
+      "use_case_id": "UC-20",
+      "use_case_name": "Quản lý nhân viên và phân công chuyến",
+      "actor": "Nhà xe, quản trị viên",
+      "group": "Negative",
+      "objective": "Nhà xe A phân công nhân viên B",
+      "preconditions": "Backend đang chạy, seed T06 đã nạp",
+      "input": "Nhà xe A phân công nhân viên B",
+      "steps": [
+        "Chuẩn bị hai request/clock/phạm vi theo đầu vào",
+        "Thực thi và đọc kết quả cùng dữ liệu sau xử lý"
+      ],
+      "expected_result": "Kiểm tra quyền API ngoài kiểm tra điều kiện dữ liệu",
+      "actual_result": "",
+      "status": "Blocked",
+      "executor": "",
+      "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
+      "evidence": [],
+      "notes": "Chưa có auth/phân quyền theo phạm vi",
+      "source": "T01; T02; docs/api/api-contract.md; code develop"
+    }
+  ]
+}

@@ -14,6 +14,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
   postgres:
     image: postgres:16
     container_name: datvexe-postgres
@@ -36,6 +37,8 @@ services:
       - ./docs/database/schema/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
       - ./docs/database/seed/001_demo.sql:/docker-entrypoint-initdb.d/004_demo.sql:ro
       - ./docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/005_fleet_demo.sql:ro
+      - ./docs/database/seed/003_t06_transport.sql:/docker-entrypoint-initdb.d/006_transport.sql:ro
+      - ./docs/database/seed/005_t06_display_alignment.sql:/docker-entrypoint-initdb.d/007_display_alignment.sql:ro
 
 volumes:
   postgres_data:
