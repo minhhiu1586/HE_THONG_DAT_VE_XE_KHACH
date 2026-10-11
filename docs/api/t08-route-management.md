@@ -48,3 +48,5 @@ Nhà xe tạo tuyến được gán phạm vi từ phiên đã xác thực trong
 ## Giao diện
 
 Đăng nhập bằng ADMIN hoặc NHA_XE, mở `/quan-tri/tuyen-duong`. ADMIN có thể quản lý tỉnh, bến và tuyến. NHA_XE chỉ có phần tuyến/điểm dừng thuộc nhà xe của mình.
+
+Cột trạng thái trong danh sách tuyến chỉ hiển thị trạng thái hiện tại bằng tiếng Việt. Để đổi trạng thái, bấm **Sửa** tuyến, chọn **Trạng thái khai thác** rồi **Lưu trạng thái**; thao tác này dùng endpoint trạng thái riêng và vẫn áp dụng được khi tuyến đã có chuyến. Thông báo cũ được xóa khi chuyển mục hoặc bắt đầu thao tác khác. Các trường bắt buộc báo validation bằng tiếng Việt theo tên trường; trường tùy chọn được để trống.

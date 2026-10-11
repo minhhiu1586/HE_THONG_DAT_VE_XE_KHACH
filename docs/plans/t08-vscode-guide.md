@@ -172,7 +172,7 @@ Chọn **Tuyến xe**, tạo:
 
 Bấm **Tạo tuyến** → thành công. Tuyến chưa có điểm dừng trung gian vẫn hợp lệ.
 
-- Đổi trạng thái tuyến sang `DANG_KHAI_THAC` → thành công.
+- Cột trạng thái trong danh sách chỉ hiển thị. Bấm **Sửa** đúng dòng tuyến, chọn **Trạng thái khai thác** là `DANG_KHAI_THAC`, bấm **Lưu trạng thái** → thành công.
 - Bấm **Sửa** đúng dòng tuyến, sửa mô tả/thời lượng, bấm **Lưu tuyến** → thành công khi chưa có chuyến.
 - Thử tạo tuyến khác với cùng bến A ở cả hai đầu → bị từ chối.
 - Thử thời lượng `0` hoặc âm → không cho lưu.

@@ -21,6 +21,7 @@ Chạy lại ngày 11/10/2026 trên nhánh `feat/t08-route-station-management`, 
 - Browser smoke: đạt trên Next.js + Tomcat + PostgreSQL; tạo tỉnh, hai bến, tuyến không có điểm dừng ban đầu, đổi trạng thái, thêm/sửa điểm dừng và sắp xếp.
 - Frontend production build: đạt; TypeScript và static generation thành công.
 - Frontend lint: 0 lỗi, còn 3 cảnh báo unused variable có sẵn trong `lib/api.ts` và `lib/mock-data.ts`.
+- Kiểm thử sửa giao diện: đạt kiểm tra tiếng Việt cho các trường bắt buộc trên bốn biểu mẫu, trường tùy chọn được bỏ trống, thông báo thành công/lỗi biến mất khi chuyển tab hoặc bắt đầu sửa, trạng thái trong danh sách chỉ hiển thị và cập nhật trạng thái qua biểu mẫu sửa tuyến. Frontend build và lint đạt sau thay đổi.
 - `git diff --check`, kiểm tra cú pháp Python và Node: đạt.
 
 ## Đối chiếu các trường hợp của đề bài

@@ -44,7 +44,23 @@ function sql(statement) {
     await page.goto(`${base}/quan-tri/tuyen-duong`);
     await page.getByRole('heading', { name: 'Quản lý tuyến đường' }).waitFor();
 
+    async function checkVietnameseValidation() {
+      for (const field of await page.locator('form input[required]:enabled, form select[required]:enabled, form textarea[required]:enabled').all()) {
+        const result = await field.evaluate(input => {
+          const previous = input.value;
+          input.value = ''; input.setCustomValidity(''); input.reportValidity();
+          const message = input.validationMessage;
+          input.value = previous; input.setCustomValidity('');
+          return { message, label: input.dataset.validationLabel };
+        });
+        assert(result.message.startsWith('Vui lòng ') && result.message.includes(result.label), result);
+      }
+      for (const field of await page.locator('form input:not([required]):enabled, form textarea:not([required]):enabled').all()) {
+        assert(await field.evaluate(input => { const previous = input.value; input.value = ''; input.setCustomValidity(''); const valid = input.checkValidity(); input.value = previous; return valid; }), 'Trường tùy chọn phải cho phép bỏ trống');
+      }
+    }
     await page.getByRole('button', { name: 'Tỉnh/thành', exact: true }).click();
+    await checkVietnameseValidation();
     await page.getByLabel('Mã tỉnh/thành').fill(ids.city);
     await page.getByLabel('Tên', { exact: true }).fill('Tỉnh kiểm thử T08');
     await page.getByLabel('Khu vực').fill('Miền kiểm thử');
@@ -52,6 +68,8 @@ function sql(statement) {
     await page.getByRole('status').filter({ hasText: 'Đã thêm tỉnh/thành phố' }).waitFor();
 
     await page.getByRole('button', { name: 'Bến xe', exact: true }).click();
+    assert.equal(await page.locator('p[role="status"]').count(), 0, 'Đổi tab phải xóa thông báo thành công');
+    await checkVietnameseValidation();
     async function stationForm(id, name) {
       await page.getByLabel('Mã bến').fill(id);
       await page.getByLabel('Tên bến').fill(name);
@@ -63,6 +81,7 @@ function sql(statement) {
     await stationForm(ids.stationA, 'Bến đi thử nghiệm');
     await stationForm(ids.stationB, 'Bến đến thử nghiệm');
     await page.getByRole('button', { name: 'Tuyến xe', exact: true }).click();
+    await checkVietnameseValidation();
     const routeStartOptions = await page.getByLabel('Bến khởi hành').locator('option').evaluateAll(options => options.map(option => option.value));
     assert(routeStartOptions.includes(ids.stationA) && routeStartOptions.includes(ids.stationB), routeStartOptions);
     await page.getByLabel('Mã tuyến').fill(ids.route);
@@ -74,9 +93,14 @@ function sql(statement) {
     await page.getByRole('button', { name: 'Tạo tuyến', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'Đã tạo tuyến xe' }).waitFor();
     await page.getByText('Tuyến chưa có điểm dừng trung gian').waitFor();
-    await page.getByLabel(`Trạng thái tuyến ${ids.route}`).selectOption('DANG_KHAI_THAC');
+    assert.equal(await page.getByLabel(`Trạng thái tuyến ${ids.route}`).evaluate(element => element.tagName), 'SPAN', 'Trạng thái danh sách chỉ được hiển thị');
+    await page.getByRole('row').filter({ hasText: ids.route }).getByRole('button', { name: 'Sửa', exact: true }).click();
+    assert.equal(await page.locator('p[role="status"]').count(), 0, 'Bắt đầu sửa phải xóa thông báo cũ');
+    await page.getByLabel('Trạng thái khai thác').selectOption('DANG_KHAI_THAC');
+    await page.getByRole('button', { name: 'Lưu trạng thái', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'Đã cập nhật trạng thái tuyến' }).waitFor();
 
+    await checkVietnameseValidation();
     async function addStop(id, name) {
       await page.getByLabel('Mã điểm dừng').fill(id);
       await page.getByLabel('Tên điểm dừng').fill(name);
@@ -95,6 +119,15 @@ function sql(statement) {
     await page.getByRole('status').filter({ hasText: 'Đã đổi thứ tự điểm dừng' }).waitFor();
     const ordered = await page.locator('ol li').allTextContents();
     assert(ordered[0].includes('Điểm dừng B') && ordered[1].includes('Điểm dừng A đã sửa'), ordered);
+    await page.getByRole('button', { name: 'Thêm điểm dừng', exact: true }).click();
+    await page.getByLabel('Mã điểm dừng').fill(ids.stopA);
+    await page.getByLabel('Tên điểm dừng').fill('Trùng mã');
+    await page.getByLabel('Địa chỉ').last().fill('Địa chỉ');
+    await page.getByRole('button', { name: 'Thêm điểm dừng', exact: true }).click();
+    await page.locator('p[role="alert"]').waitFor();
+    await page.getByRole('button', { name: 'Bến xe', exact: true }).click();
+    assert.equal(await page.locator('p[role="alert"]').count(), 0, 'Đổi tab phải xóa thông báo lỗi');
+    console.log('PASS: Vietnamese required-field validation, optional fields, notification clearing, read-only route status');
     console.log('PASS: browser province, station, route status, stop update and ordering');
   } finally {
     if (browser) await browser.close();
