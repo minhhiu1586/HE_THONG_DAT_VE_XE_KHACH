@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { errorMessage, Profile } from '@/lib/account-api';
 import styles from './Account.module.css';
+import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
 
 const roles = { KHACH_HANG: 'Khách hàng', NHA_XE: 'Quản lý nhà xe', NHAN_VIEN: 'Nhân viên', ADMIN: 'Quản trị viên' };
 export default function ProfilePanel() {
@@ -37,7 +38,7 @@ export default function ProfilePanel() {
     {error && <p className={styles.error} role="alert">{error}</p>}
     {success && <p className={styles.success} role="status">{success}</p>}
     <section className={styles.card}><h1>Hồ sơ cá nhân</h1><p className={styles.muted}>Vai trò: {roles[user.loaiTaiKhoan]}</p>
-      <form className={styles.form} onSubmit={event => submit(event)} key={user.maNguoiDung + user.email + user.soDienThoai}>
+      <form onInvalid={vietnameseValidation} onInput={clearValidation} className={styles.form} onSubmit={event => submit(event)} key={user.maNguoiDung + user.email + user.soDienThoai}>
         <label>Họ tên<input name="hoTen" defaultValue={user.hoTen} autoComplete="name" maxLength={160} required /></label>
         <label>Email<input name="email" type="email" defaultValue={user.email} autoComplete="email" maxLength={254} required /></label>
         <label>Số điện thoại<input name="soDienThoai" type="tel" defaultValue={user.soDienThoai} autoComplete="tel"
@@ -50,7 +51,7 @@ export default function ProfilePanel() {
       </form>
     </section>
     <section className={styles.card}><h2>Đổi mật khẩu</h2><p className={styles.muted}>Sau khi đổi mật khẩu, bạn cần đăng nhập lại trên tất cả thiết bị.</p>
-      <form className={styles.form} onSubmit={event => submit(event, true)}>
+      <form onInvalid={vietnameseValidation} onInput={clearValidation} className={styles.form} onSubmit={event => submit(event, true)}>
         <label>Mật khẩu hiện tại<input name="matKhauHienTai" type="password" autoComplete="current-password" maxLength={128} required /></label>
         <label>Mật khẩu mới<input name="matKhauMoi" type="password" autoComplete="new-password" minLength={10} maxLength={128} required /></label>
         <p className={styles.muted}>Mật khẩu cần 10–128 ký tự, có chữ và số.</p>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { accountRequest, errorMessage, Profile, Session } from '@/lib/account-api';
 import { useAuth } from './AuthProvider';
 import styles from './Account.module.css';
+import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
 
 export default function AuthForm({ register = false }: { register?: boolean }) {
   const { accept, notice } = useAuth(); const router = useRouter();
@@ -39,7 +40,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
     {notice && <p className={styles.error} role="status">{notice}</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     {success && <p className={styles.success} role="status">{success} <Link href="/dang-nhap">Đăng nhập</Link></p>}
-    <form className={styles.form} onSubmit={submit}>
+    <form onInvalid={vietnameseValidation} onInput={clearValidation} className={styles.form} onSubmit={submit}>
       {register && <><label>Họ tên<input name="hoTen" autoComplete="name" maxLength={160} required /></label>
         <label>Số điện thoại<input name="soDienThoai" type="tel" autoComplete="tel" pattern="(0[35789][0-9]{8}|\+84[35789][0-9]{8})" title="Số Việt Nam 10 chữ số hoặc dạng +84" required /></label></>}
       <label>Email<input name="email" type="email" autoComplete="username" maxLength={254} required /></label>
