@@ -125,6 +125,28 @@ class AccessControlTest {
             null, BigDecimal.ONE, BigDecimal.TEN, null, TrangThaiTuyenXe.DANG_KHAI_THAC, "B")));
         RequestIdentity.clear(); assertEquals("XA", routes.getChuyenXe("CA").get("maXe"));
     }
+    @Test void operatorCanCreateRouteOnlyInsideItsAuthenticatedDatabaseScope() throws Exception {
+        var routes = new RouteTripService(factory);
+        context("NX", "POST", "/api/tuyen-xe", "{\"maTuyen\":\"NEW\",\"maNhaXe\":\"A\"}");
+        var created = routes.createTuyenXe(new Inputs.TuyenXe("NEW", "Tuyến mới", "S", "D", LocalTime.NOON,
+            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, null, TrangThaiTuyenXe.DANG_KHAI_THAC, null));
+        assertEquals("A", created.get("maNhaXe"));
+        context("AD", "PUT", "/api/tuyen-xe/NEW", "{\"maTuyen\":\"NEW\"}");
+        assertEquals("A", routes.updateTuyenXe("NEW", new Inputs.TuyenXe("NEW", "Tên sửa", "S", "D", LocalTime.NOON,
+            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, null, null, null)).get("maNhaXe"));
+        context("NX", "POST", "/api/tuyen-xe", "{\"maTuyen\":\"NEW2\",\"maNhaXe\":\"B\"}");
+        forbidden(() -> routes.createTuyenXe(new Inputs.TuyenXe("NEW2", "Tuyến khác", "S", "D", LocalTime.NOON,
+            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.TEN, null, TrangThaiTuyenXe.DANG_KHAI_THAC, "B")));
+    }
+    @Test void onlyAdminCanChangeSharedGeographicCatalogs() throws Exception {
+        var routes = new RouteTripService(factory);
+        context("KH1", "POST", "/api/tinh-thanh", "{\"maTinhThanh\":\"NEW\"}");
+        forbidden(() -> routes.createTinhThanh(new Inputs.TinhThanh("NEW", "Tỉnh mới", null)));
+        context("NX", "POST", "/api/ben-xe", "{\"maBenXe\":\"NEW\"}");
+        forbidden(() -> routes.createBenXe(new Inputs.BenXe("NEW", "Bến mới", "Địa chỉ", null, "S", TrangThaiBenXe.HOAT_DONG)));
+        context("KH1", "GET", "/api/tinh-thanh", null);
+        assertEquals(1, routes.listTinhThanh(null).size());
+    }
     @Test void numericResourceIdCannotSkipTheScopeGuardThroughDtoCoercion() throws Exception {
         tx(em -> {
             Xe vehicle = new Xe(); vehicle.maXe = "1"; vehicle.bienSo = "NUMERIC"; vehicle.soChoNgoi = 1;

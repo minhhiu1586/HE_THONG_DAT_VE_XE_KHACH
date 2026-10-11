@@ -13,7 +13,8 @@ public final class AccessPolicy {
     public static boolean publicEndpoint(String method, String path) {
         if (method.equals("POST")) return Set.of("/api/auth/dang-ky", "/api/auth/dang-nhap").contains(path);
         return method.equals("GET") && (Set.of("/api/tinh-thanh", "/api/ben-xe", "/api/chuyen-xe", "/api/phuong-thuc-thanh-toan").contains(path)
-            || path.matches("/api/ben-xe/[^/]+") || path.matches("/api/chuyen-xe/[^/]+(?:/(?:ghe|gia|trang-thai))?"));
+            || path.matches("/api/tinh-thanh/[^/]+") || path.matches("/api/ben-xe/[^/]+")
+            || path.matches("/api/chuyen-xe/[^/]+(?:/(?:ghe|gia|trang-thai))?"));
     }
     public static void role(CurrentUser user, String path) {
         if (path.startsWith("/api/quan-tri/") || path.startsWith("/api/loai-xe")
@@ -55,13 +56,14 @@ public final class AccessPolicy {
             }
             JsonNode body = context.body();
             if (body != null && body.isObject()) {
-                if ((p[0].equals("tuyen-xe") || p[0].equals("xe")) && p.length <= 2
+                if ((p[0].equals("xe") || p[0].equals("tuyen-xe")) && p.length <= 2
                         && Set.of("POST", "PUT").contains(context.method())) {
                     String owner = text(body, "maNhaXe");
-                    if (owner == null || !owner.equals(user.nhaXe.maNhaXe)) throw AccessControl.denied();
+                    if ((p[0].equals("xe") && owner == null) || (owner != null && !owner.equals(user.nhaXe.maNhaXe)))
+                        throw AccessControl.denied();
                 }
                 String route = text(body, "maTuyen"), vehicle = text(body, "maXe"), trip = text(body, "maChuyen"), employee = text(body, "maNhanVien");
-                if (route != null) AccessControl.route(em, user, route);
+                if (route != null && !(p[0].equals("tuyen-xe") && p.length == 1)) AccessControl.route(em, user, route);
                 if (vehicle != null) AccessControl.vehicle(em, user, vehicle);
                 if (trip != null) AccessControl.trip(em, user, trip);
                 if (employee != null) AccessControl.employee(em, user, employee);
