@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.math.BigDecimal;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
@@ -115,6 +116,7 @@ class OperatorServiceTest {
         trips.createChuyenXe(new Inputs.ChuyenXe("C1", "R", LocalDate.of(2030, 1, 1), LocalTime.NOON, null));
         try (EntityManager em = factory.createEntityManager()) {
             em.getTransaction().begin();
+            LocalDateTime businessNow = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
             NhaXe operator = em.find(NhaXe.class, "NX1");
             ChuyenXe trip = em.find(ChuyenXe.class, "C1");
             Xe vehicle = new Xe(); vehicle.maXe = "X"; vehicle.bienSo = "TEST-X";
@@ -122,19 +124,19 @@ class OperatorServiceTest {
             Ghe seat = new Ghe(); seat.maGhe = "G"; seat.viTri = "1"; seat.xe = vehicle; em.persist(seat);
             Ghe heldSeat = new Ghe(); heldSeat.maGhe = "G2"; heldSeat.viTri = "2"; heldSeat.xe = vehicle; em.persist(heldSeat);
             DonDatVe order = new DonDatVe(); order.maDon = "O"; order.nguoiDat = em.find(NguoiDung.class, "KH");
-            order.ngayDat = LocalDateTime.now(); order.khachDatTen = "Khách";
+            order.ngayDat = businessNow; order.khachDatTen = "Khách";
             order.khachDatSoDienThoai = "0900000000"; order.trangThai = TrangThaiDon.DA_THANH_TOAN; em.persist(order);
             VeXe ticket = new VeXe(); ticket.maVe = "V"; ticket.chuyenXe = trip; ticket.ghe = seat;
             ticket.donDatVe = order; ticket.hoTenKhachHang = "Khách"; ticket.soDienThoaiKhachHang = "0900000000";
-            ticket.giaVe = BigDecimal.TEN; ticket.ngayXuatVe = LocalDateTime.now(); em.persist(ticket);
+            ticket.giaVe = BigDecimal.TEN; ticket.ngayXuatVe = businessNow; em.persist(ticket);
             PhuongThucThanhToan method = new PhuongThucThanhToan(); method.maPhuongThuc = "PT";
             method.tenPhuongThuc = "Thử nghiệm"; em.persist(method);
             ThanhToan payment = new ThanhToan(); payment.maGiaoDich = "GD"; payment.donDatVe = order;
             payment.phuongThucThanhToan = method; payment.soTien = BigDecimal.TEN;
             payment.trangThai = TrangThaiThanhToan.THANH_CONG; em.persist(payment);
             GiuCho hold = new GiuCho(); hold.maGiuCho = "H"; hold.chuyenXe = trip; hold.ghe = heldSeat;
-            hold.ngayDat = LocalDateTime.now(); hold.thoiDiemBatDau = LocalDateTime.now();
-            hold.thoiDiemHetHan = LocalDateTime.now().plusMinutes(15); em.persist(hold);
+            hold.ngayDat = businessNow; hold.thoiDiemBatDau = businessNow;
+            hold.thoiDiemHetHan = businessNow.plusMinutes(15); em.persist(hold);
             em.getTransaction().commit();
         }
         assertEquals(1, trips.searchChuyenXe("START", "END", LocalDate.of(2030, 1, 1)).size());
