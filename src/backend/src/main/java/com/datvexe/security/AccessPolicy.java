@@ -12,7 +12,7 @@ public final class AccessPolicy {
     private AccessPolicy() {}
     public static boolean publicEndpoint(String method, String path) {
         if (method.equals("POST")) return Set.of("/api/auth/dang-ky", "/api/auth/dang-nhap").contains(path);
-        return method.equals("GET") && (Set.of("/api/tinh-thanh", "/api/ben-xe", "/api/chuyen-xe", "/api/phuong-thuc-thanh-toan").contains(path)
+        return method.equals("GET") && (Set.of("/api/health", "/api/tinh-thanh", "/api/ben-xe", "/api/chuyen-xe", "/api/phuong-thuc-thanh-toan").contains(path)
             || path.matches("/api/tinh-thanh/[^/]+") || path.matches("/api/ben-xe/[^/]+")
             || path.matches("/api/chuyen-xe/[^/]+(?:/(?:ghe|gia|trang-thai))?"));
     }

@@ -1,5 +1,4 @@
 -- T07 / T07.1: additive migration; no demo passwords or privileged accounts.
-BEGIN;
 -- Normalize old identifiers only if safe; stop for manual review on collisions.
 DO $$ BEGIN
   IF EXISTS (SELECT lower(trim(email)) FROM nguoi_dung GROUP BY lower(trim(email)) HAVING count(*) > 1) THEN
@@ -21,4 +20,3 @@ CREATE TABLE IF NOT EXISTS phien_dang_nhap (
 );
 CREATE INDEX IF NOT EXISTS ix_phien_nguoi_dung ON phien_dang_nhap(ma_nguoi_dung);
 CREATE INDEX IF NOT EXISTS ix_phien_het_han ON phien_dang_nhap(het_han);
-COMMIT;

@@ -4,9 +4,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/datvexe
-      POSTGRES_USER: datvexe_user
-      POSTGRES_PASSWORD: datvexe_password
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datvexe}
+      POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
     volumes:
@@ -20,13 +20,13 @@ services:
     container_name: datvexe-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: datvexe
-      POSTGRES_USER: datvexe_user
-      POSTGRES_PASSWORD: datvexe_password
+      POSTGRES_DB: ${POSTGRES_DB:-datvexe}
+      POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U datvexe_user -d datvexe"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -39,6 +39,21 @@ services:
       - ./docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/005_fleet_demo.sql:ro
       - ./docs/database/seed/003_t06_transport.sql:/docker-entrypoint-initdb.d/006_transport.sql:ro
       - ./docs/database/seed/005_t06_display_alignment.sql:/docker-entrypoint-initdb.d/007_display_alignment.sql:ro
+
+  migrate:
+    image: postgres:16
+    profiles: [ops]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-datvexe}
+      POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
+    volumes:
+      - ./docs/database/schema:/migrations/schema:ro
+      - ./scripts/apply-migrations.sh:/migrations/apply.sh:ro
+    entrypoint: ["/bin/sh", "/migrations/apply.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
