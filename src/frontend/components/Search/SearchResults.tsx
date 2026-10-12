@@ -11,12 +11,12 @@ export default function SearchResults({ initialTrips }: { initialTrips: SearchTr
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<SortOption>('departure-asc');
-  const vehicles = Array.from(new Set(initialTrips.map(trip => trip.tenLoaiXe).filter(Boolean)));
-  const companies = Array.from(new Map(initialTrips.map(trip => [trip.maNhaXe, trip.tenNhaXe])).entries());
+  const vehicles = Array.from(new Set(initialTrips.map(trip => trip.tenLoaiXe ?? 'Chưa cập nhật')));
+  const companies = Array.from(new Map(initialTrips.map(trip => [trip.maNhaXe ?? '', trip.tenNhaXe ?? 'Chưa cập nhật'])).entries());
 
   const trips = initialTrips.filter(trip =>
-    (!selectedVehicles.length || selectedVehicles.includes(trip.tenLoaiXe)) &&
-    (!selectedCompanies.length || selectedCompanies.includes(trip.maNhaXe))
+    (!selectedVehicles.length || selectedVehicles.includes(trip.tenLoaiXe ?? 'Chưa cập nhật')) &&
+    (!selectedCompanies.length || selectedCompanies.includes(trip.maNhaXe ?? ''))
   ).sort((a, b) => {
     const departure = `${a.ngayKhoiHanh}T${a.gioKhoiHanh}`.localeCompare(`${b.ngayKhoiHanh}T${b.gioKhoiHanh}`);
     const price = Number(a.giaVeDuKien) - Number(b.giaVeDuKien);
@@ -57,7 +57,7 @@ export default function SearchResults({ initialTrips }: { initialTrips: SearchTr
       </section>
     </aside>
     <section className={styles.mainContent} aria-live="polite">
-      {trips.length ? trips.map(trip => <TripCard key={trip.maChuyen} trip={trip} />) : <div className={styles.emptyState}><h2>Không có chuyến phù hợp</h2><p>Máy chủ không trả về chuyến nào với các tiêu chí đã chọn.</p></div>}
+      {trips.length ? trips.map(trip => <TripCard key={trip.maChuyen} trip={trip} />) : <div className={styles.emptyState}><h2>Không có chuyến đang nhận đặt phù hợp</h2><p>Hãy đổi ngày, điểm đi, điểm đến hoặc bộ lọc để tìm lại.</p></div>}
     </section>
   </div>;
 }

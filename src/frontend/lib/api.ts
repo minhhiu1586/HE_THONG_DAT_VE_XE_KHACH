@@ -39,22 +39,24 @@ export interface SearchTrip {
   maChuyen: string;
   maTuyen: string;
   tenTuyen: string;
-  maNhaXe: string;
-  tenNhaXe: string;
+  maNhaXe: string | null;
+  tenNhaXe: string | null;
   logoNhaXe?: string | null;
-  maXe: string;
-  bienSo: string;
-  maLoaiXe: string;
-  tenLoaiXe: string;
+  maXe: string | null;
+  bienSo: string | null;
+  maLoaiXe: string | null;
+  tenLoaiXe: string | null;
   soChoNgoi: number;
   tongSoGhe: number;
   soGheTrong: number;
   maBenDi: string;
   tenBenDi: string;
+  diaChiBenDi: string;
   maTinhDi: string;
   tenTinhDi: string;
   maBenDen: string;
   tenBenDen: string;
+  diaChiBenDen: string;
   maTinhDen: string;
   tenTinhDen: string;
   ngayKhoiHanh: string;
@@ -65,6 +67,8 @@ export interface SearchTrip {
   trangThai: string;
   ngungNhanDatVeLuc: string;
   coTheDatVe: boolean;
+  trangThaiNhanDatVe: 'CON_CHO' | 'HET_CHO' | 'NGUNG_NHAN_DAT';
+  diemDung: { maDiemDung: string; tenDiemDung: string; diaChi: string; thuTu: number; thoiGianDung: number }[];
 }
 
 export interface TripSeat {
@@ -145,6 +149,10 @@ export async function getSearchOptions(): Promise<SearchOption[]> {
 export async function searchTrips(from: string, to: string, date: string): Promise<SearchTrip[]> {
   const query = new URLSearchParams({ from, to, date });
   return apiGet<SearchTrip[]>(`/chuyen-xe?${query.toString()}`);
+}
+
+export async function getTrip(tripId: string): Promise<SearchTrip> {
+  return apiGet<SearchTrip>(`/chuyen-xe/${encodeURIComponent(tripId)}`);
 }
 
 export async function getTripSeats(tripId: string): Promise<TripSeatResponse> {

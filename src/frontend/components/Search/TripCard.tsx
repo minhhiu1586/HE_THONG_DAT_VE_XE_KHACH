@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { getTripSeats, type SearchTrip, type TripSeat } from '@/lib/api';
 import styles from './Search.module.css';
 
@@ -29,6 +30,7 @@ export default function TripCard({ trip }: { trip: SearchTrip }) {
     setShowSeats(true);
     setLoading(true);
     setError('');
+    setSeats(null);
     try {
       const response = await getTripSeats(trip.maChuyen);
       setSeats(response.danhSachGhe);
@@ -47,8 +49,8 @@ export default function TripCard({ trip }: { trip: SearchTrip }) {
       <div className={styles.companyInfo}><div className={styles.companyName}>{trip.tenNhaXe}</div><div className={styles.vehicleType}>{trip.tenLoaiXe} · {trip.soChoNgoi} chỗ</div><div className={styles.vehicleType}>Ngày đi: {trip.ngayKhoiHanh}</div></div>
     </div>
     <div className={styles.tripBottom}>
-      <div className={styles.seatInfo}>{trip.soGheTrong} / {trip.tongSoGhe} chỗ còn trống</div>
-      <div className={styles.priceInfo}><span className={styles.price}>{money.format(Number(trip.giaVeDuKien))} ₫</span><div><button type="button" className={styles.selectBtn} onClick={toggleSeats}>{showSeats ? 'Ẩn sơ đồ ghế' : 'Xem sơ đồ ghế'}</button></div></div>
+      <div className={styles.seatInfo}>{trip.soGheTrong ? `${trip.soGheTrong} / ${trip.tongSoGhe} chỗ còn trống` : 'Hết chỗ'}</div>
+      <div className={styles.priceInfo}><span className={styles.price}>{money.format(Number(trip.giaVeDuKien))} ₫</span><div className={styles.cardActions}><Link className={styles.detailLink} href={`/tim-chuyen/${encodeURIComponent(trip.maChuyen)}`}>Xem chi tiết</Link><button type="button" className={styles.selectBtn} onClick={toggleSeats} disabled={!trip.coTheDatVe}>{showSeats ? 'Ẩn sơ đồ ghế' : 'Xem sơ đồ ghế'}</button></div></div>
     </div>
     {showSeats && <section className={styles.seatPanel} aria-live="polite"><h3>Sơ đồ ghế chuyến {trip.maChuyen}</h3>{loading && <p>Đang tải trạng thái ghế…</p>}{error && <p className={styles.error} role="alert">{error}</p>}{seats && <div className={styles.seatGrid}>{seats.map(seat => <div key={seat.maGhe} className={`${styles.seat} ${seat.tinhTrangKhaDung === 'TRONG' && seat.trangThaiSuDung === 'HOAT_DONG' ? styles.seatAvailable : ''}`} title={`${seat.maGhe} · tầng ${seat.tang} · ${seatStatus(seat)}`}><strong>{seat.viTri}</strong><span>{seatStatus(seat)}</span></div>)}</div>}</section>}
   </article>;

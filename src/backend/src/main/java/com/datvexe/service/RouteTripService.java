@@ -108,29 +108,53 @@ public class RouteTripService {
         return new SearchPoint("ANY", text(input, field, 40, true));
     }
 
+    private static String cityOf(EntityManager em, SearchPoint point) {
+        if (point.kind().equals("CITY")) {
+            if (em.find(TinhThanh.class, point.code()) == null) throw new DomainException(400, "Tỉnh/thành phố không tồn tại: " + point.code());
+            return point.code();
+        }
+        if (point.kind().equals("STATION")) {
+            BenXe station = em.find(BenXe.class, point.code());
+            if (station == null) throw new DomainException(400, "Bến xe không tồn tại: " + point.code());
+            return station.tinhThanh.maTinhThanh;
+        }
+        TinhThanh city = em.find(TinhThanh.class, point.code());
+        if (city != null) return city.maTinhThanh;
+        BenXe station = em.find(BenXe.class, point.code());
+        if (station != null) return station.tinhThanh.maTinhThanh;
+        throw new DomainException(400, "Điểm tìm kiếm không tồn tại: " + point.code());
+    }
+
     private static Map<String, Object> searchView(EntityManager em, ChuyenXe trip, LocalDateTime now) {
         var route = trip.tuyenXe;
         var origin = route.tramKhoiHanh;
         var destination = route.tramDen;
         Map<String, Object> result = view(trip);
         result.put("tenTuyen", route.tenTuyen);
-        result.put("maNhaXe", route.nhaXe.maNhaXe);
-        result.put("tenNhaXe", route.nhaXe.tenNhaXe);
-        result.put("logoNhaXe", route.nhaXe.logoUrl);
+        result.put("maNhaXe", route.nhaXe == null ? null : route.nhaXe.maNhaXe);
+        result.put("tenNhaXe", route.nhaXe == null ? null : route.nhaXe.tenNhaXe);
+        result.put("logoNhaXe", route.nhaXe == null ? null : route.nhaXe.logoUrl);
         result.put("maBenDi", origin.maBenXe);
         result.put("tenBenDi", origin.tenBenXe);
+        result.put("diaChiBenDi", origin.diaChi);
         result.put("maTinhDi", origin.tinhThanh.maTinhThanh);
         result.put("tenTinhDi", origin.tinhThanh.tenTinhThanh);
         result.put("maBenDen", destination.maBenXe);
         result.put("tenBenDen", destination.tenBenXe);
+        result.put("diaChiBenDen", destination.diaChi);
         result.put("maTinhDen", destination.tinhThanh.maTinhThanh);
         result.put("tenTinhDen", destination.tinhThanh.tenTinhThanh);
         result.put("thoiLuongPhut", Duration.between(LocalDateTime.of(trip.ngayKhoiHanh, trip.gioKhoiHanh), trip.gioDenDuKien).toMinutes());
+        result.put("diemDung", route.tramTrungGian.stream().sorted(Comparator.comparingInt(stop -> stop.thuTu))
+            .map(stop -> map("maDiemDung", stop.maDiemDung, "tenDiemDung", stop.tenDiemDung,
+                "diaChi", stop.diaChi, "thuTu", stop.thuTu, "thoiGianDung", stop.thoiGianDung)).toList());
+        result.put("bienSo", trip.xe == null ? null : trip.xe.bienSo);
         if (trip.xe == null || trip.xe.loaiXe == null) {
             result.put("maLoaiXe", null);
             result.put("tenLoaiXe", null);
             result.put("soChoNgoi", 0);
-            result.put("soGheTrong", 0);
+            result.put("tongSoGhe", 0L);
+            result.put("soGheTrong", 0L);
         } else {
             result.put("maLoaiXe", trip.xe.loaiXe.maLoaiXe);
             result.put("tenLoaiXe", trip.xe.loaiXe.tenLoaiXe);
@@ -147,7 +171,6 @@ public class RouteTripService {
             result.put("tongSoGhe", total);
             result.put("soGheTrong", available);
         }
-        result.put("coTheDatVe", true);
         return result;
     }
 
@@ -523,18 +546,30 @@ public class RouteTripService {
         });
     }
     public Map<String, Object> getChuyenXe(String id) { return read(em -> {
-        var trip=found(em,ChuyenXe.class,id);var result=view(trip);boolean available=false;
-        try{TripSaleRules.ensureSellable(em,trip,LocalDateTime.now(TripSaleRules.ZONE));available=true;}
-        catch(DomainException unavailable){ /* Read history without treating it as a bookable trip. */ }
-        result.put("coTheDatVe",available);return result;
+        var trip = found(em, ChuyenXe.class, id);
+        LocalDateTime now = LocalDateTime.now(TripSaleRules.ZONE);
+        var result = searchView(em, trip, now);
+        boolean saleOpen;
+        try { TripSaleRules.ensureSellable(em, trip, now); saleOpen = true; }
+        catch (DomainException unavailable) { saleOpen = false; }
+        long remaining = (long) result.get("soGheTrong");
+        result.put("coTheDatVe", saleOpen && remaining > 0);
+        result.put("trangThaiNhanDatVe", !saleOpen ? "NGUNG_NHAN_DAT" : remaining == 0 ? "HET_CHO" : "CON_CHO");
+        return result;
     }); }
     public List<Map<String, Object>> searchChuyenXe(String from, String to, LocalDate date) {
         SearchPoint origin = searchPoint(from, "Điểm đi");
         SearchPoint destination = searchPoint(to, "Điểm đến");
         if (date == null) throw new DomainException(400, "Ngày đi là bắt buộc");
-        if(origin.kind().equals(destination.kind()) && origin.code().equals(destination.code()))
-            throw new DomainException(400,"Điểm đi và điểm đến phải khác nhau.");
         return read(em -> {
+            String originCity = cityOf(em, origin);
+            String destinationCity = cityOf(em, destination);
+            boolean citySearch = origin.kind().equals("CITY") || destination.kind().equals("CITY")
+                || (origin.kind().equals("ANY") && destination.kind().equals("ANY")
+                    && em.find(TinhThanh.class, origin.code()) != null && em.find(TinhThanh.class, destination.code()) != null);
+            if ((citySearch && originCity.equals(destinationCity))
+                    || (origin.kind().equals(destination.kind()) && origin.code().equals(destination.code())))
+                throw new DomainException(400, "Tỉnh đi và tỉnh đến phải khác nhau.");
             LocalDateTime now = LocalDateTime.now(TripSaleRules.ZONE);
             var trips = em.createQuery("select c from ChuyenXe c join c.tuyenXe.nhaXe n where c.ngayKhoiHanh = :date and c.trangThai = :scheduled and c.tuyenXe.trangThai = :active and n.trangThai = :activeOperator and " +
                 "((:fromKind = 'ANY' and (c.tuyenXe.tramKhoiHanh.maBenXe = :from or c.tuyenXe.tramKhoiHanh.tinhThanh.maTinhThanh = :from)) or " +
@@ -550,9 +585,15 @@ public class RouteTripService {
             .setParameter("toKind", destination.kind()).setParameter("to", destination.code())
             .getResultList();
             return trips.stream().filter(c->{
-                try {TripSaleRules.ensureSellable(em,c,LocalDateTime.now(TripSaleRules.ZONE));return true;}
+                try {TripSaleRules.ensureSellable(em,c,now);return true;}
                 catch(DomainException unavailable){return false;}
-            }).map(c -> searchView(em, c, now)).toList();
+            }).map(c -> {
+                var result = searchView(em, c, now);
+                long remaining = (long) result.get("soGheTrong");
+                result.put("coTheDatVe", remaining > 0);
+                result.put("trangThaiNhanDatVe", remaining > 0 ? "CON_CHO" : "HET_CHO");
+                return result;
+            }).toList();
         });
     }
 }

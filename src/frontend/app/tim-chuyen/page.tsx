@@ -44,10 +44,10 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   return <main className={styles.searchPage}>
     <div className="container">
       <h1 className={styles.pageTitle}>Tìm chuyến xe</h1>
-      <CompactSearch initialFrom={selectedFrom} initialTo={selectedTo} initialDate={date} options={options} />
+      <CompactSearch key={`${selectedFrom}|${selectedTo}|${date}`} initialFrom={selectedFrom} initialTo={selectedTo} initialDate={date} options={options} />
       {optionsError && <p className={styles.error} role="alert">Không tải được danh mục địa điểm: {optionsError}</p>}
       {searchError && <p className={styles.error} role="alert">Không tìm được chuyến: {searchError}</p>}
-      {!initialFrom || !initialTo ? <p className={styles.info}>Chọn điểm đi, điểm đến và ngày đi để xem các chuyến đang mở bán.</p> : !searchError && <SearchResults initialTrips={trips} />}
+      {!initialFrom || !initialTo ? <p className={styles.info}>Chọn điểm đi, điểm đến và ngày đi để xem các chuyến đang mở bán.</p> : !searchError && <SearchResults key={`${selectedFrom}|${selectedTo}|${date}`} initialTrips={trips} />}
     </div>
   </main>;
 }
