@@ -4,11 +4,14 @@ import { useCallback, useRef } from 'react';
 
 /** Scrolls a newly selected management form/detail into view and gives it keyboard focus. */
 export function useManagementFocus<T extends HTMLElement = HTMLElement>() {
-  const targetRef = useRef<T>(null);
+  const targetElement = useRef<T | null>(null);
+  const attachTarget = useCallback((element: T | null) => {
+    targetElement.current = element;
+  }, []);
 
   const focusTarget = useCallback((selector?: string) => {
     window.requestAnimationFrame(() => {
-      const target = targetRef.current;
+      const target = targetElement.current;
       if (!target) return;
 
       const focusable = selector
@@ -22,5 +25,5 @@ export function useManagementFocus<T extends HTMLElement = HTMLElement>() {
     });
   }, []);
 
-  return { targetRef, focusTarget };
+  return [attachTarget, focusTarget] as const;
 }

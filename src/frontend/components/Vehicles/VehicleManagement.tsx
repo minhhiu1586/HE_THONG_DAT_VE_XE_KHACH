@@ -37,8 +37,9 @@ export default function VehicleManagement() {
   const [filterType, setFilterType] = useState(''); const [filterOwner, setFilterOwner] = useState(''); const [filterState, setFilterState] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('');
   const sending = useRef(false); const revision = useRef(0);
-  const typeFormFocus = useManagementFocus<HTMLElement>(), vehicleFormFocus = useManagementFocus<HTMLElement>();
-  const detailFocus = useManagementFocus<HTMLElement>();
+  const [typeFormTarget, focusTypeForm] = useManagementFocus<HTMLElement>();
+  const [vehicleFormTarget, focusVehicleForm] = useManagementFocus<HTMLElement>();
+  const [detailTarget, focusDetail] = useManagementFocus<HTMLElement>();
   function clearNotice() { revision.current++; setError(''); setSuccess(''); }
   function interaction(event: React.SyntheticEvent<HTMLDivElement>) { if (event.target instanceof Element && event.target.closest('button,input,select,textarea,a')) clearNotice(); }
   async function loadVehicles() {
@@ -68,18 +69,18 @@ export default function VehicleManagement() {
       setSelected(current); setSeats(map);
       loaded = true;
     }, '');
-    if (navigate && loaded) detailFocus.focusTarget();
+    if (navigate && loaded) focusDetail();
   }
   function editVehicle(vehicle: Vehicle) {
     setEditingVehicle(true);
     setVehicleForm({ maXe: vehicle.maXe, bienSo: vehicle.bienSo, maLoaiXe: vehicle.maLoaiXe, maNhaXe: vehicle.maNhaXe,
       ngayDangKiem: vehicle.ngayDangKiem ?? '', hanDangKiem: vehicle.hanDangKiem ?? '', trangThai: vehicle.trangThai,
       namSanXuat: vehicle.namSanXuat?.toString() ?? '', dungTichXang: vehicle.dungTichXang?.toString() ?? '', tocDo: vehicle.tocDo?.toString() ?? '' });
-    vehicleFormFocus.focusTarget('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
+    focusVehicleForm('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
   }
   function editType(type: Kind) {
     setEditingType(true); setTypeForm({ ...type, soChoNgoi: String(type.soChoNgoi), soTang: String(type.soTang), moTa: type.moTa ?? '' });
-    typeFormFocus.focusTarget('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
+    focusTypeForm('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
   }
   function submitType(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -98,7 +99,7 @@ export default function VehicleManagement() {
           dungTichXang: vehicleForm.dungTichXang ? Number(vehicleForm.dungTichXang) : null, tocDo: vehicleForm.tocDo ? Number(vehicleForm.tocDo) : null });
       await loadVehicles(); setSelected(current); setSeats(await request<Seat[]>(`/xe/${encodeURIComponent(current.maXe)}/ghe`));
       setEditingVehicle(false); setVehicleForm(emptyVehicle);
-      detailFocus.focusTarget();
+      focusDetail();
     }, editingVehicle ? 'Đã cập nhật xe.' : 'Đã thêm xe và tạo sơ đồ ghế.');
   }
   function updateSeat(index: number, changes: Partial<Seat>) { setSeats(current => current.map((seat, i) => i === index ? { ...seat, ...changes } : seat)); }
@@ -111,7 +112,7 @@ export default function VehicleManagement() {
     <nav className={styles.tabs}><button aria-pressed={tab === 'vehicles'} onClick={() => setTab('vehicles')}>Xe và ghế</button>
       {isAdmin && <button aria-pressed={tab === 'types'} onClick={() => setTab('types')}>Loại xe</button>}</nav>
     {busy && <p role="status">Đang xử lý…</p>}{error && <p className={styles.error} role="alert">{error}</p>}{success && <p className={styles.success} role="status">{success}</p>}
-    {tab === 'types' && isAdmin && <section ref={typeFormFocus.targetRef} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editingType ? 'Sửa loại xe' : 'Thêm loại xe'}</h2>
+    {tab === 'types' && isAdmin && <section ref={typeFormTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editingType ? 'Sửa loại xe' : 'Thêm loại xe'}</h2>
       <form className={styles.form} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} onSubmit={submitType}>
         <Field label="Mã loại xe" required maxLength={40} disabled={editingType} value={typeForm.maLoaiXe} onChange={e => setTypeForm({ ...typeForm, maLoaiXe: e.target.value })} />
         <Field label="Tên loại xe" required maxLength={120} value={typeForm.tenLoaiXe} onChange={e => setTypeForm({ ...typeForm, tenLoaiXe: e.target.value })} />
@@ -130,7 +131,7 @@ export default function VehicleManagement() {
         </td></tr>)}</tbody></table></div>
     </section>}
     {tab === 'vehicles' && <>
-      <section ref={vehicleFormFocus.targetRef} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editingVehicle ? `Sửa xe ${vehicleForm.maXe}` : 'Thêm xe'}</h2>
+      <section ref={vehicleFormTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editingVehicle ? `Sửa xe ${vehicleForm.maXe}` : 'Thêm xe'}</h2>
         <p>Sức chứa lấy từ loại xe. Xe không đủ đăng kiểm hoặc đang bảo trì không được gán vào chuyến mới.</p>
         <form className={styles.form} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} onSubmit={submitVehicle}>
           <Field label="Mã xe" required maxLength={40} disabled={editingVehicle} value={vehicleForm.maXe} onChange={e => setVehicleForm({ ...vehicleForm, maXe: e.target.value })} />
@@ -161,7 +162,7 @@ export default function VehicleManagement() {
           </td></tr>)}{vehicles.length === 0 && <tr><td colSpan={7}>Không có xe phù hợp.</td></tr>}
         </tbody></table></div>
       </section>
-      {selected && <section ref={detailFocus.targetRef} className={styles.panel}><h2 data-management-focus tabIndex={-1}>Chi tiết xe · {selected.bienSo}</h2>
+      {selected && <section ref={detailTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>Chi tiết xe · {selected.bienSo}</h2>
         <p>Nhà xe: {operators.find(owner => owner.maNhaXe === selected.maNhaXe)?.tenNhaXe || selected.maNhaXe}. Đăng kiểm: {selected.ngayDangKiem} → {selected.hanDangKiem}.</p>
         <p>Loại xe: {layoutType?.tenLoaiXe || selected.maLoaiXe} · Sức chứa: {selected.soChoNgoi} · Trạng thái: {vehicleStates[selected.trangThai]}.</p>
         <p>Năm sản xuất: {selected.namSanXuat ?? 'Chưa nhập'} · Dung tích nhiên liệu: {selected.dungTichXang == null ? 'Chưa nhập' : `${selected.dungTichXang} lít`} · Tốc độ: {selected.tocDo == null ? 'Chưa nhập' : `${selected.tocDo} km/giờ`}.</p>
