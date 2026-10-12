@@ -53,7 +53,7 @@ public class AuthFilter implements Filter {
                 try { identity = accounts.authenticate(token(req)); }
                 catch (AccountException e) { cookie(res, "", 0); throw e; }
                 req.setAttribute(IDENTITY, identity);
-                AccessPolicy.role(identity.user(), path);
+                AccessPolicy.role(identity.user(), path, req.getMethod());
                 if (!safe && !csrf(identity.csrfToken(), req.getHeader("X-CSRF-Token")))
                     throw new AccountException(403, "FORBIDDEN", "Yêu cầu không hợp lệ. Vui lòng tải lại trang.");
             } else if (!safe && !"datvexe".equals(req.getHeader("X-Requested-With"))) {

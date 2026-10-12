@@ -10,6 +10,8 @@ Mục tiêu: thống nhất cách frontend gửi yêu cầu, backend trả dữ 
 
 Bộ tài liệu gồm:
 
+- **[t10-vehicle-management.md](t10-vehicle-management.md)**: quản lý loại xe, xe, đăng kiểm, ghế vật lý và helper điều kiện khai thác T10.
+
 - **[account-auth.md](account-auth.md)** và **[account-openapi.yaml](account-openapi.yaml)**: hợp đồng tài khoản/xác thực đã triển khai trong T07.
 - **[T07.1-integration.md](../tasks/T07.1-integration.md)**: guard, helper và phạm vi quyền dùng chung.
 - **[t08-route-management.md](t08-route-management.md)**: API quản lý tỉnh/thành, bến xe, tuyến và điểm dừng thuộc T08.

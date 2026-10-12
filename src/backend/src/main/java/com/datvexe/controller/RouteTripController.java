@@ -79,6 +79,8 @@ public class RouteTripController extends HttpServlet {
                     result = service.createChuyenXe(body(request, Inputs.ChuyenXe.class)); status = 201;
                 } else if (p.length == 2 && method.equals("GET")) result = service.getChuyenXe(p[1]);
                 else if (p.length == 2 && method.equals("PUT")) result = service.updateChuyenXe(p[1], body(request, Inputs.CapNhatChuyen.class));
+                else if (p.length == 3 && p[2].equals("ghe") && method.equals("GET"))
+                    result = new VehicleService(Jpa.factory()).tripSeats(p[1]);
                 else if (p.length == 3 && p[2].equals("trang-thai") && method.equals("GET"))
                     result = Map.of("trangThai", service.getChuyenXe(p[1]).get("trangThai"));
                 else if (p.length == 3 && p[2].equals("xe") && method.equals("PUT"))

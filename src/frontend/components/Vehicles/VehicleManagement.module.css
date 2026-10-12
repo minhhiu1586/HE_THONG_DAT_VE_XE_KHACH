@@ -1,0 +1,24 @@
+.page { max-width: 1280px; padding: 24px 20px 60px; margin: auto; color: #18324f; }
+.page h1 { font-size: clamp(26px, 4vw, 38px); }
+.page p { margin: 12px 0; }
+.panel { background: white; border: 1px solid #dde5ef; border-radius: 14px; padding: 22px; margin: 20px 0; }
+.tabs, .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+.page button { padding: 10px 14px; margin: 3px; border: 0; border-radius: 7px; background: #e9f0ff; color: #1857b4; font-weight: 700; cursor: pointer; }
+.page button[aria-pressed=true], .form > button:not([type]), .buttons > button:not([type]) { background: #2563eb; color: white; }
+.page button:disabled { opacity: .5; cursor: not-allowed; }
+.form, .filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: end; margin: 18px 0; }
+.page label { display: grid; gap: 7px; font-weight: 600; }
+.page input, .page select { width: 100%; padding: 10px; min-width: 0; border: 1px solid #cbd5e1; border-radius: 7px; background: white; color: #18324f; }
+.page input:disabled, .page select:disabled, .page input:read-only { background: #f1f5f9; }
+.page input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+.page input::-webkit-inner-spin-button, .page input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.scroll { overflow-x: auto; }
+.page table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.page td, .page th { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+.error, .success, .warning { padding: 14px; border-radius: 8px; }
+.error { background: #fff0ee; color: #9e2727; }.success { background: #eaf8ef; color: #176a3b; }.warning { background: #fff8df; color: #7a5510; }
+.seatGrid { display: grid; grid-template-columns: repeat(4, minmax(60px, 120px)); gap: 10px; margin: 14px 0 24px; }
+.seat { display: grid; gap: 6px; padding: 12px 7px; border-radius: 8px; text-align: center; font-weight: 700; }.seat small { font-size: 11px; font-weight: 400; }
+.activeSeat { background: #e7f2ff; border: 1px solid #90bdf2; }.maintenanceSeat { background: #f5ebe5; border: 1px solid #d3aaa0; color: #8b4632; }
+@media(max-width: 760px) { .form, .filters { grid-template-columns: 1fr 1fr; } .panel { padding: 16px; } }
+@media(max-width: 480px) { .form, .filters { grid-template-columns: 1fr; } .page { padding: 20px 12px; } }

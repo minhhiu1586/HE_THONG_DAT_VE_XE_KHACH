@@ -76,9 +76,12 @@ def setup():
         call("POST", "/tinh-thanh", {"maTinhThanh": ident(name), "tenTinhThanh": name}, 201)
     call("POST", "/ben-xe", station("A"), 201)
     call("POST", "/ben-xe", station("B", "CITY_B"), 201)
-    sql(f"INSERT INTO xe (ma_xe,bien_so,so_cho_ngoi,trang_thai) VALUES "
-        f"('{ident('X')}','{ident('X')}',40,'SAN_SANG'),"
-        f"('{ident('BROKEN')}','{ident('BROKEN')}',40,'BAO_TRI')")
+    sql(f"INSERT INTO nha_xe (ma_nha_xe,ten_nha_xe,trang_thai) VALUES ('{ident('NX')}','Test','HOAT_DONG');"
+        f"INSERT INTO loai_xe (ma_loai_xe,ten_loai_xe,so_cho_ngoi,so_tang) VALUES ('{ident('LX')}','Test',40,2);"
+        f"INSERT INTO xe (ma_xe,bien_so,so_cho_ngoi,trang_thai,ma_loai_xe,ma_nha_xe,ngay_dang_kiem,han_dang_kiem) VALUES "
+        f"('{ident('X')}','{ident('X')}',40,'SAN_SANG','{ident('LX')}','{ident('NX')}','2020-01-01','2100-01-01'),"
+        f"('{ident('BROKEN')}','{ident('BROKEN')}',40,'BAO_TRI','{ident('LX')}','{ident('NX')}','2020-01-01','2100-01-01');"
+        f"INSERT INTO ghe (ma_ghe,vi_tri,tang,trang_thai,ma_xe) SELECT '{ident('G')}'||i,'G'||i,1,'HOAT_DONG','{ident('X')}' FROM generate_series(1,40) i")
 
 
 def crud():
@@ -207,7 +210,7 @@ def validation():
 
 def cleanup():
     for table, key in (("chuyen_xe", "ma_chuyen"), ("diem_dung", "ma_diem_dung"),
-                       ("tuyen_xe", "ma_tuyen"), ("xe", "ma_xe"), ("ben_xe", "ma_ben_xe"),
+                       ("tuyen_xe", "ma_tuyen"), ("ghe", "ma_ghe"), ("xe", "ma_xe"), ("loai_xe", "ma_loai_xe"), ("nha_xe", "ma_nha_xe"), ("ben_xe", "ma_ben_xe"),
                        ("tinh_thanh", "ma_tinh_thanh")):
         # Prefix contains only ASCII letters, digits and underscores, generated here.
         sql(f"DELETE FROM {table} WHERE left({key}, {len(PREFIX)}) = '{PREFIX}'")

@@ -1,5 +1,15 @@
 # Kiểm tra backend tuyến/chuyến
 
+## T10 — Quản lý xe và sơ đồ ghế
+
+Hướng dẫn mới: [t10-vscode-guide.md](../../docs/plans/t10-vscode-guide.md), [ma trận T10](../../docs/tasks/T10-test-matrix.md), [API/helper T10](../../docs/api/t10-vehicle-management.md).
+
+```bash
+python3 tests/backend/vehicle_management_smoke.py
+```
+
+Chạy ở thư mục gốc với WAR T10 vừa build và PostgreSQL phát triển có schema 001/002/003. Có thể đặt `API_BASE_URL`, `DB_NAME`, `DB_CONTAINER`. Script tạo riêng loại xe/xe/ghế/tuyến/chuyến/đơn/vé và kiểm tra quyền bằng tài khoản fixture; tự dọn dữ liệu của lượt chạy. Bộ test xe cũ đã được điều chỉnh để thay ghế bằng toàn sơ đồ, không xóa một ghế làm thiếu sức chứa.
+
 Chạy test nghiệp vụ từ thư mục gốc repository:
 
 ```bash

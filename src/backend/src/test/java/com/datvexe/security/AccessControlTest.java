@@ -41,12 +41,15 @@ class AccessControlTest {
             TinhThanh city = new TinhThanh(); city.maTinhThanh = "T"; city.tenTinhThanh = "T"; em.persist(city);
             BenXe start = new BenXe(); start.maBenXe = "S"; start.tenBenXe = "S"; start.diaChi = "S"; start.tinhThanh = city; em.persist(start);
             BenXe end = new BenXe(); end.maBenXe = "D"; end.tenBenXe = "D"; end.diaChi = "D"; end.tinhThanh = city; em.persist(end);
+            LoaiXe type=new LoaiXe();type.maLoaiXe="L";type.tenLoaiXe="Test";type.soChoNgoi=2;em.persist(type);
             for (NhaXe owner : List.of(a, b)) {
                 String id = owner.maNhaXe;
                 TuyenXe route = new TuyenXe(); route.maTuyen = "R" + id; route.tenTuyen = id; route.nhaXe = owner;
                 route.tramKhoiHanh = start; route.tramDen = end; route.giaCoBan = BigDecimal.TEN; route.thoiGianDuKien = BigDecimal.ONE;
                 route.trangThai = TrangThaiTuyenXe.DANG_KHAI_THAC; em.persist(route);
-                Xe vehicle = new Xe(); vehicle.maXe = "X" + id; vehicle.bienSo = id; vehicle.soChoNgoi = 1; vehicle.nhaXe = owner; em.persist(vehicle);
+                Xe vehicle = new Xe(); vehicle.maXe = "X" + id; vehicle.bienSo = id; vehicle.soChoNgoi = 2; vehicle.nhaXe = owner;vehicle.loaiXe=type;
+                vehicle.ngayDangKiem=LocalDate.of(2020,1,1);vehicle.hanDangKiem=LocalDate.of(2100,1,1);em.persist(vehicle);
+                if(id.equals("B")) for(int i=1;i<=2;i++) { var g=new Ghe();g.maGhe="GB"+i;g.viTri="G"+i;g.xe=vehicle;em.persist(g); }
                 ChuyenXe trip = new ChuyenXe(); trip.maChuyen = "C" + id; trip.tuyenXe = route; trip.xe = vehicle;
                 trip.ngayKhoiHanh = LocalDate.of(2030, 1, 1); trip.gioKhoiHanh = LocalTime.NOON; trip.gioDenDuKien = trip.ngayKhoiHanh.atTime(13, 0); em.persist(trip);
             }

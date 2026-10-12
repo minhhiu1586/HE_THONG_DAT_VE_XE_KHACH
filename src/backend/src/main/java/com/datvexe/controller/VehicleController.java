@@ -15,7 +15,14 @@ import java.util.Map;
 public class VehicleController extends HttpServlet {
     private VehicleService service;
     private final ObjectMapper json=new ObjectMapper().registerModule(new JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+        .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
+    public VehicleController() {
+        json.coercionConfigFor(com.fasterxml.jackson.databind.type.LogicalType.Textual)
+            .setCoercion(com.fasterxml.jackson.databind.cfg.CoercionInputShape.Integer, com.fasterxml.jackson.databind.cfg.CoercionAction.Fail)
+            .setCoercion(com.fasterxml.jackson.databind.cfg.CoercionInputShape.Float, com.fasterxml.jackson.databind.cfg.CoercionAction.Fail)
+            .setCoercion(com.fasterxml.jackson.databind.cfg.CoercionInputShape.Boolean, com.fasterxml.jackson.databind.cfg.CoercionAction.Fail);
+    }
     @Override public void init() { service=new VehicleService(Jpa.factory()); }
     private <T> T body(HttpServletRequest req,Class<T> type) throws IOException {
         T value=json.readValue(req.getInputStream(),type);
@@ -28,7 +35,11 @@ public class VehicleController extends HttpServlet {
             String path=req.getPathInfo();
             String[] p=path==null || path.equals("/")?new String[0]:path.substring(1).split("/");
             String method=req.getMethod(); Object result; int status=200;
-            if(kind.equals("xe") && p.length==3 && p[1].equals("dieu-kien") && method.equals("GET")) {
+            if(kind.equals("xe") && p.length==1 && p[0].equals("pham-vi") && method.equals("GET")) {
+                result=service.operators();
+            } else if(kind.equals("xe") && p.length==2 && p[1].equals("so-do-ghe") && method.equals("PUT")) {
+                result=service.saveLayout(p[0],body(req,VehicleInputs.SoDoGhe.class));
+            } else if(kind.equals("xe") && p.length==3 && p[1].equals("dieu-kien") && method.equals("GET")) {
                 result=service.vehicleEligibility(p[0],p[2]);
             } else if(kind.equals("xe") && p.length>=2 && p[1].equals("ghe")) {
                 if(p.length==2 && method.equals("GET")) result=service.seats(p[0],false);
@@ -40,7 +51,7 @@ public class VehicleController extends HttpServlet {
                 else throw new DomainException(404,"API không tồn tại");
             } else if(p.length<=1) {
                 String id=p.length==0?null:p[0];
-                if(method.equals("GET")) result=id==null?service.list(kind):service.get(kind,id);
+                if(method.equals("GET")) result=id==null?service.filtered(kind,req.getParameter("q"),req.getParameter("maLoaiXe"),req.getParameter("maNhaXe"),req.getParameter("trangThai"),req.getParameter("maChuyen")):service.get(kind,id);
                 else if((method.equals("POST") && id==null) || (method.equals("PUT") && id!=null)) {
                     result=switch(kind) {
                         case "loai-xe" -> service.saveType(id,body(req,VehicleInputs.LoaiXe.class));

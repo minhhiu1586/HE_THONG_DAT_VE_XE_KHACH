@@ -418,6 +418,9 @@ public class RouteTripService {
             if (start.isBefore(c.gioDenDuKien) && otherStart.isBefore(trip.gioDenDuKien))
                 throw new DomainException(409, "Xe đã có chuyến trùng thời gian");
         }
+        if ((trip.xe == null || !trip.xe.maXe.equals(xe.maXe)) && VehicleRules.hasTicketsOrHolds(em, trip))
+            throw new DomainException(409, "Không thể đổi xe của chuyến đã có vé hoặc giữ chỗ.");
+        VehicleRules.ready(em, xe.maXe, trip);
         trip.xe = xe;
     }
     public Map<String, Object> assignVehicle(String id, String xeId) {
