@@ -1124,7 +1124,7 @@
       "executor": "",
       "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
       "evidence": [],
-      "notes": "Chưa có API CRUD nhà xe/phân quyền",
+      "notes": "T09 đã có service/API và unit test; còn cần xác nhận quy tắc trạng thái và chạy ca tích hợp HTTP/PostgreSQL với seed.",
       "source": "T01; T02; docs/api/api-contract.md; code develop"
     },
     {
@@ -1147,7 +1147,7 @@
       "executor": "",
       "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
       "evidence": [],
-      "notes": "Chưa có API CRUD nhà xe/phân quyền",
+      "notes": "T09 đã có kiểm tra Admin và unit test; còn cần chạy ca HTTP với phiên khách hàng thực tế.",
       "source": "T01; T02; docs/api/api-contract.md; code develop"
     },
     {
@@ -1170,7 +1170,7 @@
       "executor": "",
       "owner": "Thành viên phụ trách chức năng; Kim Cương tổng hợp",
       "evidence": [],
-      "notes": "Chưa có API CRUD nhà xe/phân quyền",
+      "notes": "T09 trả 409 khi xóa nhà xe đã được tham chiếu và cho đổi trạng thái; còn cần kiểm thử tích hợp PostgreSQL và nhóm duyệt quy tắc.",
       "source": "T01; T02; docs/api/api-contract.md; code develop"
     },
     {

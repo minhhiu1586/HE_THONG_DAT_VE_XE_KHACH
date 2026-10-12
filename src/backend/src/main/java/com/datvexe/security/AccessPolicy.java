@@ -40,6 +40,7 @@ public final class AccessPolicy {
         String[] p = path.substring("/api/".length()).split("/");
         if (user.loaiTaiKhoan == LoaiTaiKhoan.NHA_XE) {
             AccessControl.operator(user, user.nhaXe);
+            if (!Set.of("GET", "HEAD").contains(context.method())) AccessControl.activeOperator(em, user);
             if (p.length > 1) switch (p[0]) {
                 case "tuyen-xe" -> AccessControl.route(em, user, p[1]);
                 case "chuyen-xe" -> AccessControl.trip(em, user, p[1]);

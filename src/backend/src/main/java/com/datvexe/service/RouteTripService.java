@@ -383,6 +383,7 @@ public class RouteTripService {
         return write(em -> {
             newId(em, ChuyenXe.class, input.maChuyen());
             TuyenXe route = found(em, TuyenXe.class, input.maTuyen());
+            AccessControl.businessAllowed(em, route.nhaXe);
             if (route.trangThai != TrangThaiTuyenXe.DANG_KHAI_THAC)
                 throw new DomainException(409, "Tuyến chưa hoạt động");
             if (route.tramKhoiHanh.trangThai != TrangThaiBenXe.HOAT_DONG || route.tramDen.trangThai != TrangThaiBenXe.HOAT_DONG)

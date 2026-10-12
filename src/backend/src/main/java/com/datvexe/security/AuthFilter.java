@@ -61,15 +61,15 @@ public class AuthFilter implements Filter {
             }
             JsonNode body = null;
             HttpServletRequest actual = req;
-            if (!safe && req.getContentLengthLong() != 0) {
-                if (req.getContentType() == null || !req.getContentType().toLowerCase(Locale.ROOT).split(";", 2)[0].strip().equals("application/json"))
-                    throw new AccountException(415, "UNSUPPORTED_MEDIA_TYPE", "Chỉ hỗ trợ application/json.");
+            if (!safe) {
                 byte[] bytes = req.getInputStream().readNBytes(65_537);
                 if (bytes.length > 65_536) throw new AccountException(413, "REQUEST_TOO_LARGE", "Nội dung yêu cầu quá lớn.");
                 if (bytes.length > 0) {
+                    if (req.getContentType() == null || !req.getContentType().toLowerCase(Locale.ROOT).split(";", 2)[0].strip().equals("application/json"))
+                        throw new AccountException(415, "UNSUPPORTED_MEDIA_TYPE", "Chỉ hỗ trợ application/json.");
                     try { body = json.readTree(bytes); } catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw AccountException.invalid("body", "JSON không hợp lệ."); }
+                    actual = new CachedRequest(req, bytes);
                 }
-                actual = new CachedRequest(req, bytes);
             }
             RequestIdentity.set(new RequestIdentity.Context(identity == null ? null : identity.user(), req.getMethod(), path, body));
             chain.doFilter(actual, res);

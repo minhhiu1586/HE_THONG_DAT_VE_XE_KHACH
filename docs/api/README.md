@@ -13,6 +13,7 @@ Bộ tài liệu gồm:
 - **[account-auth.md](account-auth.md)** và **[account-openapi.yaml](account-openapi.yaml)**: hợp đồng tài khoản/xác thực đã triển khai trong T07.
 - **[T07.1-integration.md](../tasks/T07.1-integration.md)**: guard, helper và phạm vi quyền dùng chung.
 - **[t08-route-management.md](t08-route-management.md)**: API quản lý tỉnh/thành, bến xe, tuyến và điểm dừng thuộc T08.
+- **[t09-operator-management.md](t09-operator-management.md)**: API quản lý nhà xe, trạng thái và tài khoản quản lý thuộc T09.
 - **README.md**: quy ước chung, cách xử lý lỗi và các điểm cần thống nhất.
 - **[api-contract.md](api-contract.md)**: danh sách API, request/response và dữ liệu mẫu ngay trong từng nhóm.
 - **[openapi.yaml](openapi.yaml)**: kiểu dữ liệu, trường bắt buộc, giá trị null và ví dụ chi tiết để xem bằng công cụ hỗ trợ OpenAPI/Swagger. https://editor.swagger.io/

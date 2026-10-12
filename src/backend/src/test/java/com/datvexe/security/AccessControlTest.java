@@ -97,6 +97,17 @@ class AccessControlTest {
             AccessControl.trip(em, user(em, "AD"), "CB");
         });
     }
+    @Test void suspendedOperatorCanReadOwnHistoryButCannotWriteOrSell() throws Exception {
+        tx(em -> em.find(NhaXe.class, "A").trangThai = TrangThaiNhaXe.TAM_NGUNG);
+        context("NX", "GET", "/api/tuyen-xe/RA", null);
+        tx(em -> AccessPolicy.guard(em));
+        context("NX", "PUT", "/api/tuyen-xe/RA", "{}");
+        tx(em -> forbidden(() -> AccessPolicy.guard(em)));
+        tx(em -> {
+            assertEquals(409, assertThrows(AccountException.class, () -> AccessControl.saleAllowed(em, "CA")).status());
+            AccessControl.saleAllowed(em, "CB");
+        });
+    }
     @Test void employeeMustHaveCurrentAssignmentAndActiveEmployment() {
         tx(em -> { AccessControl.assigned(em, user(em, "NV"), "CA"); forbidden(() -> AccessControl.assigned(em, user(em, "NV"), "CB")); });
         tx(em -> em.remove(em.find(PhanCongChuyenXe.class, "P")));
