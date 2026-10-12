@@ -28,7 +28,7 @@ class RouteTripServiceTest {
         service = new RouteTripService(factory);
         try (EntityManager em = factory.createEntityManager()) {
             em.getTransaction().begin();
-            for (String name : List.of("ChuyenXe", "DiemDung", "TuyenXe", "Xe", "NhaXe", "BenXe", "TinhThanh"))
+            for (String name : List.of("ChuyenXe", "DiemDung", "TuyenXe", "Ghe", "Xe", "LoaiXe", "NhaXe", "BenXe", "TinhThanh"))
                 em.createQuery("delete from " + name).executeUpdate();
             em.getTransaction().commit();
         }
@@ -45,8 +45,11 @@ class RouteTripServiceTest {
     private void vehicle(String id) {
         try (EntityManager em = factory.createEntityManager()) {
             em.getTransaction().begin();
-            Xe x = new Xe(); x.maXe = id; x.bienSo = id; x.soChoNgoi = 40;
-            em.persist(x);
+            if(em.find(NhaXe.class,"TEST_NX")==null) { var n=new NhaXe();n.maNhaXe="TEST_NX";n.tenNhaXe="Test";em.persist(n); }
+            if(em.find(LoaiXe.class,"TEST_L")==null) { var l=new LoaiXe();l.maLoaiXe="TEST_L";l.tenLoaiXe="Test";l.soChoNgoi=40;l.soTang=2;em.persist(l); }
+            Xe x = new Xe(); x.maXe = id; x.bienSo = id; x.soChoNgoi = 40;x.nhaXe=em.find(NhaXe.class,"TEST_NX");x.loaiXe=em.find(LoaiXe.class,"TEST_L");
+            x.ngayDangKiem=LocalDate.of(2020,1,1);x.hanDangKiem=LocalDate.of(2100,1,1);em.persist(x);
+            for(int i=1;i<=40;i++) { var g=new Ghe();g.maGhe=id+"_"+i;g.viTri="G"+i;g.xe=x;em.persist(g); }
             em.getTransaction().commit();
         }
     }

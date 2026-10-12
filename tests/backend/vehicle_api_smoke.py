@@ -44,7 +44,7 @@ def main():
         kind["tenLoaiXe"] = "HTTP updated"
         assert call("PUT", "/loai-xe/" + type_id, kind)["tenLoaiXe"] == "HTTP updated"
         today = date.today()
-        vehicle = dict(maXe=vehicle_id, bienSo=tag, maLoaiXe=type_id, maNhaXe="DEMO_NX",
+        vehicle = dict(maXe=vehicle_id, bienSo=tag.replace("_", "-"), maLoaiXe=type_id, maNhaXe="DEMO_NX",
                        namSanXuat=2024, ngayDangKiem=str(today - timedelta(days=30)),
                        hanDangKiem=str(today + timedelta(days=365)), trangThai="SAN_SANG",
                        tocDo=60, dungTichXang=100)
@@ -58,10 +58,11 @@ def main():
         seat_path = seats_path + "/" + seats[0]["maGhe"]
         call("GET", seat_path)
         call("PUT", seat_path, dict(viTri="A01", tang=1, trangThai="BAO_TRI"))
-        call("DELETE", seat_path, expected=204)
+        call("DELETE", seat_path, expected=409)
+        replacement = [dict(maGhe=s["maGhe"], viTri=s["viTri"], tang=s["tang"], trangThai=s["trangThai"]) for s in call("GET", seats_path)]
+        replacement[0] = dict(maGhe=None, viTri="B01", tang=2, trangThai="HOAT_DONG")
+        call("PUT", "/xe/" + vehicle_id + "/so-do-ghe", dict(danhSachGhe=replacement))
         call("GET", seat_path, expected=404)
-        new_seat = call("POST", seats_path, dict(viTri="B01", tang=2, trangThai="HOAT_DONG"), 201)
-        assert call("GET", seats_path + "/" + new_seat["maGhe"])["viTri"] == "B01"
         assert len(call("GET", seats_path)) == 29
         assignment = dict(maPhanCong=assignment_id, maChuyen="DEMO_SAU",
                           maNhanVien="DEMO_TX", vaiTro="TAI_XE_CHINH", ghiChu="HTTP test")

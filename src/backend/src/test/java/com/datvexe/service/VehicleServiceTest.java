@@ -42,7 +42,7 @@ class VehicleServiceTest {
     }
     @Test void duplicatePlateRollsBackVehicleAndGeneratedSeats() {
         service.saveVehicle(null,vehicle("X","51B-12345"));
-        assertThrows(PersistenceException.class,()->service.saveVehicle(null,vehicle("Y","51B-12345")));
+        assertThrows(DomainException.class,()->service.saveVehicle(null,vehicle("Y","51B-12345")));
         assertEquals(1,service.list("xe").size());
         assertEquals(404,assertThrows(DomainException.class,()->service.get("xe","Y")).status());
     }
@@ -51,13 +51,12 @@ class VehicleServiceTest {
         var seats=service.seats("X",false);
         String id=(String)seats.get(0).get("maGhe");
         assertThrows(DomainException.class,()->service.createSeat("X",new VehicleInputs.Ghe("EXTRA",1,null)));
-        service.deleteSeat("X",id);
-        assertEquals(5,service.seats("X",false).size());
+        assertEquals(409,assertThrows(DomainException.class,()->service.deleteSeat("X",id)).status());
+        var layout=seats.stream().map(g -> new VehicleInputs.ViTriGhe((String)g.get("maGhe"),(String)g.get("viTri"),(Integer)g.get("tang"),TrangThaiGhe.HOAT_DONG)).toList();
+        var replaced=new java.util.ArrayList<>(layout);
+        replaced.set(0,new VehicleInputs.ViTriGhe(null,"A01",2,TrangThaiGhe.HOAT_DONG));
+        assertEquals(6,service.saveLayout("X",new VehicleInputs.SoDoGhe(replaced)).size());
         assertThrows(DomainException.class,()->service.getSeat("X",id));
-        assertThrows(PersistenceException.class,()->service.createSeat("X",new VehicleInputs.Ghe("G002",1,null)));
-        assertEquals(5,service.seats("X",false).size());
-        var created=service.createSeat("X",new VehicleInputs.Ghe("A01",2,TrangThaiGhe.HOAT_DONG));
-        assertEquals("A01",service.getSeat("X",(String)created.get("maGhe")).get("viTri"));
         assertEquals(6,service.seats("X",false).size());
     }
     @Test void rejectsInvalidInspectionAndSeatStructure() {

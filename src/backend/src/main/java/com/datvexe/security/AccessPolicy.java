@@ -16,7 +16,12 @@ public final class AccessPolicy {
             || path.matches("/api/tinh-thanh/[^/]+") || path.matches("/api/ben-xe/[^/]+")
             || path.matches("/api/chuyen-xe/[^/]+(?:/(?:ghe|gia|trang-thai))?"));
     }
-    public static void role(CurrentUser user, String path) {
+    public static void role(CurrentUser user, String path) { role(user, path, "POST"); }
+    public static void role(CurrentUser user, String path, String method) {
+        if (path.startsWith("/api/loai-xe") && method.equals("GET")) {
+            if (user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan() != LoaiTaiKhoan.NHA_XE) throw AccessControl.denied();
+            return;
+        }
         if (path.startsWith("/api/quan-tri/") || path.startsWith("/api/loai-xe")
                 || path.startsWith("/api/tinh-thanh") || path.startsWith("/api/ben-xe")) {
             if (user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN) throw AccessControl.denied();
@@ -35,7 +40,7 @@ public final class AccessPolicy {
         String path = context.path(); CurrentUser current = new CurrentUser(user.maNguoiDung, user.loaiTaiKhoan,
             user.nhaXe == null ? null : user.nhaXe.maNhaXe, user.nhanVien == null ? null : user.nhanVien.maNhanVien,
             context.user().sessionHash());
-        role(current, path);
+        role(current, path, context.method());
         RequestIdentity.set(new RequestIdentity.Context(current, context.method(), path, context.body()));
         String[] p = path.substring("/api/".length()).split("/");
         if (user.loaiTaiKhoan == LoaiTaiKhoan.NHA_XE) {
@@ -45,7 +50,7 @@ public final class AccessPolicy {
                 case "tuyen-xe" -> AccessControl.route(em, user, p[1]);
                 case "chuyen-xe" -> AccessControl.trip(em, user, p[1]);
                 case "xe" -> {
-                    AccessControl.vehicle(em, user, p[1]);
+                    if (!(p.length == 2 && p[1].equals("pham-vi") && context.method().equals("GET"))) AccessControl.vehicle(em, user, p[1]);
                     if (p.length == 4 && p[2].equals("dieu-kien")) AccessControl.trip(em, user, p[3]);
                 }
                 case "phan-cong" -> {
@@ -60,12 +65,12 @@ public final class AccessPolicy {
                 if ((p[0].equals("xe") || p[0].equals("tuyen-xe")) && p.length <= 2
                         && Set.of("POST", "PUT").contains(context.method())) {
                     String owner = text(body, "maNhaXe");
-                    if ((p[0].equals("xe") && owner == null) || (owner != null && !owner.equals(user.nhaXe.maNhaXe)))
+                    if ((owner != null && !owner.equals(user.nhaXe.maNhaXe)))
                         throw AccessControl.denied();
                 }
                 String route = text(body, "maTuyen"), vehicle = text(body, "maXe"), trip = text(body, "maChuyen"), employee = text(body, "maNhanVien");
                 if (route != null && !(p[0].equals("tuyen-xe") && p.length == 1)) AccessControl.route(em, user, route);
-                if (vehicle != null) AccessControl.vehicle(em, user, vehicle);
+                if (vehicle != null && !(p[0].equals("xe") && p.length == 1 && context.method().equals("POST"))) AccessControl.vehicle(em, user, vehicle);
                 if (trip != null) AccessControl.trip(em, user, trip);
                 if (employee != null) AccessControl.employee(em, user, employee);
             }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import styles from './Header.module.css';
 import { useAuth } from '../Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
+import { canManage } from '@/lib/management-navigation';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -19,6 +20,7 @@ export default function Header() {
     finally { setLoggingOut(false); }
   }
   const accountActions = loading ? <span className={styles.actionLink}>Đang kiểm tra…</span> : user ? <>
+    {canManage(user.loaiTaiKhoan) && <Link href="/quan-tri" className={`${styles.loginBtn} ${styles.managementBtn}`}>{user.loaiTaiKhoan === 'ADMIN' ? 'Quản trị' : 'Quản lý nhà xe'}</Link>}
     <Link href="/tai-khoan" className={styles.loginBtn}>👤 {user.hoTen}</Link>
     <button className={styles.loginBtn} onClick={logout} disabled={loggingOut}>{loggingOut ? 'Đang đăng xuất…' : 'Đăng xuất'}</button>
   </> : <Link href="/dang-nhap" className={styles.loginBtn}>👤 Đăng nhập</Link>;
@@ -42,7 +44,7 @@ export default function Header() {
               Xe khách
             </button>
           </nav>
-          <div className={styles.headerRight}>
+          <div className={`${styles.headerRight} ${styles.marketingLinks}`}>
             <div className={styles.actionLinks}>
                <span className={styles.actionLink}>📋 Đơn hàng của tôi</span>
                <span className={styles.actionLink}>🏢 Mở bán vé trên VeXe</span>
@@ -60,6 +62,8 @@ export default function Header() {
             className={styles.mobileMenuBtn}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="header-mobile-menu"
           >
             {mobileMenuOpen ? '✕' : '☰'}
           </button>
@@ -68,11 +72,12 @@ export default function Header() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className={styles.mobileMenu}>
+        <div id="header-mobile-menu" className={styles.mobileMenu}>
           <button className={`${styles.navTab} ${styles.navTabActive}`}>
             🚌 Xe khách
           </button>
           {user ? <>
+            {canManage(user.loaiTaiKhoan) && <Link href="/quan-tri" onClick={() => setMobileMenuOpen(false)}>{user.loaiTaiKhoan === 'ADMIN' ? 'Quản trị' : 'Quản lý nhà xe'}</Link>}
             <Link href="/tai-khoan" onClick={() => setMobileMenuOpen(false)}>Hồ sơ cá nhân</Link>
             <button className={styles.navTab} onClick={logout} disabled={loggingOut}>Đăng xuất</button>
           </> : <Link href="/dang-nhap" onClick={() => setMobileMenuOpen(false)}>Đăng nhập / Đăng ký</Link>}

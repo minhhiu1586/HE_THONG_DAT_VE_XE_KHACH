@@ -146,6 +146,11 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+.managementBtn { background: white; color: var(--primary-dark); border-color: white; }
+.managementBtn:hover { background: var(--primary-light); }
+.managementBtn:focus-visible { outline: 3px solid white; outline-offset: 3px; }
+@media (max-width: 1600px) { .marketingLinks { display: none; } }
+
 /* Trust Badges */
 .trustBar {
   background: var(--surface);

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { errorMessage, Profile } from '@/lib/account-api';
@@ -59,7 +58,5 @@ export default function ProfilePanel() {
         <button className={styles.primary} disabled={busy}>{busy ? 'Đang xử lý…' : 'Đổi mật khẩu'}</button>
       </form>
     </section>
-    {user.loaiTaiKhoan === 'ADMIN' && <div className={styles.links}><Link href="/quan-tri/tai-khoan">Quản lý trạng thái tài khoản</Link><Link href="/quan-tri/tuyen-duong">Quản lý tuyến, bến xe và tỉnh thành</Link></div>}
-    {user.loaiTaiKhoan === 'NHA_XE' && <div className={styles.links}><Link href="/quan-tri/tuyen-duong">Quản lý tuyến xe và điểm dừng</Link></div>}
   </div>;
 }
