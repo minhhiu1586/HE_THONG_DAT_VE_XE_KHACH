@@ -41,4 +41,4 @@ Public API tìm chuyến chỉ trả chuyến `DANG_MO_BAN` còn đủ điều k
 
 Module giữ ghế/đặt vé phải gọi `AccessControl.saleAllowed` và `VehicleRules.seatSellable` trong giao dịch ghi, theo đồng hồ backend; không tin lựa chọn hoặc cờ frontend. T12 chưa triển khai toàn bộ giữ ghế, thanh toán hay mua vé; kiểm tra helper không thay thế nghiệm thu các API đó. Trang tìm vé hiện có còn dùng dữ liệu mock thuộc công việc tích hợp tiếp theo.
 
-Giao diện quản lý: `/quan-tri/chuyen-xe`, menu Quản lý và thanh bên. T11 phân công được tích hợp qua API hiện có; không thêm module giao diện T11 ngoài phạm vi.
+Giao diện quản lý: `/quan-tri/chuyen-xe`, menu Quản lý và thanh bên. T11 phân công được tích hợp qua API hiện có; không thêm module giao diện T11 ngoài phạm vi. Trang chủ và tìm chuyến đọc dữ liệu trực tiếp từ API/database, theo [T13](t13-trip-search-availability.md); frontend không dùng danh sách chuyến hoặc địa điểm mẫu.

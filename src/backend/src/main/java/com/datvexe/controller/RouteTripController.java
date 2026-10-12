@@ -50,7 +50,9 @@ public class RouteTripController extends HttpServlet {
                 else if (p.length == 2 && method.equals("DELETE")) { service.deleteBenXe(p[1]); result = null; status = 204; }
                 else throw new DomainException(404, "API không tồn tại");
             } else if (p[0].equals("tuyen-xe")) {
-                if (p.length == 1 && method.equals("GET")) result = service.listTuyenXe(request.getParameter("tramKhoiHanh"),
+                if (p.length == 2 && p[1].equals("cong-khai") && method.equals("GET"))
+                    result = service.listTuyenXe(null, null, null, TrangThaiTuyenXe.DANG_KHAI_THAC);
+                else if (p.length == 1 && method.equals("GET")) result = service.listTuyenXe(request.getParameter("tramKhoiHanh"),
                     request.getParameter("tramDen"), request.getParameter("maNhaXe"),
                     enumQuery(request.getParameter("trangThai"), TrangThaiTuyenXe.class));
                 else if (p.length == 1 && method.equals("POST")) { result = service.createTuyenXe(body(request, Inputs.TuyenXe.class)); status = 201; }

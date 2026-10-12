@@ -127,6 +127,8 @@ class VehicleTask10Test {
         vehicles.saveLayout("X1",new VehicleInputs.SoDoGhe(items));
         trip("C1","X1",DAY);returnTrip("C2","X1",DAY.plusDays(1));String seat=layout("X1").getFirst().maGhe();ticket("C1",seat);
         PublishedTripFixture.open(factory,"C2");
+        assertEquals(2L, trips.getChuyenXe("C1").get("soGheTrong"));
+        assertEquals(3L, trips.getChuyenXe("C2").get("soGheTrong"));
         tx(em -> {
             assertEquals("DA_BAN",VehicleRules.availability(em,em.find(ChuyenXe.class,"C1"),em.find(Ghe.class,seat),DAY.atStartOfDay()));
             assertEquals("TRONG",VehicleRules.availability(em,em.find(ChuyenXe.class,"C2"),em.find(Ghe.class,seat),DAY.atStartOfDay()));

@@ -96,6 +96,84 @@ public class RouteTripService {
             "ngungNhanDatVeLuc",TripSaleRules.cutoff(x).atZone(TripSaleRules.ZONE).toOffsetDateTime());
     }
 
+    private record SearchPoint(String kind, String code) {}
+    private static SearchPoint searchPoint(String value, String field) {
+        String input = required(value, field);
+        int separator = input.indexOf(':');
+        if (separator > 0) {
+            String kind = input.substring(0, separator).toUpperCase(Locale.ROOT);
+            if (kind.equals("CITY") || kind.equals("STATION"))
+                return new SearchPoint(kind, text(input.substring(separator + 1), field, 40, true));
+        }
+        return new SearchPoint("ANY", text(input, field, 40, true));
+    }
+
+    private static String cityOf(EntityManager em, SearchPoint point) {
+        if (point.kind().equals("CITY")) {
+            if (em.find(TinhThanh.class, point.code()) == null) throw new DomainException(400, "Tỉnh/thành phố không tồn tại: " + point.code());
+            return point.code();
+        }
+        if (point.kind().equals("STATION")) {
+            BenXe station = em.find(BenXe.class, point.code());
+            if (station == null) throw new DomainException(400, "Bến xe không tồn tại: " + point.code());
+            return station.tinhThanh.maTinhThanh;
+        }
+        TinhThanh city = em.find(TinhThanh.class, point.code());
+        if (city != null) return city.maTinhThanh;
+        BenXe station = em.find(BenXe.class, point.code());
+        if (station != null) return station.tinhThanh.maTinhThanh;
+        throw new DomainException(400, "Điểm tìm kiếm không tồn tại: " + point.code());
+    }
+
+    private static Map<String, Object> searchView(EntityManager em, ChuyenXe trip, LocalDateTime now) {
+        var route = trip.tuyenXe;
+        var origin = route.tramKhoiHanh;
+        var destination = route.tramDen;
+        Map<String, Object> result = view(trip);
+        result.put("tenTuyen", route.tenTuyen);
+        result.put("maNhaXe", route.nhaXe == null ? null : route.nhaXe.maNhaXe);
+        result.put("tenNhaXe", route.nhaXe == null ? null : route.nhaXe.tenNhaXe);
+        result.put("logoNhaXe", route.nhaXe == null ? null : route.nhaXe.logoUrl);
+        result.put("maBenDi", origin.maBenXe);
+        result.put("tenBenDi", origin.tenBenXe);
+        result.put("diaChiBenDi", origin.diaChi);
+        result.put("maTinhDi", origin.tinhThanh.maTinhThanh);
+        result.put("tenTinhDi", origin.tinhThanh.tenTinhThanh);
+        result.put("maBenDen", destination.maBenXe);
+        result.put("tenBenDen", destination.tenBenXe);
+        result.put("diaChiBenDen", destination.diaChi);
+        result.put("maTinhDen", destination.tinhThanh.maTinhThanh);
+        result.put("tenTinhDen", destination.tinhThanh.tenTinhThanh);
+        result.put("thoiLuongPhut", Duration.between(LocalDateTime.of(trip.ngayKhoiHanh, trip.gioKhoiHanh), trip.gioDenDuKien).toMinutes());
+        result.put("diemDung", route.tramTrungGian.stream().sorted(Comparator.comparingInt(stop -> stop.thuTu))
+            .map(stop -> map("maDiemDung", stop.maDiemDung, "tenDiemDung", stop.tenDiemDung,
+                "diaChi", stop.diaChi, "thuTu", stop.thuTu, "thoiGianDung", stop.thoiGianDung)).toList());
+        result.put("bienSo", trip.xe == null ? null : trip.xe.bienSo);
+        if (trip.xe == null || trip.xe.loaiXe == null) {
+            result.put("maLoaiXe", null);
+            result.put("tenLoaiXe", null);
+            result.put("soChoNgoi", 0);
+            result.put("tongSoGhe", 0L);
+            result.put("soGheTrong", 0L);
+        } else {
+            result.put("maLoaiXe", trip.xe.loaiXe.maLoaiXe);
+            result.put("tenLoaiXe", trip.xe.loaiXe.tenLoaiXe);
+            result.put("soChoNgoi", trip.xe.soChoNgoi);
+            Long total = em.createQuery("select count(g) from Ghe g where g.xe = :vehicle", Long.class)
+                .setParameter("vehicle", trip.xe).getSingleResult();
+            Long available = em.createQuery("select count(g) from Ghe g where g.xe = :vehicle and g.trangThai = :active " +
+                    "and not exists (select v.maVe from VeXe v where v.chuyenXe = :trip and v.ghe = g and v.trangThai in :sold) " +
+                    "and not exists (select h.maGiuCho from GiuCho h where h.chuyenXe = :trip and h.ghe = g " +
+                    "and h.trangThai = :holding and h.thoiDiemHetHan > :now)", Long.class)
+                .setParameter("vehicle", trip.xe).setParameter("active", TrangThaiGhe.HOAT_DONG)
+                .setParameter("trip", trip).setParameter("sold", List.of(TrangThaiVe.DA_XUAT_VE, TrangThaiVe.DA_LEN_XE))
+                .setParameter("holding", TrangThaiGiuCho.DANG_GIU).setParameter("now", now).getSingleResult();
+            result.put("tongSoGhe", total);
+            result.put("soGheTrong", available);
+        }
+        return result;
+    }
+
     public Map<String, Object> createTinhThanh(Inputs.TinhThanh input) {
         return write(em -> {
             newId(em, TinhThanh.class, input.maTinhThanh());
@@ -468,26 +546,54 @@ public class RouteTripService {
         });
     }
     public Map<String, Object> getChuyenXe(String id) { return read(em -> {
-        var trip=found(em,ChuyenXe.class,id);var result=view(trip);boolean available=false;
-        try{TripSaleRules.ensureSellable(em,trip,LocalDateTime.now(TripSaleRules.ZONE));available=true;}
-        catch(DomainException unavailable){ /* Read history without treating it as a bookable trip. */ }
-        result.put("coTheDatVe",available);return result;
+        var trip = found(em, ChuyenXe.class, id);
+        LocalDateTime now = LocalDateTime.now(TripSaleRules.ZONE);
+        var result = searchView(em, trip, now);
+        boolean saleOpen;
+        try { TripSaleRules.ensureSellable(em, trip, now); saleOpen = true; }
+        catch (DomainException unavailable) { saleOpen = false; }
+        long remaining = (long) result.get("soGheTrong");
+        result.put("coTheDatVe", saleOpen && remaining > 0);
+        result.put("trangThaiNhanDatVe", !saleOpen ? "NGUNG_NHAN_DAT" : remaining == 0 ? "HET_CHO" : "CON_CHO");
+        return result;
     }); }
     public List<Map<String, Object>> searchChuyenXe(String from, String to, LocalDate date) {
-        String fromId = text(from, "Điểm đi", 40, true);
-        String toId = text(to, "Điểm đến", 40, true);
+        SearchPoint origin = searchPoint(from, "Điểm đi");
+        SearchPoint destination = searchPoint(to, "Điểm đến");
         if (date == null) throw new DomainException(400, "Ngày đi là bắt buộc");
-        if(fromId.equals(toId))throw new DomainException(400,"Điểm đi và điểm đến phải khác nhau.");
-        return read(em -> em.createQuery("select c from ChuyenXe c join c.tuyenXe.nhaXe n where c.ngayKhoiHanh = :date and c.trangThai = :scheduled and c.tuyenXe.trangThai = :active and n.trangThai = :activeOperator and " +
-                "(c.tuyenXe.tramKhoiHanh.maBenXe = :from or c.tuyenXe.tramKhoiHanh.tinhThanh.maTinhThanh = :from) and " +
-                "(c.tuyenXe.tramDen.maBenXe = :to or c.tuyenXe.tramDen.tinhThanh.maTinhThanh = :to) order by c.gioKhoiHanh", ChuyenXe.class)
+        return read(em -> {
+            String originCity = cityOf(em, origin);
+            String destinationCity = cityOf(em, destination);
+            boolean citySearch = origin.kind().equals("CITY") || destination.kind().equals("CITY")
+                || (origin.kind().equals("ANY") && destination.kind().equals("ANY")
+                    && em.find(TinhThanh.class, origin.code()) != null && em.find(TinhThanh.class, destination.code()) != null);
+            if ((citySearch && originCity.equals(destinationCity))
+                    || (origin.kind().equals(destination.kind()) && origin.code().equals(destination.code())))
+                throw new DomainException(400, "Tỉnh đi và tỉnh đến phải khác nhau.");
+            LocalDateTime now = LocalDateTime.now(TripSaleRules.ZONE);
+            var trips = em.createQuery("select c from ChuyenXe c join c.tuyenXe.nhaXe n where c.ngayKhoiHanh = :date and c.trangThai = :scheduled and c.tuyenXe.trangThai = :active and n.trangThai = :activeOperator and " +
+                "((:fromKind = 'ANY' and (c.tuyenXe.tramKhoiHanh.maBenXe = :from or c.tuyenXe.tramKhoiHanh.tinhThanh.maTinhThanh = :from)) or " +
+                "(:fromKind = 'CITY' and c.tuyenXe.tramKhoiHanh.tinhThanh.maTinhThanh = :from) or " +
+                "(:fromKind = 'STATION' and c.tuyenXe.tramKhoiHanh.maBenXe = :from)) and " +
+                "((:toKind = 'ANY' and (c.tuyenXe.tramDen.maBenXe = :to or c.tuyenXe.tramDen.tinhThanh.maTinhThanh = :to)) or " +
+                "(:toKind = 'CITY' and c.tuyenXe.tramDen.tinhThanh.maTinhThanh = :to) or " +
+                "(:toKind = 'STATION' and c.tuyenXe.tramDen.maBenXe = :to)) order by c.gioKhoiHanh", ChuyenXe.class)
             .setParameter("date", date).setParameter("scheduled", TrangThaiChuyen.DANG_MO_BAN)
             .setParameter("active", TrangThaiTuyenXe.DANG_KHAI_THAC)
             .setParameter("activeOperator", TrangThaiNhaXe.HOAT_DONG)
-            .setParameter("from", fromId).setParameter("to", toId)
-            .getResultList().stream().filter(c->{
-                try {TripSaleRules.ensureSellable(em,c,LocalDateTime.now(TripSaleRules.ZONE));return true;}
+            .setParameter("fromKind", origin.kind()).setParameter("from", origin.code())
+            .setParameter("toKind", destination.kind()).setParameter("to", destination.code())
+            .getResultList();
+            return trips.stream().filter(c->{
+                try {TripSaleRules.ensureSellable(em,c,now);return true;}
                 catch(DomainException unavailable){return false;}
-            }).map(c->{var result=view(c);result.put("coTheDatVe",true);return result;}).toList());
+            }).map(c -> {
+                var result = searchView(em, c, now);
+                long remaining = (long) result.get("soGheTrong");
+                result.put("coTheDatVe", remaining > 0);
+                result.put("trangThaiNhanDatVe", remaining > 0 ? "CON_CHO" : "HET_CHO");
+                return result;
+            }).toList();
+        });
     }
 }

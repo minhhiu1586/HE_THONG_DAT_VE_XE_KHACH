@@ -2,109 +2,82 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { SearchOption } from '@/lib/api';
+import { clearValidation, vietnameseValidation } from '@/lib/form-validation';
 import styles from './Home.module.css';
 
-// Hàm hỗ trợ lấy chuỗi ngày YYYY-MM-DD
-const getLocalDateString = (daysToAdd = 0) => {
-  const d = new Date();
-  d.setDate(d.getDate() + daysToAdd);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+function dateInVietnam(daysToAdd = 0) {
+  const date = new Date(Date.now() + daysToAdd * 86_400_000);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find(part => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+}
 
-export default function HeroBanner() {
+function LocationOptions({ options }: { options: SearchOption[] }) {
+  return <>
+    <option value="">Chọn tỉnh/thành hoặc bến xe</option>
+    <optgroup label="Tỉnh/thành phố">
+      {options.filter(option => option.kind === 'CITY').map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </optgroup>
+    <optgroup label="Bến xe đang hoạt động">
+      {options.filter(option => option.kind === 'STATION').map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </optgroup>
+  </>;
+}
+
+export default function HeroBanner({ options, loadError }: { options: SearchOption[]; loadError?: string }) {
   const router = useRouter();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  
-  // Khởi tạo state ngay từ đầu (Lazy initialization)
-  const [date, setDate] = useState(() => getLocalDateString(0));
-  
-  // Các biến không thay đổi trong suốt vòng đời component thì không cần dùng State
-  const minDate = getLocalDateString(0);
-  const maxDate = getLocalDateString(7);
+  const [date, setDate] = useState(() => dateInVietnam());
+  const minDate = dateInVietnam();
 
-  const handleSwap = () => {
-    const temp = from;
-    setFrom(to);
-    setTo(temp);
-  };
-  
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Gom các giá trị nhập vào thành tham số URL
-    const query = new URLSearchParams();
-    if (from) query.append('from', from.trim());
-    if (to) query.append('to', to.trim());
-    if (date) query.append('date', date);
-    
-    // Chuyển hướng sang trang kết quả
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = new URLSearchParams({ from, to, date });
     router.push(`/tim-chuyen?${query.toString()}`);
-  };
+  }
 
   return (
     <div className={styles.heroBanner}>
       <div className={styles.heroOverlay}>
         <div className="container">
           <div className={styles.heroContent}>
-            <h1 className={styles.heroTitle}>VeXe - Cam kết hoàn tiền 150% nếu không có chỗ</h1>
-            
-            <form className={styles.searchForm} onSubmit={handleSearch}>
+            <h1 className={styles.heroTitle}>Tìm chuyến xe khách phù hợp với hành trình của bạn</h1>
+            <form className={styles.searchForm} onSubmit={submit} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation}>
               <div className={styles.searchInputs}>
                 <div className={styles.inputGroup}>
                   <span className={styles.inputIcon}>📍</span>
                   <div className={styles.inputField}>
-                    <label>Nơi xuất phát</label>
-                    <input 
-                      type="text" 
-                      placeholder="Chọn điểm đi" 
-                      value={from}
-                      onChange={(e) => setFrom(e.target.value)}
-                      required /* Bắt buộc nhập */
-                    />
+                    <label htmlFor="home-from">Nơi xuất phát</label>
+                    <select id="home-from" data-validation-label="nơi xuất phát" value={from} onChange={event => setFrom(event.target.value)} required disabled={!options.length}>
+                      <LocationOptions options={options} />
+                    </select>
                   </div>
                 </div>
-                
-                <button type="button" className={styles.inputDivider} onClick={handleSwap} aria-label="Đổi chiều">
-                  ⇄
-                </button>
-                
+                <button type="button" className={styles.inputDivider} onClick={() => { setFrom(to); setTo(from); }} aria-label="Đổi chiều">⇄</button>
                 <div className={styles.inputGroup}>
                   <span className={styles.inputIcon}>🎯</span>
                   <div className={styles.inputField}>
-                    <label>Nơi đến</label>
-                    <input 
-                      type="text" 
-                      placeholder="Chọn điểm đến" 
-                      value={to}
-                      onChange={(e) => setTo(e.target.value)}
-                      required /* Bắt buộc nhập */
-                    />
+                    <label htmlFor="home-to">Nơi đến</label>
+                    <select id="home-to" data-validation-label="nơi đến" value={to} onChange={event => setTo(event.target.value)} required disabled={!options.length}>
+                      <LocationOptions options={options} />
+                    </select>
                   </div>
                 </div>
-                
                 <div className={styles.inputGroup}>
                   <span className={styles.inputIcon}>📅</span>
                   <div className={styles.inputField}>
-                    <label>Ngày đi</label>
-                    <input 
-                      type="date" 
-                      value={date}
-                      min={minDate}
-                      max={maxDate}
-                      onChange={(e) => setDate(e.target.value)}
-                      required
-                      suppressHydrationWarning 
-                      /* suppressHydrationWarning giúp ẩn lỗi nếu ngày của Server Next.js khác ngày của máy tính người dùng */
-                    />
+                    <label htmlFor="home-date">Ngày đi</label>
+                    <input id="home-date" data-validation-label="ngày đi" type="date" value={date} min={minDate} onChange={event => setDate(event.target.value)} required />
                   </div>
                 </div>
               </div>
-              <button type="submit" className={styles.searchBtn}>Tìm chuyến</button>
+              <button type="submit" className={styles.searchBtn} disabled={!options.length}>Tìm chuyến</button>
             </form>
+            {loadError && <p role="alert">Không tải được danh mục tìm kiếm: {loadError}</p>}
           </div>
         </div>
       </div>

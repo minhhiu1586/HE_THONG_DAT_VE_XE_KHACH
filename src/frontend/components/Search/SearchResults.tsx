@@ -3,164 +3,61 @@
 import { useState } from 'react';
 import TripCard from './TripCard';
 import styles from './Search.module.css';
-import { Trip } from '../../lib/mock-data';
+import type { SearchTrip } from '@/lib/api';
 
-// Hàm phụ trợ đổi chuỗi "HH:MM" thành số phút để dễ so sánh
-const timeToMinutes = (timeStr: string) => {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes;
-};
+type SortOption = 'departure-asc' | 'departure-desc' | 'price-asc' | 'price-desc' | 'seats-desc';
 
-export default function SearchResults({ initialTrips }: { initialTrips: Trip[] }) {
-  // State quản lý Bộ lọc
+export default function SearchResults({ initialTrips }: { initialTrips: SearchTrip[] }) {
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
-  
-  // State quản lý Sắp xếp
-  const [sortOption, setSortOption] = useState<string>('default');
+  const [sortOption, setSortOption] = useState<SortOption>('departure-asc');
+  const vehicles = Array.from(new Set(initialTrips.map(trip => trip.tenLoaiXe ?? 'Chưa cập nhật')));
+  const companies = Array.from(new Map(initialTrips.map(trip => [trip.maNhaXe ?? '', trip.tenNhaXe ?? 'Chưa cập nhật'])).entries());
 
-  const availableCompanies = Array.from(
-    new Map(initialTrips.map(trip => [trip.company.id, trip.company])).values()
-  );
-
-  const toggleVehicle = (type: string) => {
-    setSelectedVehicles(prev => 
-      prev.includes(type) ? prev.filter(v => v !== type) : [...prev, type]
-    );
-  };
-
-  const toggleCompany = (id: string) => {
-    setSelectedCompanies(prev => 
-      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
-    );
-  };
-
-  // Bước 1: Lọc danh sách (Filter)
-  const filteredTrips = initialTrips.filter(trip => {
-    const matchVehicle = selectedVehicles.length === 0 || selectedVehicles.includes(trip.vehicleType);
-    const matchCompany = selectedCompanies.length === 0 || selectedCompanies.includes(trip.companyId);
-    return matchVehicle && matchCompany;
-  });
-
-  // Bước 2: Sắp xếp danh sách đã lọc (Sort)
-  const sortedTrips = [...filteredTrips].sort((a, b) => {
+  const trips = initialTrips.filter(trip =>
+    (!selectedVehicles.length || selectedVehicles.includes(trip.tenLoaiXe ?? 'Chưa cập nhật')) &&
+    (!selectedCompanies.length || selectedCompanies.includes(trip.maNhaXe ?? ''))
+  ).sort((a, b) => {
+    const departure = `${a.ngayKhoiHanh}T${a.gioKhoiHanh}`.localeCompare(`${b.ngayKhoiHanh}T${b.gioKhoiHanh}`);
+    const price = Number(a.giaVeDuKien) - Number(b.giaVeDuKien);
     switch (sortOption) {
-      case 'time-asc':
-        return timeToMinutes(a.departureTime) - timeToMinutes(b.departureTime);
-      case 'time-desc':
-        return timeToMinutes(b.departureTime) - timeToMinutes(a.departureTime);
-      case 'price-asc':
-        return a.price - b.price;
-      case 'price-desc':
-        return b.price - a.price;
-      case 'seats-desc':
-        return b.availableSeats - a.availableSeats;
-      case 'seats-asc':
-        return a.availableSeats - b.availableSeats;
-      default:
-        return 0; // Giữ nguyên thứ tự mặc định
+      case 'departure-desc': return -departure;
+      case 'price-asc': return price;
+      case 'price-desc': return -price;
+      case 'seats-desc': return b.soGheTrong - a.soGheTrong;
+      default: return departure;
     }
   });
 
-  // Hàm xóa bộ lọc
-  const clearFilters = () => {
-    setSelectedVehicles([]);
-    setSelectedCompanies([]);
-  };
+  function toggle(value: string, current: string[], setter: (next: string[]) => void) {
+    setter(current.includes(value) ? current.filter(item => item !== value) : [...current, value]);
+  }
 
-  return (
-    <div className={styles.searchLayout}>
-      {/* Cột trái: Bao gồm Khối Sắp xếp và Khối Lọc */}
-      <aside className={styles.sidebarWrapper}>
-        
-        {/* KHỐI 1: SẮP XẾP */}
-        <div className={styles.sidebarBlock}>
-          <h2 className={styles.sidebarTitle}>Sắp xếp</h2>
-          <div className={styles.filterList}>
-            <label className={styles.radioLabel}>
-              <input type="radio" name="sort" value="default" checked={sortOption === 'default'} onChange={(e) => setSortOption(e.target.value)} />
-              Mặc định
-            </label>
-            <label className={styles.radioLabel}>
-              <input type="radio" name="sort" value="time-asc" checked={sortOption === 'time-asc'} onChange={(e) => setSortOption(e.target.value)} />
-              Giờ đi sớm nhất
-            </label>
-            <label className={styles.radioLabel}>
-              <input type="radio" name="sort" value="time-desc" checked={sortOption === 'time-desc'} onChange={(e) => setSortOption(e.target.value)} />
-              Giờ đi muộn nhất
-            </label>
-            <label className={styles.radioLabel}>
-              <input type="radio" name="sort" value="price-asc" checked={sortOption === 'price-asc'} onChange={(e) => setSortOption(e.target.value)} />
-              Giá tăng dần
-            </label>
-            <label className={styles.radioLabel}>
-              <input type="radio" name="sort" value="price-desc" checked={sortOption === 'price-desc'} onChange={(e) => setSortOption(e.target.value)} />
-              Giá giảm dần
-            </label>
-          </div>
+  return <div className={styles.searchLayout}>
+    <aside className={styles.sidebarWrapper}>
+      <section className={styles.sidebarBlock}>
+        <h2 className={styles.sidebarTitle}>Sắp xếp</h2>
+        <div className={styles.filterList}>
+          <label className={styles.radioLabel}><input type="radio" name="sort" checked={sortOption === 'departure-asc'} onChange={() => setSortOption('departure-asc')} />Giờ đi sớm nhất</label>
+          <label className={styles.radioLabel}><input type="radio" name="sort" checked={sortOption === 'departure-desc'} onChange={() => setSortOption('departure-desc')} />Giờ đi muộn nhất</label>
+          <label className={styles.radioLabel}><input type="radio" name="sort" checked={sortOption === 'price-asc'} onChange={() => setSortOption('price-asc')} />Giá tăng dần</label>
+          <label className={styles.radioLabel}><input type="radio" name="sort" checked={sortOption === 'price-desc'} onChange={() => setSortOption('price-desc')} />Giá giảm dần</label>
+          <label className={styles.radioLabel}><input type="radio" name="sort" checked={sortOption === 'seats-desc'} onChange={() => setSortOption('seats-desc')} />Còn nhiều chỗ</label>
         </div>
-
-        {/* KHỐI 2: LỌC */}
-        <div className={styles.sidebarBlock}>
-          <div className={styles.filterHeader}>
-            <h2 className={styles.sidebarTitle}>Lọc</h2>
-            {(selectedVehicles.length > 0 || selectedCompanies.length > 0) && (
-              <button className={styles.clearFilterBtn} onClick={clearFilters}>Xóa lọc</button>
-            )}
-          </div>
-
-          <div className={styles.filterGroup}>
-            <h3 className={styles.filterTitle}>Loại xe</h3>
-          <div className={styles.filterList}>
-            <label className={styles.filterLabel}>
-              <input type="checkbox" onChange={() => toggleVehicle('sleeper')} />
-              Giường nằm
-            </label>
-            <label className={styles.filterLabel}>
-              <input type="checkbox" onChange={() => toggleVehicle('seat')} />
-              Ghế ngồi
-            </label>
-            <label className={styles.filterLabel}>
-              <input type="checkbox" onChange={() => toggleVehicle('limousine')} />
-              Limousine
-            </label>
-          </div>
-        </div>
-
-        {availableCompanies.length > 0 && (
-          <div className={styles.filterGroup}>
-            <h3 className={styles.filterTitle}>Hãng xe</h3>
-            <div className={styles.filterList}>
-              {availableCompanies.map(company => (
-                <label key={company.id} className={styles.filterLabel}>
-                  <input type="checkbox" onChange={() => toggleCompany(company.id)} />
-                  {company.name}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-        </div>
-      </aside>
-
-      {/* Cột phải: Danh sách kết quả */}
-      <div className={styles.mainContent}>
-
-        {/* Danh sách thẻ (Dùng mảng sortedTrips) */}
-        {sortedTrips.length > 0 ? (
-          sortedTrips.map((trip) => (
-            <TripCard key={trip.id} trip={trip} />
-          ))
-        ) : (
-          <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--surface)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📭</div>
-            <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)' }}>Không có kết quả phù hợp</h3>
-            <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-              Vui lòng bỏ bớt các tiêu chí lọc để xem thêm chuyến xe.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+      </section>
+      <section className={styles.sidebarBlock}>
+        <h2 className={styles.sidebarTitle}>Lọc theo dữ liệu chuyến</h2>
+        {vehicles.length > 0 && <div className={styles.filterGroup}><h3 className={styles.filterTitle}>Loại xe</h3><div className={styles.filterList}>
+          {vehicles.map(vehicle => <label key={vehicle} className={styles.filterLabel}><input type="checkbox" checked={selectedVehicles.includes(vehicle)} onChange={() => toggle(vehicle, selectedVehicles, setSelectedVehicles)} />{vehicle}</label>)}
+        </div></div>}
+        {companies.length > 0 && <div className={styles.filterGroup}><h3 className={styles.filterTitle}>Nhà xe</h3><div className={styles.filterList}>
+          {companies.map(([id, name]) => <label key={id} className={styles.filterLabel}><input type="checkbox" checked={selectedCompanies.includes(id)} onChange={() => toggle(id, selectedCompanies, setSelectedCompanies)} />{name}</label>)}
+        </div></div>}
+        {(selectedVehicles.length > 0 || selectedCompanies.length > 0) && <button type="button" className={styles.clearFilterBtn} onClick={() => { setSelectedVehicles([]); setSelectedCompanies([]); }}>Xóa bộ lọc</button>}
+      </section>
+    </aside>
+    <section className={styles.mainContent} aria-live="polite">
+      {trips.length ? trips.map(trip => <TripCard key={trip.maChuyen} trip={trip} />) : <div className={styles.emptyState}><h2>Không có chuyến đang nhận đặt phù hợp</h2><p>Hãy đổi ngày, điểm đi, điểm đến hoặc bộ lọc để tìm lại.</p></div>}
+    </section>
+  </div>;
 }

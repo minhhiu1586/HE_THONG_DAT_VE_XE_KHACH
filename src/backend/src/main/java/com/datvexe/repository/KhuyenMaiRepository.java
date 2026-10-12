@@ -89,6 +89,14 @@ public final class KhuyenMaiRepository extends JpaRepository<KhuyenMai> {
         return orders > 0;
     }
 
+    /** Public catalogue contains only discounts usable at the captured business time. */
+    public List<KhuyenMai> dangHieuLuc(int offset, int limit) {
+        if (limit <= 0) return List.of();
+        return em.createQuery("select k from KhuyenMai k where k.ngayBatDau <= :now and k.ngayKetThuc > :now " +
+                "and k.soLuongDaDung < k.soLuong order by k.ngayKetThuc, k.maKhuyenMai", KhuyenMai.class)
+            .setParameter("now", now).setFirstResult(Math.max(0, offset)).setMaxResults(limit).getResultList();
+    }
+
     private QueryParts filters(
             String tuKhoa,
             TrangThaiKhuyenMai trangThai,

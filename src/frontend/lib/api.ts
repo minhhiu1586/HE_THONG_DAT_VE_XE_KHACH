@@ -1,97 +1,204 @@
-// Sửa lại import từ mock-data
-import { popularRoutes as mockRoutes, busStationCards as mockStations } from './mock-data';
+export interface CityRecord {
+  maTinhThanh: string;
+  tenTinhThanh: string;
+  khuVuc?: string | null;
+}
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+export interface StationRecord {
+  maBenXe: string;
+  tenBenXe: string;
+  diaChi: string;
+  maTinhThanh: string;
+  trangThai: string;
+}
+
+export interface SearchOption {
+  value: string;
+  label: string;
+  kind: 'CITY' | 'STATION';
+}
 
 export interface PopularRoute {
   id: string;
+  name: string;
   from: string;
   to: string;
-  image: string;
+  fromValue: string;
+  toValue: string;
   price: number;
-  originalPrice?: number;
 }
 
 export interface Station {
   id: string;
   name: string;
   city: string;
-  image: string;
+  searchValue: string;
 }
 
-interface RawTuyenXe {
-  id?: string;
-  maTuyen?: string;
-  tramKhoiHanh?: string;
-  tramDen?: string;
-  giaCoBan?: number;
+export interface SearchTrip {
+  maChuyen: string;
+  maTuyen: string;
+  tenTuyen: string;
+  maNhaXe: string | null;
+  tenNhaXe: string | null;
+  logoNhaXe?: string | null;
+  maXe: string | null;
+  bienSo: string | null;
+  maLoaiXe: string | null;
+  tenLoaiXe: string | null;
+  soChoNgoi: number;
+  tongSoGhe: number;
+  soGheTrong: number;
+  maBenDi: string;
+  tenBenDi: string;
+  diaChiBenDi: string;
+  maTinhDi: string;
+  tenTinhDi: string;
+  maBenDen: string;
+  tenBenDen: string;
+  diaChiBenDen: string;
+  maTinhDen: string;
+  tenTinhDen: string;
+  ngayKhoiHanh: string;
+  gioKhoiHanh: string;
+  gioDenDuKien: string;
+  thoiLuongPhut: number;
+  giaVeDuKien: string;
+  trangThai: string;
+  ngungNhanDatVeLuc: string;
+  coTheDatVe: boolean;
+  trangThaiNhanDatVe: 'CON_CHO' | 'HET_CHO' | 'NGUNG_NHAN_DAT';
+  diemDung: { maDiemDung: string; tenDiemDung: string; diaChi: string; thuTu: number; thoiGianDung: number }[];
 }
 
-interface RawBenXe {
-  id?: string;
-  maBen?: string;
-  tenBen?: string;
-  tinhThanh?: string;
+export interface TripSeat {
+  maGhe: string;
+  viTri: string;
+  tang: number;
+  trangThaiSuDung: 'HOAT_DONG' | 'BAO_TRI' | 'NGUNG_SU_DUNG';
+  tinhTrangKhaDung: 'TRONG' | 'DANG_GIU' | 'DA_BAN' | 'KHONG_BAN';
+}
+
+export interface TripSeatResponse {
+  maChuyen: string;
+  maXe: string;
+  serverTime: string;
+  danhSachGhe: TripSeat[];
+}
+
+export interface ActivePromotion {
+  maKhuyenMai: string;
+  tenKhuyenMai: string;
+  moTa?: string | null;
+  loaiGiam: 'PHAN_TRAM' | 'SO_TIEN_CO_DINH';
+  giaTriGiam: number | string;
+  giamToiDa?: string | null;
+  ngayBatDau: string;
+  ngayKetThuc: string;
+}
+
+interface RawRoute {
+  maTuyen: string;
+  tenTuyen: string;
+  tramKhoiHanh: string;
+  tramDen: string;
+  giaCoBan: number | string;
+  trangThai: string;
+}
+
+function apiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL;
+  if (configured) return configured.replace(/\/$/, '');
+  if (typeof window !== 'undefined') return '/api';
+  return `${(process.env.BACKEND_URL || 'http://127.0.0.1:8080').replace(/\/$/, '')}/api`;
+}
+
+async function apiGet<T>(path: string): Promise<T> {
+  const response = await fetch(`${apiBase()}${path}`, { cache: 'no-store' });
+  if (!response.ok) {
+    let message = `Máy chủ trả về lỗi ${response.status}.`;
+    try {
+      const problem = await response.json() as { message?: string };
+      if (problem.message) message = problem.message;
+    } catch {
+      // Giữ thông báo HTTP nếu server không trả JSON.
+    }
+    throw new Error(message);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function getSearchOptions(): Promise<SearchOption[]> {
+  const [cities, stations] = await Promise.all([
+    apiGet<CityRecord[]>('/tinh-thanh'),
+    apiGet<StationRecord[]>('/ben-xe?trangThai=HOAT_DONG'),
+  ]);
+  return [
+    ...cities.map(city => ({ value: `CITY:${city.maTinhThanh}`, label: city.tenTinhThanh, kind: 'CITY' as const })),
+    ...stations.map(station => {
+      const city = cities.find(item => item.maTinhThanh === station.maTinhThanh);
+      return {
+        value: `STATION:${station.maBenXe}`,
+        label: `${station.tenBenXe}${city ? ` · ${city.tenTinhThanh}` : ''}`,
+        kind: 'STATION' as const,
+      };
+    }),
+  ];
+}
+
+export async function searchTrips(from: string, to: string, date: string): Promise<SearchTrip[]> {
+  const query = new URLSearchParams({ from, to, date });
+  return apiGet<SearchTrip[]>(`/chuyen-xe?${query.toString()}`);
+}
+
+export async function getTrip(tripId: string): Promise<SearchTrip> {
+  return apiGet<SearchTrip>(`/chuyen-xe/${encodeURIComponent(tripId)}`);
+}
+
+export async function getTripSeats(tripId: string): Promise<TripSeatResponse> {
+  return apiGet<TripSeatResponse>(`/chuyen-xe/${encodeURIComponent(tripId)}/ghe`);
 }
 
 export async function getPopularRoutes(): Promise<PopularRoute[]> {
-  try {
-    const res = await fetch(`${API_URL}/tuyen-xe`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Lỗi fetch tuyến xe');
-
-    const rawData: RawTuyenXe[] = await res.json();
-
-    if (!rawData || rawData.length === 0) {
-      return mockRoutes;
-    }
-
-    return rawData.slice(0, 4).map((item) => ({
-      id: item.maTuyen || item.id || Math.random().toString(),
-      from: item.tramKhoiHanh || 'Chưa rõ',
-      to: item.tramDen || 'Chưa rõ',
-      image: '/images/sapa.jpg',
-      price: item.giaCoBan || 200000,
-      originalPrice: item.giaCoBan ? item.giaCoBan + 50000 : 250000
-    }));
-
-  } catch (error) {
-    console.error("Dùng mock data Tuyến xe");
-    return mockRoutes;
-  }
+  const [routes, stations, cities] = await Promise.all([
+    apiGet<RawRoute[]>('/tuyen-xe/cong-khai'),
+    apiGet<StationRecord[]>('/ben-xe?trangThai=HOAT_DONG'),
+    apiGet<CityRecord[]>('/tinh-thanh'),
+  ]);
+  const stationById = new Map(stations.map(station => [station.maBenXe, station]));
+  const cityById = new Map(cities.map(city => [city.maTinhThanh, city]));
+  return routes.flatMap(route => {
+    const origin = stationById.get(route.tramKhoiHanh);
+    const destination = stationById.get(route.tramDen);
+    if (!origin || !destination) return [];
+    const from = cityById.get(origin.maTinhThanh)?.tenTinhThanh ?? origin.tenBenXe;
+    const to = cityById.get(destination.maTinhThanh)?.tenTinhThanh ?? destination.tenBenXe;
+    return [{
+      id: route.maTuyen,
+      name: route.tenTuyen,
+      from,
+      to,
+      fromValue: `STATION:${origin.maBenXe}`,
+      toValue: `STATION:${destination.maBenXe}`,
+      price: Number(route.giaCoBan),
+    }];
+  });
 }
 
 export async function getPopularStations(): Promise<Station[]> {
-  try {
-    const res = await fetch(`${API_URL}/ben-xe`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Lỗi fetch bến xe');
+  const [stations, cities] = await Promise.all([
+    apiGet<StationRecord[]>('/ben-xe?trangThai=HOAT_DONG'),
+    apiGet<CityRecord[]>('/tinh-thanh'),
+  ]);
+  const cityById = new Map(cities.map(city => [city.maTinhThanh, city]));
+  return stations.map(station => ({
+    id: station.maBenXe,
+    name: station.tenBenXe,
+    city: cityById.get(station.maTinhThanh)?.tenTinhThanh ?? '',
+    searchValue: `STATION:${station.maBenXe}`,
+  }));
+}
 
-    const rawData: RawBenXe[] = await res.json();
-
-    if (!rawData || rawData.length === 0) {
-       // Sử dụng mockStations đã được map từ busStationCards
-      return mockStations.map(station => ({
-        id: station.id,
-        name: station.name,
-        city: station.city,
-        image: station.image
-      }));
-    }
-
-    return rawData.slice(0, 4).map((item) => ({
-      id: item.id || item.maBen || Math.random().toString(),
-      name: item.tenBen || 'Bến xe',
-      city: item.tinhThanh || 'Tỉnh/Thành phố',
-      image: '/images/haiphong.jpg'
-    }));
-
-  } catch (error) {
-    console.error("Dùng mock data Bến xe");
-     // Trả về mock data được ánh xạ chuẩn xác
-    return mockStations.map(station => ({
-      id: station.id,
-      name: station.name,
-      city: station.city,
-      image: station.image
-    }));
-  }
+export async function getActivePromotions(): Promise<ActivePromotion[]> {
+  return apiGet<ActivePromotion[]>('/khuyen-mai');
 }
