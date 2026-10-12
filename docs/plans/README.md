@@ -14,3 +14,5 @@ Nội dung gợi ý:
 - Checklist tài liệu.
 - Checklist triển khai.
 - Biên bản họp nhóm.
+
+- [Hướng dẫn T12 trên VS Code](t12-vscode-guide.md).

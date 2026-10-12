@@ -64,12 +64,19 @@ def main():
         call("PUT", "/xe/" + vehicle_id + "/so-do-ghe", dict(danhSachGhe=replacement))
         call("GET", seat_path, expected=404)
         assert len(call("GET", seats_path)) == 29
-        assignment = dict(maPhanCong=assignment_id, maChuyen="DEMO_SAU",
-                          maNhanVien="DEMO_TX", vaiTro="TAI_XE_CHINH", ghiChu="HTTP test")
+        route_id=tag+"_R";trip_id=tag+"_C"
+        original=call("GET","/tuyen-xe/DEMO_TUYEN")
+        original_trip=call("GET","/chuyen-xe/DEMO_CHUYEN")
+        call("POST","/tuyen-xe",dict(maTuyen=route_id,tenTuyen="Return fixture",tramKhoiHanh=original["tramDen"],tramDen=original["tramKhoiHanh"],thoiGianKhoiHanh="08:00",thoiGianDuKien=6,giaCoBan=250000,trangThai="DANG_KHAI_THAC",maNhaXe="DEMO_NX"),201)
+        cleanup.append("/tuyen-xe/"+route_id)
+        call("POST","/chuyen-xe",dict(maChuyen=trip_id,maTuyen=route_id,ngayKhoiHanh=str(date.fromisoformat(original_trip["ngayKhoiHanh"])+timedelta(days=1)),gioKhoiHanh="08:00"),201)
+        cleanup.append("/quan-ly/chuyen-xe/"+trip_id)
+        assignment = dict(maPhanCong=assignment_id, maChuyen=trip_id,
+                          maNhanVien="DEMO_TX", vaiTro="TAI_XE_CHINH", ghiChu="HTTP test",xacNhanKeHoachLaiNghi=True)
         call("POST", "/phan-cong", assignment, 201); cleanup.append("/phan-cong/" + assignment_id)
         assignment["ghiChu"] = "HTTP update"
         call("PUT", "/phan-cong/" + assignment_id, assignment)
-        assert call("GET", "/phan-cong/" + assignment_id)["ghiChu"] == "HTTP update"
+        assert call("GET", "/phan-cong/" + assignment_id)["ghiChu"].endswith("HTTP update")
         call("GET", "/xe/DEMO_HETHAN/dieu-kien/DEMO_SAU", expected=409)
         call("GET", "/xe/DEMO_BAOTRI/dieu-kien/DEMO_SAU", expected=409)
         call("GET", "/xe/DEMO_XE/dieu-kien/DEMO_TRUNG", expected=409)

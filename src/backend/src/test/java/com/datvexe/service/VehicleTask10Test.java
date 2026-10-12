@@ -126,6 +126,7 @@ class VehicleTask10Test {
         items.set(3,new VehicleInputs.ViTriGhe(maintenance.maGhe(),maintenance.viTri(),maintenance.tang(),TrangThaiGhe.BAO_TRI));
         vehicles.saveLayout("X1",new VehicleInputs.SoDoGhe(items));
         trip("C1","X1",DAY);returnTrip("C2","X1",DAY.plusDays(1));String seat=layout("X1").getFirst().maGhe();ticket("C1",seat);
+        PublishedTripFixture.open(factory,"C2");
         tx(em -> {
             assertEquals("DA_BAN",VehicleRules.availability(em,em.find(ChuyenXe.class,"C1"),em.find(Ghe.class,seat),DAY.atStartOfDay()));
             assertEquals("TRONG",VehicleRules.availability(em,em.find(ChuyenXe.class,"C2"),em.find(Ghe.class,seat),DAY.atStartOfDay()));
@@ -171,6 +172,7 @@ class VehicleTask10Test {
         vehicles.updateSeat("X1",first.maGhe(),new VehicleInputs.Ghe(first.viTri(),first.tang(),TrangThaiGhe.HOAT_DONG));
         vehicles.saveVehicle("X1",input("X1","51B-X1","A",DAY,TrangThaiXe.SAN_SANG));
         trip("C1","X1",DAY);
+        PublishedTripFixture.open(factory,"C1");
         assertEquals(original,layout("X1"));
         tx(em -> assertNotNull(VehicleRules.seatSellable(em,"C1",first.maGhe(),DAY.atStartOfDay())));
     }

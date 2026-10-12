@@ -100,8 +100,9 @@ public final class OperatorService {
     }
     private static Impact impact(EntityManager em, NhaXe operator) {
         long upcoming = em.createQuery("select count(c) from ChuyenXe c where c.tuyenXe.nhaXe = :operator "
-                + "and c.trangThai = :state and c.ngayKhoiHanh >= :today", Long.class)
-            .setParameter("operator", operator).setParameter("state", TrangThaiChuyen.CHUA_KHOI_HANH)
+                + "and c.trangThai in (:draft,:legacy,:sale) and c.ngayKhoiHanh >= :today", Long.class)
+            .setParameter("operator", operator).setParameter("draft", TrangThaiChuyen.NHAP)
+            .setParameter("legacy", TrangThaiChuyen.CHUA_KHOI_HANH).setParameter("sale", TrangThaiChuyen.DANG_MO_BAN)
             .setParameter("today", LocalDate.now(BUSINESS_ZONE)).getSingleResult();
         long running = count(em, "select count(c) from ChuyenXe c where c.tuyenXe.nhaXe = :operator and c.trangThai = :state",
             operator, "state", TrangThaiChuyen.DANG_CHAY);

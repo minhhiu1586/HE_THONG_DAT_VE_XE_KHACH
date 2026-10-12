@@ -120,7 +120,9 @@ class OperatorServiceTest {
             NhaXe operator = em.find(NhaXe.class, "NX1");
             ChuyenXe trip = em.find(ChuyenXe.class, "C1");
             Xe vehicle = new Xe(); vehicle.maXe = "X"; vehicle.bienSo = "TEST-X";
-            vehicle.soChoNgoi = 2; vehicle.nhaXe = operator; em.persist(vehicle);
+            vehicle.soChoNgoi = 2; vehicle.nhaXe = operator;
+            var type=new LoaiXe();type.maLoaiXe="PUB_L";type.tenLoaiXe="Two seats";type.soChoNgoi=2;em.persist(type);
+            vehicle.loaiXe=type;vehicle.ngayDangKiem=LocalDate.of(2020,1,1);vehicle.hanDangKiem=LocalDate.of(2100,1,1);em.persist(vehicle);trip.xe=vehicle;
             Ghe seat = new Ghe(); seat.maGhe = "G"; seat.viTri = "1"; seat.xe = vehicle; em.persist(seat);
             Ghe heldSeat = new Ghe(); heldSeat.maGhe = "G2"; heldSeat.viTri = "2"; heldSeat.xe = vehicle; em.persist(heldSeat);
             DonDatVe order = new DonDatVe(); order.maDon = "O"; order.nguoiDat = em.find(NguoiDung.class, "KH");
@@ -139,6 +141,7 @@ class OperatorServiceTest {
             hold.thoiDiemHetHan = businessNow.plusMinutes(15); em.persist(hold);
             em.getTransaction().commit();
         }
+        PublishedTripFixture.open(factory,"C1");
         assertEquals(1, trips.searchChuyenXe("START", "END", LocalDate.of(2030, 1, 1)).size());
         assertEquals(1, service.impact(admin, "NX1").chuyenSapKhoiHanh());
         var changed = service.state(admin, "NX1", new OperatorInputs.TrangThai(TrangThaiNhaXe.TAM_NGUNG));

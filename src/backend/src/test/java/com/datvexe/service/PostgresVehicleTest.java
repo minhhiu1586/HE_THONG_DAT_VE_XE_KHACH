@@ -12,6 +12,22 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Run only against a disposable database loaded with schema 001, 002 and demo seed. */
 @EnabledIfSystemProperty(named="vehicle.pg.url", matches=".+")
 class PostgresVehicleTest {
+    @BeforeEach void prepareReturnRouteForNewT11ConnectionRule() {
+        try(var factory=factory();var em=factory.createEntityManager()) {
+            em.getTransaction().begin();var trip=em.find(com.datvexe.domain.Entities.ChuyenXe.class,"DEMO_SAU");
+            var original=em.find(com.datvexe.domain.Entities.TuyenXe.class,"DEMO_TUYEN");
+            var route=new com.datvexe.domain.Entities.TuyenXe();route.maTuyen="TEST_PG_RETURN";route.tenTuyen="Return fixture";
+            route.tramKhoiHanh=original.tramDen;route.tramDen=original.tramKhoiHanh;route.nhaXe=original.nhaXe;
+            route.giaCoBan=original.giaCoBan;route.thoiGianDuKien=original.thoiGianDuKien;route.trangThai=TrangThaiTuyenXe.DANG_KHAI_THAC;
+            em.persist(route);trip.tuyenXe=route;em.getTransaction().commit();
+        }
+    }
+    @AfterEach void restoreSeedRoute() {
+        try(var factory=factory();var em=factory.createEntityManager()) {
+            em.getTransaction().begin();em.find(com.datvexe.domain.Entities.ChuyenXe.class,"DEMO_SAU").tuyenXe=em.find(com.datvexe.domain.Entities.TuyenXe.class,"DEMO_TUYEN");
+            em.remove(em.find(com.datvexe.domain.Entities.TuyenXe.class,"TEST_PG_RETURN"));em.getTransaction().commit();
+        }
+    }
     private EntityManagerFactory factory() {
         return Persistence.createEntityManagerFactory("datvexe",Map.of(
             "jakarta.persistence.jdbc.driver","org.postgresql.Driver",
@@ -36,9 +52,10 @@ class PostgresVehicleTest {
             assertThrows(DomainException.class,()->vehicles.saveAssignment(null,new VehicleInputs.PhanCong("TEST_EXPIRED","DEMO_TRUNG","DEMO_TXHH",VaiTroChuyen.TAI_XE_PHU)));
             assertThrows(DomainException.class,()->vehicles.saveAssignment(null,new VehicleInputs.PhanCong("TEST_LEAVE","DEMO_TRUNG","DEMO_TXNGHI",VaiTroChuyen.TAI_XE_CHINH)));
             assertThrows(DomainException.class,()->vehicles.saveAssignment(null,new VehicleInputs.PhanCong("TEST_ROLE","DEMO_TRUNG","DEMO_PX",VaiTroChuyen.TAI_XE_CHINH)));
-            var saved=vehicles.saveAssignment(null,new VehicleInputs.PhanCong("TEST_OK","DEMO_SAU","DEMO_TX",VaiTroChuyen.TAI_XE_CHINH,"Kiểm thử PostgreSQL"));
+            var saved=vehicles.saveAssignment(null,new VehicleInputs.PhanCong("TEST_OK","DEMO_SAU","DEMO_TX",VaiTroChuyen.TAI_XE_CHINH,"Kiểm thử PostgreSQL",true));
             try {
-                assertEquals("Kiểm thử PostgreSQL",saved.get("ghiChu"));
+                assertTrue(saved.get("ghiChu").toString().startsWith("[T11_PLAN:"));
+                assertTrue(saved.get("ghiChu").toString().endsWith("Kiểm thử PostgreSQL"));
                 assertEquals("DEMO_SAU",vehicles.get("phan-cong","TEST_OK").get("maChuyen"));
             } finally {
                 vehicles.delete("phan-cong","TEST_OK");
@@ -75,7 +92,7 @@ class PostgresVehicleTest {
         ready.countDown();
         if(!start.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent test did not start");
         try {
-            vehicles.saveAssignment(null,new VehicleInputs.PhanCong(id,"DEMO_SAU","DEMO_TX",VaiTroChuyen.TAI_XE_CHINH));
+            vehicles.saveAssignment(null,new VehicleInputs.PhanCong(id,"DEMO_SAU","DEMO_TX",VaiTroChuyen.TAI_XE_CHINH,null,true));
             return 1;
         } catch(DomainException e) {
             assertEquals(409,e.status());

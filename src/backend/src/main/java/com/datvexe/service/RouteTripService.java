@@ -91,7 +91,9 @@ public class RouteTripService {
     private static Map<String, Object> view(ChuyenXe x) {
         return map("maChuyen", x.maChuyen, "maTuyen", x.tuyenXe.maTuyen,
             "maXe", x.xe == null ? null : x.xe.maXe, "ngayKhoiHanh", x.ngayKhoiHanh,
-            "gioKhoiHanh", x.gioKhoiHanh, "gioDenDuKien", x.gioDenDuKien, "trangThai", x.trangThai);
+            "gioKhoiHanh", x.gioKhoiHanh, "gioDenDuKien", x.gioDenDuKien, "trangThai", x.trangThai,
+            "giaVeDuKien",x.tuyenXe.giaCoBan==null?null:x.tuyenXe.giaCoBan.stripTrailingZeros().toPlainString(),
+            "ngungNhanDatVeLuc",TripSaleRules.cutoff(x).atZone(TripSaleRules.ZONE).toOffsetDateTime());
     }
 
     public Map<String, Object> createTinhThanh(Inputs.TinhThanh input) {
@@ -401,8 +403,10 @@ public class RouteTripService {
         });
     }
     private static void assignVehicle(EntityManager em, ChuyenXe trip, String xeId) {
-        if (trip.trangThai != TrangThaiChuyen.CHUA_KHOI_HANH)
+        if (!TripSaleRules.scheduled(trip))
             throw new DomainException(409, "Chỉ gán xe cho chuyến chưa khởi hành");
+        if(trip.trangThai==TrangThaiChuyen.DANG_MO_BAN && (trip.xe==null || !trip.xe.maXe.equals(xeId)))
+            throw new DomainException(409,"Không đổi xe chuyến đang mở bán; cần xử lý vận hành trước.");
         Xe xe = em.find(Xe.class, text(xeId, "Mã xe", 40, true), LockModeType.PESSIMISTIC_WRITE);
         if (xe == null) throw new DomainException(404, "Xe không tồn tại: " + xeId);
         if (xe.trangThai != TrangThaiXe.SAN_SANG) throw new DomainException(409, "Xe không sẵn sàng");
@@ -424,6 +428,7 @@ public class RouteTripService {
         AssignmentRules.validateVehicleSchedule(em,trip,xe.maXe);
         trip.xe = xe;
         AssignmentRules.validateTrip(em,trip);
+        if(trip.trangThai==TrangThaiChuyen.DANG_MO_BAN)AssignmentRules.readyForOperation(em,trip);
     }
     public Map<String, Object> assignVehicle(String id, String xeId) {
         return write(em -> {
@@ -435,8 +440,9 @@ public class RouteTripService {
     public Map<String, Object> updateChuyenXe(String id, Inputs.CapNhatChuyen input) {
         return write(em -> {
             ChuyenXe x = found(em, ChuyenXe.class, id);
-            if (x.trangThai != TrangThaiChuyen.CHUA_KHOI_HANH)
-                throw new DomainException(409, "Chỉ sửa chuyến chưa khởi hành");
+            if (!TripSaleRules.draft(x))
+                throw new DomainException(409, "Chỉ sửa chuyến chưa mở bán");
+            if(VehicleRules.hasTicketsOrHolds(em,x))throw new DomainException(409,"Chuyến có giữ chỗ/vé; không đổi lịch đã cam kết.");
             x.ngayKhoiHanh = input.ngayKhoiHanh();
             x.gioKhoiHanh = input.gioKhoiHanh();
             x.gioDenDuKien = expectedArrival(x.tuyenXe, x.ngayKhoiHanh, x.gioKhoiHanh);
@@ -446,12 +452,13 @@ public class RouteTripService {
         });
     }
     public Map<String, Object> transition(String id, TrangThaiChuyen target) {
+        if(target==TrangThaiChuyen.DA_HUY)return new TripService(factory).cancel(id);
         return write(em -> {
             ChuyenXe x = found(em, ChuyenXe.class, id);
             if (target == TrangThaiChuyen.DANG_CHAY && x.xe != null) assignVehicle(em, x, x.xe.maXe);
             boolean allowed = switch (target) {
                 case DA_HUY -> x.trangThai == TrangThaiChuyen.CHUA_KHOI_HANH;
-                case DANG_CHAY -> x.trangThai == TrangThaiChuyen.CHUA_KHOI_HANH && x.xe != null;
+                case DANG_CHAY -> x.trangThai == TrangThaiChuyen.DANG_MO_BAN && x.xe != null;
                 case HOAN_TAT -> x.trangThai == TrangThaiChuyen.DANG_CHAY;
                 default -> false;
             };
@@ -460,19 +467,27 @@ public class RouteTripService {
             return view(x);
         });
     }
-    public Map<String, Object> getChuyenXe(String id) { return read(em -> view(found(em, ChuyenXe.class, id))); }
+    public Map<String, Object> getChuyenXe(String id) { return read(em -> {
+        var trip=found(em,ChuyenXe.class,id);var result=view(trip);boolean available=false;
+        try{TripSaleRules.ensureSellable(em,trip,LocalDateTime.now(TripSaleRules.ZONE));available=true;}
+        catch(DomainException unavailable){ /* Read history without treating it as a bookable trip. */ }
+        result.put("coTheDatVe",available);return result;
+    }); }
     public List<Map<String, Object>> searchChuyenXe(String from, String to, LocalDate date) {
         String fromId = text(from, "Điểm đi", 40, true);
         String toId = text(to, "Điểm đến", 40, true);
         if (date == null) throw new DomainException(400, "Ngày đi là bắt buộc");
-        return read(em -> em.createQuery("select c from ChuyenXe c left join c.tuyenXe.nhaXe n where c.ngayKhoiHanh = :date and c.trangThai in (:scheduled, :running) and c.tuyenXe.trangThai = :active and (n is null or n.trangThai = :activeOperator) and " +
+        if(fromId.equals(toId))throw new DomainException(400,"Điểm đi và điểm đến phải khác nhau.");
+        return read(em -> em.createQuery("select c from ChuyenXe c join c.tuyenXe.nhaXe n where c.ngayKhoiHanh = :date and c.trangThai = :scheduled and c.tuyenXe.trangThai = :active and n.trangThai = :activeOperator and " +
                 "(c.tuyenXe.tramKhoiHanh.maBenXe = :from or c.tuyenXe.tramKhoiHanh.tinhThanh.maTinhThanh = :from) and " +
                 "(c.tuyenXe.tramDen.maBenXe = :to or c.tuyenXe.tramDen.tinhThanh.maTinhThanh = :to) order by c.gioKhoiHanh", ChuyenXe.class)
-            .setParameter("date", date).setParameter("scheduled", TrangThaiChuyen.CHUA_KHOI_HANH)
-            .setParameter("running", TrangThaiChuyen.DANG_CHAY)
+            .setParameter("date", date).setParameter("scheduled", TrangThaiChuyen.DANG_MO_BAN)
             .setParameter("active", TrangThaiTuyenXe.DANG_KHAI_THAC)
             .setParameter("activeOperator", TrangThaiNhaXe.HOAT_DONG)
             .setParameter("from", fromId).setParameter("to", toId)
-            .getResultList().stream().map(RouteTripService::view).toList());
+            .getResultList().stream().filter(c->{
+                try {TripSaleRules.ensureSellable(em,c,LocalDateTime.now(TripSaleRules.ZONE));return true;}
+                catch(DomainException unavailable){return false;}
+            }).map(c->{var result=view(c);result.put("coTheDatVe",true);return result;}).toList());
     }
 }

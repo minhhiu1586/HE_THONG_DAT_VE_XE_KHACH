@@ -10,6 +10,7 @@ services:
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       VEHICLE_TURNAROUND_MINUTES: ${VEHICLE_TURNAROUND_MINUTES:-30}
+      TRIP_BOOKING_CUTOFF_MINUTES: ${TRIP_BOOKING_CUTOFF_MINUTES:-60}
     volumes:
       - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
     depends_on:
