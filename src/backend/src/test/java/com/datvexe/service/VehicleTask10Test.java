@@ -44,6 +44,10 @@ class VehicleTask10Test {
     }
     void vehicle(String id,String owner) {vehicles.saveVehicle(null,input(id,"51B-"+id,owner,LocalDate.of(2100,1,1),TrangThaiXe.SAN_SANG));}
     void trip(String id,String vehicle,LocalDate day) {trips.createChuyenXe(new Inputs.ChuyenXe(id,"R",day,LocalTime.of(8,0),vehicle));}
+    void returnTrip(String id,String vehicle,LocalDate day) {
+        trips.createTuyenXe(new Inputs.TuyenXe("RETURN","Return","D","S",LocalTime.of(8,0),BigDecimal.ONE,BigDecimal.ONE,BigDecimal.TEN,null,TrangThaiTuyenXe.DANG_KHAI_THAC,"A"));
+        trips.createChuyenXe(new Inputs.ChuyenXe(id,"RETURN",day,LocalTime.of(8,0),vehicle));
+    }
     List<VehicleInputs.ViTriGhe> layout(String id) {
         return vehicles.seats(id,false).stream().map(g -> new VehicleInputs.ViTriGhe((String)g.get("maGhe"),(String)g.get("viTri"),(Integer)g.get("tang"),TrangThaiGhe.valueOf(g.get("trangThai").toString()))).toList();
     }
@@ -121,7 +125,7 @@ class VehicleTask10Test {
         vehicle("X1","A");var items=new ArrayList<>(layout("X1"));var maintenance=items.get(3);
         items.set(3,new VehicleInputs.ViTriGhe(maintenance.maGhe(),maintenance.viTri(),maintenance.tang(),TrangThaiGhe.BAO_TRI));
         vehicles.saveLayout("X1",new VehicleInputs.SoDoGhe(items));
-        trip("C1","X1",DAY);trip("C2","X1",DAY.plusDays(1));String seat=layout("X1").getFirst().maGhe();ticket("C1",seat);
+        trip("C1","X1",DAY);returnTrip("C2","X1",DAY.plusDays(1));String seat=layout("X1").getFirst().maGhe();ticket("C1",seat);
         tx(em -> {
             assertEquals("DA_BAN",VehicleRules.availability(em,em.find(ChuyenXe.class,"C1"),em.find(Ghe.class,seat),DAY.atStartOfDay()));
             assertEquals("TRONG",VehicleRules.availability(em,em.find(ChuyenXe.class,"C2"),em.find(Ghe.class,seat),DAY.atStartOfDay()));
@@ -140,7 +144,7 @@ class VehicleTask10Test {
         assertEquals(List.of("A2","A10","B1","B2"),vehicles.seats("X1",false).stream().map(g -> g.get("viTri")).toList());
     }
     @Test void heldSeatIsUnavailableOnlyUntilExpiryOnItsTrip() {
-        vehicle("X1","A");vehicle("X2","A");trip("C1","X1",DAY);trip("C2","X1",DAY.plusDays(1));String id=layout("X1").getFirst().maGhe();
+        vehicle("X1","A");vehicle("X2","A");trip("C1","X1",DAY);returnTrip("C2","X1",DAY.plusDays(1));String id=layout("X1").getFirst().maGhe();
         tx(em -> {var h=new GiuCho();h.maGiuCho="H";h.ghe=em.find(Ghe.class,id);h.chuyenXe=em.find(ChuyenXe.class,"C1");h.ngayDat=DAY.atStartOfDay();h.thoiDiemBatDau=h.ngayDat;h.thoiDiemHetHan=h.ngayDat.plusMinutes(15);em.persist(h);});
         tx(em -> {var c=em.find(ChuyenXe.class,"C1");var g=em.find(Ghe.class,id);
             assertEquals("DANG_GIU",VehicleRules.availability(em,c,g,DAY.atStartOfDay()));

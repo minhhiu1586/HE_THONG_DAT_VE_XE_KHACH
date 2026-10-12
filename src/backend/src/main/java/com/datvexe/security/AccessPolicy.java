@@ -18,6 +18,11 @@ public final class AccessPolicy {
     }
     public static void role(CurrentUser user, String path) { role(user, path, "POST"); }
     public static void role(CurrentUser user, String path, String method) {
+        if(path.startsWith("/api/nhan-vien")) {
+            if(user.loaiTaiKhoan()!=LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan()!=LoaiTaiKhoan.NHA_XE
+                && !(user.loaiTaiKhoan()==LoaiTaiKhoan.NHAN_VIEN && method.equals("GET"))) throw AccessControl.denied();
+            return;
+        }
         if (path.startsWith("/api/loai-xe") && method.equals("GET")) {
             if (user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan() != LoaiTaiKhoan.NHA_XE) throw AccessControl.denied();
             return;
@@ -58,11 +63,12 @@ public final class AccessPolicy {
                     AccessControl.operator(user, assignment.chuyenXe.tuyenXe.nhaXe);
                     AccessControl.operator(user, assignment.nhanVien.nhaXe);
                 }
+                case "nhan-vien" -> AccessControl.employee(em,user,p[1]);
                 default -> { }
             }
             JsonNode body = context.body();
             if (body != null && body.isObject()) {
-                if ((p[0].equals("xe") || p[0].equals("tuyen-xe")) && p.length <= 2
+                if ((p[0].equals("xe") || p[0].equals("tuyen-xe") || p[0].equals("nhan-vien")) && p.length <= 2
                         && Set.of("POST", "PUT").contains(context.method())) {
                     String owner = text(body, "maNhaXe");
                     if ((owner != null && !owner.equals(user.nhaXe.maNhaXe)))
@@ -72,7 +78,8 @@ public final class AccessPolicy {
                 if (route != null && !(p[0].equals("tuyen-xe") && p.length == 1)) AccessControl.route(em, user, route);
                 if (vehicle != null && !(p[0].equals("xe") && p.length == 1 && context.method().equals("POST"))) AccessControl.vehicle(em, user, vehicle);
                 if (trip != null) AccessControl.trip(em, user, trip);
-                if (employee != null) AccessControl.employee(em, user, employee);
+                if (employee != null && !(p[0].equals("nhan-vien") && p.length==1 && context.method().equals("POST")))
+                    AccessControl.employee(em, user, employee);
             }
         }
     }

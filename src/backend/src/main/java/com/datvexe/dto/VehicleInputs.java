@@ -22,9 +22,12 @@ public final class VehicleInputs {
     public record Ghe(String viTri, Integer tang, TrangThaiGhe trangThai) {}
     public record ViTriGhe(String maGhe, String viTri, Integer tang, TrangThaiGhe trangThai) {}
     public record SoDoGhe(java.util.List<ViTriGhe> danhSachGhe) {}
-    public record PhanCong(String maPhanCong, String maChuyen, String maNhanVien, VaiTroChuyen vaiTro, String ghiChu) {
+    public record PhanCong(String maPhanCong, String maChuyen, String maNhanVien, VaiTroChuyen vaiTro, String ghiChu, Boolean xacNhanKeHoachLaiNghi) {
+        public PhanCong(String maPhanCong,String maChuyen,String maNhanVien,VaiTroChuyen vaiTro,String ghiChu) {
+            this(maPhanCong,maChuyen,maNhanVien,vaiTro,ghiChu,null);
+        }
         public PhanCong(String maPhanCong, String maChuyen, String maNhanVien, VaiTroChuyen vaiTro) {
-            this(maPhanCong, maChuyen, maNhanVien, vaiTro, null);
+            this(maPhanCong, maChuyen, maNhanVien, vaiTro, null, null);
         }
     }
 }

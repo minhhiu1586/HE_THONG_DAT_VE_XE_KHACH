@@ -172,6 +172,7 @@ public final class VehicleService {
         Xe x=found(new XeRepository(em).find(text(vehicle,40)));
         ChuyenXe c=found(em.find(ChuyenXe.class,text(trip,40)));
         VehicleRules.ready(em, x.maXe, c);
+        AssignmentRules.validateVehicleSchedule(em,c,x.maXe);
         for(ChuyenXe other:x.danhSachChuyenXe) if(!other.maChuyen.equals(c.maChuyen) && active(other)) {
             check(!LocalDateTime.of(c.ngayKhoiHanh,c.gioKhoiHanh).isBefore(other.gioDenDuKien)
                 || !LocalDateTime.of(other.ngayKhoiHanh,other.gioKhoiHanh).isBefore(c.gioDenDuKien),"Xe đã có chuyến trùng thời gian");
@@ -278,6 +279,8 @@ public final class VehicleService {
     public Map<String,Object> saveAssignment(String id, VehicleInputs.PhanCong input) { return tx(em -> {
         PhanCongChuyenXeRepository repo=new PhanCongChuyenXeRepository(em);
         PhanCongChuyenXe p=id==null?new PhanCongChuyenXe():found(repo.lock(text(id,40)));
+        ChuyenXe previousTrip=id==null?null:em.find(ChuyenXe.class,p.chuyenXe.maChuyen,LockModeType.PESSIMISTIC_WRITE);
+        if(previousTrip!=null) previousTrip=(ChuyenXe)org.hibernate.Hibernate.unproxy(previousTrip);
         if(id==null) { p.maPhanCong=text(input.maPhanCong(),40); check(repo.find(p.maPhanCong)==null,"Mã phân công đã tồn tại"); }
         if(id!=null) check(p.chuyenXe.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH,"Không sửa phân công chuyến đã khởi hành");
         ChuyenXe c=found(em.find(ChuyenXe.class,text(input.maChuyen(),40),LockModeType.PESSIMISTIC_WRITE));
@@ -286,25 +289,36 @@ public final class VehicleService {
         check(c.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH,"Chỉ phân công chuyến chưa khởi hành");
         NhanVien n=found(em.find(NhanVien.class,text(input.maNhanVien(),40),LockModeType.PESSIMISTIC_WRITE));
         n=(NhanVien)org.hibernate.Hibernate.unproxy(n);
-        if(input.vaiTro()==null) throw new DomainException(400,"Thiếu vai trò");
-        check(n.trangThai==TrangThaiNhanVien.DANG_LAM_VIEC,"Nhân viên không đang làm việc");
-        check((input.vaiTro()!=VaiTroChuyen.PHU_XE && n.loaiNhanVien==LoaiNhanVien.TAI_XE) || (input.vaiTro()==VaiTroChuyen.PHU_XE && n.loaiNhanVien==LoaiNhanVien.PHU_XE),"Loại nhân viên không phù hợp vai trò");
-        if(c.tuyenXe.nhaXe!=null) check(n.nhaXe!=null && n.nhaXe.maNhaXe.equals(c.tuyenXe.nhaXe.maNhaXe),"Nhân viên không thuộc nhà xe của tuyến");
-        if(input.vaiTro()!=VaiTroChuyen.PHU_XE) check(n.soBangLai!=null && !n.soBangLai.isBlank() && n.ngayHetHanBangLai!=null && !n.ngayHetHanBangLai.isBefore(c.gioDenDuKien.toLocalDate()),"Bằng lái thiếu hoặc hết hạn trước khi kết thúc chuyến");
-        for(PhanCongChuyenXe other:repo.list()) if(!other.maPhanCong.equals(p.maPhanCong) && other.nhanVien.maNhanVien.equals(n.maNhanVien) && active(other.chuyenXe)) {
-            ChuyenXe o=other.chuyenXe;
-            check(!LocalDateTime.of(c.ngayKhoiHanh,c.gioKhoiHanh).isBefore(o.gioDenDuKien) || !LocalDateTime.of(o.ngayKhoiHanh,o.gioKhoiHanh).isBefore(c.gioDenDuKien),"Nhân viên đã có chuyến trùng thời gian");
-        }
+        AssignmentRules.validate(em,c,n,input.vaiTro(),p.maPhanCong);
         if(input.ghiChu()!=null && input.ghiChu().length()>1000) throw new DomainException(400,"Ghi chú quá dài");
-        p.ghiChu=input.ghiChu(); p.chuyenXe=c; p.nhanVien=n; p.vaiTro=input.vaiTro();
+        String note=input.ghiChu()==null?"":input.ghiChu().replaceFirst("^\\[T11_PLAN:[^\\]]*\\]\\s*","");
+        if(AssignmentRules.needsDrivingPlan(c)) {
+            check(Boolean.TRUE.equals(input.xacNhanKeHoachLaiNghi()),"Chuyến dài cần xác nhận kế hoạch lái/nghỉ; hệ thống chưa tự kiểm chứng giờ nghỉ.");
+            var identity=RequestIdentity.get();
+            String reviewer=identity==null?"INTERNAL":identity.user().maNguoiDung();
+            note=AssignmentRules.reviewPrefix(c)+reviewer+"/"+Instant.now()+"] "+note;
+        }
+        check(note.length()<=1000,"Ghi chú quá dài sau khi ghi nhận xác nhận.");
+        p.ghiChu=note.isEmpty()?null:note; p.chuyenXe=c; p.nhanVien=n; p.vaiTro=input.vaiTro();
         if(id==null) repo.save(p);
+        em.flush();
+        if(VehicleRules.hasTicketsOrHolds(em,c)) AssignmentRules.readyForOperation(em,c);
+        if(previousTrip!=null && !previousTrip.maChuyen.equals(c.maChuyen) && VehicleRules.hasTicketsOrHolds(em,previousTrip))
+            AssignmentRules.readyForOperation(em,previousTrip);
         return view(p);
     }); }
     public void delete(String kind,String id) { tx(em -> {
         switch(kind) {
             case "loai-xe" -> { var r=new LoaiXeRepository(em); var x=found(r.lock(text(id,40))); check(x.danhSachXe.isEmpty(),"Loại xe đang được sử dụng"); r.delete(x); }
             case "xe" -> { var r=new XeRepository(em); var x=found(r.lock(text(id,40))); check(x.danhSachChuyenXe.isEmpty(),"Xe đã có lịch sử chuyến"); for(Ghe g:x.danhSachGhe) check(g.danhSachVe.isEmpty() && g.danhSachGiuCho.isEmpty(),"Ghế đã được sử dụng"); r.delete(x); }
-            case "phan-cong" -> { var r=new PhanCongChuyenXeRepository(em); var x=found(r.lock(text(id,40))); check(x.chuyenXe.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH,"Chuyến đã khởi hành"); r.delete(x); }
+            case "phan-cong" -> {
+                var r=new PhanCongChuyenXeRepository(em); var x=found(r.lock(text(id,40)));
+                check(x.chuyenXe.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH,"Chuyến đã khởi hành");
+                ChuyenXe trip=em.find(ChuyenXe.class,x.chuyenXe.maChuyen,LockModeType.PESSIMISTIC_WRITE);
+                boolean sold=VehicleRules.hasTicketsOrHolds(em,trip);
+                r.delete(x); em.flush();
+                if(sold) AssignmentRules.readyForOperation(em,trip);
+            }
             default -> throw new DomainException(404,"API không tồn tại");
         } return null;
     }); }
