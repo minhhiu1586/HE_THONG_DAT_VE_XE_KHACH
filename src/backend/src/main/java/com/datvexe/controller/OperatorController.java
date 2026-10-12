@@ -11,7 +11,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.IOException;
 
-/** Administrative API for operator profiles and manager grants. */
 @WebServlet(urlPatterns = {"/api/quan-tri/nha-xe", "/api/quan-tri/nha-xe/*"})
 public class OperatorController extends HttpServlet {
     private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
@@ -38,6 +37,8 @@ public class OperatorController extends HttpServlet {
                 audit(res, user, "create", created.maNhaXe(), null);
             } else if (parts.length == 1 && method.equals("GET")) {
                 result = operators.get(user, parts[0]);
+            } else if (parts.length == 2 && parts[1].equals("anh-huong") && method.equals("GET")) {
+                result = operators.impact(user, parts[0]);
             } else if (parts.length == 1 && method.equals("PUT")) {
                 result = operators.update(user, parts[0], body(req, OperatorInputs.NhaXe.class));
                 audit(res, user, "update", parts[0], null);
@@ -47,7 +48,10 @@ public class OperatorController extends HttpServlet {
             } else if (parts.length == 2 && parts[1].equals("trang-thai") && method.equals("PUT")) {
                 var changed = operators.state(user, parts[0], body(req, OperatorInputs.TrangThai.class));
                 result = changed;
-                audit(res, user, "state", parts[0], changed.trangThai().name());
+                audit(res, user, "state", parts[0], changed.nhaXe().trangThai().name()
+                    + " upcoming=" + changed.anhHuong().chuyenSapKhoiHanh()
+                    + " running=" + changed.anhHuong().chuyenDangChay()
+                    + " paid=" + changed.anhHuong().veCoThanhToanThanhCong());
             } else if (parts.length == 2 && parts[1].equals("quan-ly") && method.equals("GET")) {
                 result = operators.managers(user, parts[0]);
             } else if (parts.length == 2 && parts[1].equals("quan-ly") && method.equals("POST")) {

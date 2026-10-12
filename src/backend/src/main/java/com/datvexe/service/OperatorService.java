@@ -8,11 +8,13 @@ import com.datvexe.security.*;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.function.Function;
 
-/** T09: operator profiles, state and manager grants. All mutations are atomic. */
 public final class OperatorService {
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private final EntityManagerFactory factory;
     public OperatorService(EntityManagerFactory factory) { this.factory = factory; }
 
@@ -22,6 +24,9 @@ public final class OperatorService {
     public record ManagerView(String maNguoiDung, String hoTen, String email, String soDienThoai,
                               TrangThaiTaiKhoan trangThai) {}
     public record Page<T>(List<T> items, int page, int size, long totalItems, long totalPages) {}
+    public record Impact(long chuyenSapKhoiHanh, long chuyenDangChay, long giuChoDangGiu,
+                         long veDaPhatHanh, long veCoThanhToanThanhCong) {}
+    public record StateChange(OperatorView nhaXe, Impact anhHuong) {}
 
     private <T> T tx(CurrentUser identity, Function<EntityManager,T> action) {
         try (EntityManager em = factory.createEntityManager()) {
@@ -88,6 +93,32 @@ public final class OperatorService {
     public OperatorView get(CurrentUser user, String operatorId) {
         return tx(user, em -> view(found(em, operatorId, false)));
     }
+    private static long count(EntityManager em, String query, NhaXe operator, String parameter, Object value) {
+        TypedQuery<Long> statement = em.createQuery(query, Long.class).setParameter("operator", operator);
+        if (parameter != null) statement.setParameter(parameter, value);
+        return statement.getSingleResult();
+    }
+    private static Impact impact(EntityManager em, NhaXe operator) {
+        long upcoming = em.createQuery("select count(c) from ChuyenXe c where c.tuyenXe.nhaXe = :operator "
+                + "and c.trangThai = :state and c.ngayKhoiHanh >= :today", Long.class)
+            .setParameter("operator", operator).setParameter("state", TrangThaiChuyen.CHUA_KHOI_HANH)
+            .setParameter("today", LocalDate.now(BUSINESS_ZONE)).getSingleResult();
+        long running = count(em, "select count(c) from ChuyenXe c where c.tuyenXe.nhaXe = :operator and c.trangThai = :state",
+            operator, "state", TrangThaiChuyen.DANG_CHAY);
+        long holds = em.createQuery("select count(g) from GiuCho g where g.chuyenXe.tuyenXe.nhaXe = :operator "
+                + "and g.trangThai = :state and g.thoiDiemHetHan > :now", Long.class)
+            .setParameter("operator", operator).setParameter("state", TrangThaiGiuCho.DANG_GIU)
+            .setParameter("now", LocalDateTime.now(BUSINESS_ZONE)).getSingleResult();
+        long tickets = count(em, "select count(v) from VeXe v where v.chuyenXe.tuyenXe.nhaXe = :operator and v.trangThai = :state",
+            operator, "state", TrangThaiVe.DA_XUAT_VE);
+        long paid = count(em, "select count(distinct v) from VeXe v join v.donDatVe d join d.danhSachThanhToan t "
+            + "where v.chuyenXe.tuyenXe.nhaXe = :operator and t.trangThai = :state",
+            operator, "state", TrangThaiThanhToan.THANH_CONG);
+        return new Impact(upcoming, running, holds, tickets, paid);
+    }
+    public Impact impact(CurrentUser user, String operatorId) {
+        return tx(user, em -> impact(em, found(em, operatorId, false)));
+    }
     private static void apply(NhaXe x, OperatorInputs.NhaXe input) {
         x.tenNhaXe = required(input.tenNhaXe(), "tenNhaXe", 160);
         x.hotline = optional(input.hotline(), "hotline", 30);
@@ -95,7 +126,7 @@ public final class OperatorService {
         x.diaChi = optional(input.diaChi(), "diaChi", 255);
         x.moTa = optional(input.moTa(), "moTa", 1000);
         x.logoUrl = optional(input.logoUrl(), "logoUrl", 500);
-        if (input.ngayThanhLap() != null && input.ngayThanhLap().isAfter(LocalDate.now()))
+        if (input.ngayThanhLap() != null && input.ngayThanhLap().isAfter(LocalDate.now(BUSINESS_ZONE)))
             throw AccountException.invalid("ngayThanhLap", "Ngày thành lập không được ở tương lai.");
         x.ngayThanhLap = input.ngayThanhLap();
     }
@@ -123,11 +154,12 @@ public final class OperatorService {
             apply(x, input); return view(x);
         });
     }
-    public OperatorView state(CurrentUser user, String operatorId, OperatorInputs.TrangThai input) {
+    public StateChange state(CurrentUser user, String operatorId, OperatorInputs.TrangThai input) {
         if (input.trangThai() == null) throw AccountException.invalid("trangThai", "Trạng thái là bắt buộc.");
         return tx(user, em -> {
             NhaXe x = found(em, operatorId, true);
-            x.trangThai = input.trangThai(); return view(x);
+            Impact related = impact(em, x);
+            x.trangThai = input.trangThai(); return new StateChange(view(x), related);
         });
     }
     public void delete(CurrentUser user, String operatorId) {

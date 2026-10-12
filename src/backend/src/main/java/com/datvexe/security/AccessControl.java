@@ -33,7 +33,6 @@ public final class AccessControl {
         if (caller.loaiTaiKhoan == LoaiTaiKhoan.ADMIN) return;
         if (owner == null || caller.nhaXe == null || !owner.maNhaXe.equals(caller.nhaXe.maNhaXe)) throw denied();
     }
-    /** A suspended operator may inspect its own history, but cannot create or change resources. */
     public static void activeOperator(NguoiDung caller) {
         if (caller.loaiTaiKhoan == LoaiTaiKhoan.NHA_XE &&
                 (caller.nhaXe == null || caller.nhaXe.trangThai != TrangThaiNhaXe.HOAT_DONG)) throw denied();
@@ -55,12 +54,12 @@ public final class AccessControl {
     public static void trip(EntityManager em, NguoiDung caller, String id) { operator(caller, resource(em, ChuyenXe.class, id).tuyenXe.nhaXe); }
     public static void vehicle(EntityManager em, NguoiDung caller, String id) { operator(caller, resource(em, Xe.class, id).nhaXe); }
     public static void employee(EntityManager em, NguoiDung caller, String id) { operator(caller, resource(em, NhanVien.class, id).nhaXe); }
-    /** Call inside the booking transaction before accepting a new hold or issuing a ticket. */
     public static void saleAllowed(EntityManager em, String tripId) {
         ChuyenXe trip = resource(em, ChuyenXe.class, tripId);
+        if (trip.tuyenXe.nhaXe == null)
+            throw new AccountException(409, "OPERATOR_UNASSIGNED", "Chuyến chưa có nhà xe vận hành; không thể bán vé.");
         businessAllowed(em, trip.tuyenXe.nhaXe);
     }
-    /** Lock the operator row so suspension and new business serialize in one transaction. */
     public static void businessAllowed(EntityManager em, NhaXe operator) {
         if (operator != null && resource(em, NhaXe.class, operator.maNhaXe).trangThai != TrangThaiNhaXe.HOAT_DONG)
             throw new AccountException(409, "OPERATOR_SUSPENDED", "Nhà xe chưa hoạt động; không thể bán vé mới.");

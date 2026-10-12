@@ -10,6 +10,7 @@ import jakarta.persistence.*;
 import org.junit.jupiter.api.*;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -59,7 +60,7 @@ class OperatorServiceTest {
         rejects(400, () -> service.update(admin, "NX1", form("NX2")));
         assertEquals("Tên mới", service.update(admin, "NX1", new OperatorInputs.NhaXe(null, "Tên mới", null, null, null, null, null, null)).tenNhaXe());
         assertEquals(TrangThaiNhaXe.TAM_NGUNG,
-            service.state(admin, "NX1", new OperatorInputs.TrangThai(TrangThaiNhaXe.TAM_NGUNG)).trangThai());
+            service.state(admin, "NX1", new OperatorInputs.TrangThai(TrangThaiNhaXe.TAM_NGUNG)).nhaXe().trangThai());
         assertEquals(1, service.list(admin, null, TrangThaiNhaXe.TAM_NGUNG, 1, 20).totalItems());
         rejects(400, () -> service.list(admin, null, null, 0, 20));
         service.delete(admin, "NX1");
@@ -112,9 +113,49 @@ class OperatorServiceTest {
         }
         RouteTripService trips = new RouteTripService(factory);
         trips.createChuyenXe(new Inputs.ChuyenXe("C1", "R", LocalDate.of(2030, 1, 1), LocalTime.NOON, null));
-        service.state(admin, "NX1", new OperatorInputs.TrangThai(TrangThaiNhaXe.TAM_NGUNG));
+        try (EntityManager em = factory.createEntityManager()) {
+            em.getTransaction().begin();
+            NhaXe operator = em.find(NhaXe.class, "NX1");
+            ChuyenXe trip = em.find(ChuyenXe.class, "C1");
+            Xe vehicle = new Xe(); vehicle.maXe = "X"; vehicle.bienSo = "TEST-X";
+            vehicle.soChoNgoi = 2; vehicle.nhaXe = operator; em.persist(vehicle);
+            Ghe seat = new Ghe(); seat.maGhe = "G"; seat.viTri = "1"; seat.xe = vehicle; em.persist(seat);
+            Ghe heldSeat = new Ghe(); heldSeat.maGhe = "G2"; heldSeat.viTri = "2"; heldSeat.xe = vehicle; em.persist(heldSeat);
+            DonDatVe order = new DonDatVe(); order.maDon = "O"; order.nguoiDat = em.find(NguoiDung.class, "KH");
+            order.ngayDat = LocalDateTime.now(); order.khachDatTen = "Khách";
+            order.khachDatSoDienThoai = "0900000000"; order.trangThai = TrangThaiDon.DA_THANH_TOAN; em.persist(order);
+            VeXe ticket = new VeXe(); ticket.maVe = "V"; ticket.chuyenXe = trip; ticket.ghe = seat;
+            ticket.donDatVe = order; ticket.hoTenKhachHang = "Khách"; ticket.soDienThoaiKhachHang = "0900000000";
+            ticket.giaVe = BigDecimal.TEN; ticket.ngayXuatVe = LocalDateTime.now(); em.persist(ticket);
+            PhuongThucThanhToan method = new PhuongThucThanhToan(); method.maPhuongThuc = "PT";
+            method.tenPhuongThuc = "Thử nghiệm"; em.persist(method);
+            ThanhToan payment = new ThanhToan(); payment.maGiaoDich = "GD"; payment.donDatVe = order;
+            payment.phuongThucThanhToan = method; payment.soTien = BigDecimal.TEN;
+            payment.trangThai = TrangThaiThanhToan.THANH_CONG; em.persist(payment);
+            GiuCho hold = new GiuCho(); hold.maGiuCho = "H"; hold.chuyenXe = trip; hold.ghe = heldSeat;
+            hold.ngayDat = LocalDateTime.now(); hold.thoiDiemBatDau = LocalDateTime.now();
+            hold.thoiDiemHetHan = LocalDateTime.now().plusMinutes(15); em.persist(hold);
+            em.getTransaction().commit();
+        }
+        assertEquals(1, trips.searchChuyenXe("START", "END", LocalDate.of(2030, 1, 1)).size());
+        assertEquals(1, service.impact(admin, "NX1").chuyenSapKhoiHanh());
+        var changed = service.state(admin, "NX1", new OperatorInputs.TrangThai(TrangThaiNhaXe.TAM_NGUNG));
+        assertEquals(1, changed.anhHuong().chuyenSapKhoiHanh());
+        assertEquals(1, changed.anhHuong().giuChoDangGiu());
+        assertEquals(1, changed.anhHuong().veDaPhatHanh());
+        assertEquals(1, changed.anhHuong().veCoThanhToanThanhCong());
+        assertEquals(TrangThaiNhaXe.TAM_NGUNG, changed.nhaXe().trangThai());
         assertEquals(409, assertThrows(DomainException.class, () -> trips.createChuyenXe(
             new Inputs.ChuyenXe("C2", "R", LocalDate.of(2030, 1, 2), LocalTime.NOON, null))).status());
         assertEquals("C1", trips.getChuyenXe("C1").get("maChuyen"));
+        assertTrue(trips.searchChuyenXe("START", "END", LocalDate.of(2030, 1, 1)).isEmpty());
+        try (EntityManager em = factory.createEntityManager()) {
+            em.getTransaction().begin();
+            assertEquals(409, assertThrows(AccountException.class, () -> AccessControl.saleAllowed(em, "C1")).status());
+            assertEquals(TrangThaiDon.DA_THANH_TOAN, em.find(DonDatVe.class, "O").trangThai);
+            assertEquals(TrangThaiVe.DA_XUAT_VE, em.find(VeXe.class, "V").trangThai);
+            assertEquals(TrangThaiThanhToan.THANH_CONG, em.find(ThanhToan.class, "GD").trangThai);
+            em.getTransaction().rollback();
+        }
     }
 }

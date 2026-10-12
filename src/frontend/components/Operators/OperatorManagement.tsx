@@ -10,6 +10,9 @@ type Status = 'CHO_PHE_DUYET' | 'HOAT_DONG' | 'TAM_NGUNG' | 'NGUNG_HOAT_DONG';
 type Operator = { maNhaXe: string; tenNhaXe: string; hotline: string | null; email: string | null;
   diaChi: string | null; moTa: string | null; logoUrl: string | null; ngayThanhLap: string | null; trangThai: Status };
 type Manager = { maNguoiDung: string; hoTen: string; email: string; soDienThoai: string; trangThai: string };
+type Impact = { chuyenSapKhoiHanh: number; chuyenDangChay: number; giuChoDangGiu: number;
+  veDaPhatHanh: number; veCoThanhToanThanhCong: number };
+type StateChange = { nhaXe: Operator; anhHuong: Impact };
 type Page<T> = { items: T[]; page: number; totalPages: number; totalItems: number };
 const empty = { maNhaXe: '', tenNhaXe: '', hotline: '', email: '', diaChi: '', moTa: '', logoUrl: '', ngayThanhLap: '' };
 type Form = typeof empty;
@@ -79,11 +82,17 @@ export default function OperatorManagement() {
     } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   }
   async function changeState(status: Status) {
-    if (!selected || !window.confirm(`Chuyển ${selected.tenNhaXe} sang "${labels[status]}"? Vé và chuyến cũ sẽ không tự bị hủy.`)) return;
+    if (!selected) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const result = await request<Operator>(`/quan-tri/nha-xe/${selected.maNhaXe}/trang-thai`, 'PUT', { trangThai: status });
-      setSelected(result); await load(); setNotice('Đã cập nhật trạng thái nhà xe.');
+      const impact = await request<Impact>(`/quan-tri/nha-xe/${selected.maNhaXe}/anh-huong`);
+      const summary = `Chuyến sắp khởi hành: ${impact.chuyenSapKhoiHanh}; đang chạy: ${impact.chuyenDangChay}; `
+        + `giữ chỗ: ${impact.giuChoDangGiu}; vé đã phát hành: ${impact.veDaPhatHanh}; `
+        + `vé có thanh toán thành công: ${impact.veCoThanhToanThanhCong}.`;
+      if (!window.confirm(`Chuyển ${selected.tenNhaXe} sang "${labels[status]}"?\n${summary}\n`
+        + 'Các chuyến, vé và giao dịch sẽ giữ nguyên. Những trường hợp còn hoạt động cần xử lý theo quy trình vận hành.')) return;
+      const result = await request<StateChange>(`/quan-tri/nha-xe/${selected.maNhaXe}/trang-thai`, 'PUT', { trangThai: status });
+      setSelected(result.nhaXe); await load(); setNotice(`Đã cập nhật trạng thái. ${summary}`);
     } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   }
   async function remove() {
@@ -115,7 +124,7 @@ export default function OperatorManagement() {
   if (user.loaiTaiKhoan !== 'ADMIN') return <main className={styles.page} role="alert">Bạn không có quyền quản lý nhà xe.</main>;
   return <main className={styles.page}>
     <header className={styles.heading}><div><h1>Quản lý nhà xe</h1><p>Hồ sơ, trạng thái và tài khoản quản lý</p></div>
-      <button onClick={() => { setSelected(null); setForm(empty); setManagers([]); setNotice(''); }}>+ Thêm nhà xe</button></header>
+      <button disabled={busy} onClick={() => { setSelected(null); setForm(empty); setManagers([]); setNotice(''); }}>+ Thêm nhà xe</button></header>
     {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
     <div className={styles.grid}>
       <section className={styles.card}><h2>Danh sách</h2>
@@ -126,7 +135,7 @@ export default function OperatorManagement() {
           </select><button type="submit">Tìm</button>
         </form>
         {loadingList && <p role="status">Đang tải danh sách nhà xe…</p>}
-        <div className={styles.list}>{items.map(item => <button key={item.maNhaXe} disabled={loadingManagers} className={selected?.maNhaXe === item.maNhaXe ? styles.selected : ''}
+        <div className={styles.list}>{items.map(item => <button key={item.maNhaXe} disabled={loadingManagers || busy} className={selected?.maNhaXe === item.maNhaXe ? styles.selected : ''}
           onClick={() => void choose(item)}><strong>{item.tenNhaXe}</strong><small>{item.maNhaXe} · {labels[item.trangThai]}</small></button>)}</div>
         {items.length === 0 && <p>Không có nhà xe phù hợp.</p>}
         <div className={styles.pager}><button disabled={page <= 1} onClick={() => { setLoadingList(true); setPage(page - 1); }}>Trước</button><span>Trang {page}</span>
