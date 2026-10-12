@@ -421,7 +421,9 @@ public class RouteTripService {
         if ((trip.xe == null || !trip.xe.maXe.equals(xe.maXe)) && VehicleRules.hasTicketsOrHolds(em, trip))
             throw new DomainException(409, "Không thể đổi xe của chuyến đã có vé hoặc giữ chỗ.");
         VehicleRules.ready(em, xe.maXe, trip);
+        AssignmentRules.validateVehicleSchedule(em,trip,xe.maXe);
         trip.xe = xe;
+        AssignmentRules.validateTrip(em,trip);
     }
     public Map<String, Object> assignVehicle(String id, String xeId) {
         return write(em -> {
@@ -439,6 +441,7 @@ public class RouteTripService {
             x.gioKhoiHanh = input.gioKhoiHanh();
             x.gioDenDuKien = expectedArrival(x.tuyenXe, x.ngayKhoiHanh, x.gioKhoiHanh);
             if (x.xe != null) assignVehicle(em, x, x.xe.maXe);
+            else AssignmentRules.validateTrip(em,x);
             return view(x);
         });
     }

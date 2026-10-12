@@ -193,14 +193,16 @@ class RouteTripServiceTest {
         service.createTuyenXe(route("R")); vehicle("X");
         LocalDate date = LocalDate.of(2030, 1, 1);
         service.createChuyenXe(new Inputs.ChuyenXe("C1", "R", date, LocalTime.of(8, 0), "X"));
-        // The exact end/start boundary does not overlap.
-        service.createChuyenXe(new Inputs.ChuyenXe("C2", "R", date, LocalTime.of(14, 30), "X"));
+        service.createTuyenXe(new Inputs.TuyenXe("RETURN","Đà Lạt - HCM","DL","MD",LocalTime.of(15,0),
+            BigDecimal.valueOf(300),BigDecimal.valueOf(6.5),BigDecimal.valueOf(250000),null,TrangThaiTuyenXe.DANG_KHAI_THAC,null));
+        // Same vehicle returns from its arrival station after 30 minutes of preparation.
+        service.createChuyenXe(new Inputs.ChuyenXe("C2", "RETURN", date, LocalTime.of(15, 0), "X"));
         assertEquals(409, assertThrows(DomainException.class, () -> service.updateChuyenXe("C2",
             new Inputs.CapNhatChuyen(date, LocalTime.of(12, 0)))).status());
-        assertEquals(LocalTime.of(14, 30), service.getChuyenXe("C2").get("gioKhoiHanh"));
+        assertEquals(LocalTime.of(15, 0), service.getChuyenXe("C2").get("gioKhoiHanh"));
         service.updateChuyenXe("C2", new Inputs.CapNhatChuyen(date.plusDays(1), LocalTime.of(10, 0)));
         assertEquals(1, service.searchChuyenXe("MD", "DL", date).size());
-        assertEquals(1, service.searchChuyenXe("MD", "DL", date.plusDays(1)).size());
+        assertEquals(1, service.searchChuyenXe("DL", "MD", date.plusDays(1)).size());
         service.transition("C1", TrangThaiChuyen.DA_HUY);
         service.updateChuyenXe("C2", new Inputs.CapNhatChuyen(date, LocalTime.of(8, 0)));
     }

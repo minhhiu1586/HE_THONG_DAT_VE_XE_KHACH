@@ -9,6 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      VEHICLE_TURNAROUND_MINUTES: ${VEHICLE_TURNAROUND_MINUTES:-30}
     volumes:
       - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
     depends_on:
@@ -39,6 +40,7 @@ services:
       - ./docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/005_fleet_demo.sql:ro
       - ./docs/database/seed/003_t06_transport.sql:/docker-entrypoint-initdb.d/006_transport.sql:ro
       - ./docs/database/seed/005_t06_display_alignment.sql:/docker-entrypoint-initdb.d/007_display_alignment.sql:ro
+      - ./docs/database/seed/006_t11_staff.sql:/docker-entrypoint-initdb.d/008_staff.sql:ro
 
   migrate:
     image: postgres:16
