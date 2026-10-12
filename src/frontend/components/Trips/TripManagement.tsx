@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
+import { useManagementFocus } from '@/lib/use-management-focus';
 import styles from './TripManagement.module.css';
 
 type Route={maTuyen:string;tenTuyen:string;maNhaXe:string|null;giaCoBan:number;thoiGianDuKien:number;trangThai:string};
@@ -36,6 +37,7 @@ export default function TripManagement(){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
   const [initialLoading,setInitialLoading]=useState(true);const waiting=busy||initialLoading;
   const sending=useRef(false),revision=useRef(0);
+  const formFocus=useManagementFocus<HTMLElement>(),detailFocus=useManagementFocus<HTMLElement>();
   function clearNotice(){revision.current++;setError('');setSuccess('');}
   function interaction(event:React.SyntheticEvent<HTMLDivElement>){if(event.target instanceof Element && event.target.closest('button,input,select,a'))clearNotice();}
   async function load(number=1){
@@ -57,13 +59,14 @@ export default function TripManagement(){
       .finally(()=>{if(active)setInitialLoading(false);});
     return()=>{active=false;};
   },[request]);
-  async function detail(code:string){
+  async function detail(code:string,navigate=true){
     const [trip,checks]=await Promise.all([request<Trip>(`${API}/${encodeURIComponent(code)}`),request<Report>(`${API}/${encodeURIComponent(code)}/dieu-kien-mo-ban`)]);
     setSelected(trip);setReport(checks);
+    if(navigate)detailFocus.focusTarget();
   }
   const route=routes.find(r=>r.maTuyen===form.maTuyen);
   const arrival=form.gioDenDuKien || estimated(form.ngayKhoiHanh,form.gioKhoiHanh,route?.thoiGianDuKien);
-  function edit(trip:Trip){setEditing(true);setForm({maChuyen:trip.maChuyen,maTuyen:trip.maTuyen,maXe:trip.maXe??'',ngayKhoiHanh:trip.ngayKhoiHanh,gioKhoiHanh:trip.gioKhoiHanh.slice(0,5),gioDenDuKien:trip.gioDenDuKien.slice(0,16)});}
+  function edit(trip:Trip){setEditing(true);setForm({maChuyen:trip.maChuyen,maTuyen:trip.maTuyen,maXe:trip.maXe??'',ngayKhoiHanh:trip.ngayKhoiHanh,gioKhoiHanh:trip.gioKhoiHanh.slice(0,5),gioDenDuKien:trip.gioDenDuKien.slice(0,16)});formFocus.focusTarget('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');}
   function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();void action(async()=>{
       const saved=await request<Trip>(editing?`${API}/${encodeURIComponent(form.maChuyen)}`:API,editing?'PUT':'POST',
@@ -74,7 +77,7 @@ export default function TripManagement(){
   return <div className={styles.page} onClickCapture={interaction} onFocusCapture={interaction} onInputCapture={interaction} onChangeCapture={interaction}>
     <h1>Quản lý chuyến xe và mở bán</h1><p>Tạo lịch chạy, hoàn tất phân công và kiểm tra điều kiện trước khi mở bán.</p>
     {waiting&&<p role="status">{initialLoading?'Đang tải dữ liệu…':'Đang xử lý…'}</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}{success&&<p role="status" className={styles.success}>{success}</p>}
-    <section className={styles.panel}><h2>{editing?'Sửa chuyến nháp':'Tạo chuyến nháp'}</h2>
+    <section ref={formFocus.targetRef} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editing?'Sửa chuyến nháp':'Tạo chuyến nháp'}</h2>
       <form className={styles.form} onSubmit={submit} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation}>
         <label>Mã chuyến<input data-validation-label="mã chuyến" required maxLength={40} pattern="[A-Za-z0-9_-]+" disabled={editing} value={form.maChuyen} onChange={e=>setForm({...form,maChuyen:e.target.value})}/></label>
         <label>Tuyến xe<select aria-label="Tuyến xe" data-validation-label="tuyến xe" required value={form.maTuyen} onChange={e=>setForm({...form,maTuyen:e.target.value,maXe:'',gioDenDuKien:''})}><option value="">Chọn tuyến</option>{routes.map(r=><option key={r.maTuyen} value={r.maTuyen} disabled={!r.maNhaXe}>{r.tenTuyen} · {r.maTuyen}</option>)}</select></label>
@@ -103,17 +106,17 @@ export default function TripManagement(){
         </td></tr>)}{page.items.length===0&&<tr><td colSpan={5}>Không có chuyến phù hợp.</td></tr>}</tbody></table></div>
       <div className={styles.buttons}><button disabled={waiting||page.page<=1} onClick={()=>void action(()=>load(page.page-1))}>Trang trước</button><span>Trang {page.page} · {page.totalItems} chuyến</span><button disabled={waiting||page.page>=page.totalPages} onClick={()=>void action(()=>load(page.page+1))}>Trang sau</button></div>
     </section>
-    {selected&&<section className={styles.panel}><h2>Chi tiết chuyến · {selected.maChuyen}</h2><p>{selected.tenTuyen} · {selected.tenNhaXe} · {selected.bienSo??'Chưa gán xe'}</p>
+    {selected&&<section ref={detailFocus.targetRef} className={styles.panel}><h2 data-management-focus tabIndex={-1}>Chi tiết chuyến · {selected.maChuyen}</h2><p>{selected.tenTuyen} · {selected.tenNhaXe} · {selected.bienSo??'Chưa gán xe'}</p>
       <p>Trạng thái: <strong>{stateLabel(selected)}</strong>. Giá dự kiến: {Number(selected.giaVeDuKien).toLocaleString('vi-VN')} đồng.</p>
       <p>Ngừng nhận đặt vé: <strong>{dateTime(selected.ngungNhanDatVeLuc)}</strong> ({selected.phutDungNhanDatVe} phút trước khởi hành, giờ Việt Nam).</p>
       <h3>Nhân viên đã phân công</h3><div className={styles.scroll}><table><thead><tr><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Hạn bằng lái</th></tr></thead><tbody>{selected.nhanVienPhanCong.map(c=><tr key={c.maPhanCong}><td>{c.hoTen}</td><td>{crewRoles[c.vaiTro]??c.vaiTro}</td><td>{c.trangThai==='DANG_LAM_VIEC'?'Đang làm việc':c.trangThai}</td><td>{c.ngayHetHanBangLai??'Không áp dụng'}</td></tr>)}{selected.nhanVienPhanCong.length===0&&<tr><td colSpan={4}>Chưa có nhân viên được phân công. Cần hoàn tất phân công trước khi mở bán.</td></tr>}</tbody></table></div>
       <h3>Điều kiện mở bán</h3>{report&&<ul className={styles.checks}>{report.dieuKien.map(check=><li key={check.maDieuKien} className={check.dat?styles.passed:styles.failed}><span aria-hidden="true">{check.dat?'✓':'✕'}</span><div><strong>{check.tenDieuKien}</strong><small>{check.dat?'Đạt':check.lyDo}</small></div></li>)}</ul>}
-      <div className={styles.buttons}><button disabled={waiting} onClick={()=>void action(()=>detail(selected.maChuyen))}>Kiểm tra lại điều kiện</button>
+      <div className={styles.buttons}><button disabled={waiting} onClick={()=>void action(()=>detail(selected.maChuyen,false))}>Kiểm tra lại điều kiện</button>
         <button disabled={waiting||!report?.duDieuKien||selected.trangThai==='DANG_MO_BAN'} onClick={()=>{if(window.confirm(`Xác nhận mở bán chuyến ${selected.maChuyen}?`))void action(async()=>{
           try{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/mo-ban`,'POST');}catch(failure){await detail(selected.maChuyen);throw failure;}
-          await detail(selected.maChuyen);await load(page.page);
+          await detail(selected.maChuyen,false);await load(page.page);
         },'Đã mở bán chuyến.');}}>Mở bán chuyến</button>
-        <button disabled={waiting||!selected.coTheHuy} onClick={()=>{if(window.confirm(`Hủy chuyến ${selected.maChuyen}?`))void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/huy`,'POST');await detail(selected.maChuyen);await load(page.page);},'Đã hủy chuyến.');}}>Hủy chuyến</button></div>
+        <button disabled={waiting||!selected.coTheHuy} onClick={()=>{if(window.confirm(`Hủy chuyến ${selected.maChuyen}?`))void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/huy`,'POST');await detail(selected.maChuyen,false);await load(page.page);},'Đã hủy chuyến.');}}>Hủy chuyến</button></div>
     </section>}
   </div>;
 }
