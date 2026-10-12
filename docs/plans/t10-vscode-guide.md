@@ -50,7 +50,7 @@ Giữ terminal chạy; mở Chrome/Edge tại **http://localhost:3000**. Nếu c
 
 ## 4. ADMIN và nhà xe kiểm thử
 
-Đăng nhập ADMIN đã có từ T07. Tại hồ sơ, chọn **Quản lý xe, đăng kiểm và sơ đồ ghế**, hoặc mở **http://localhost:3000/quan-tri/xe**.
+Đăng nhập ADMIN đã có từ T07. Bấm **Quản trị** trên thanh đầu trang, rồi chọn **Xe và sơ đồ ghế** trong menu bên trái; hoặc mở **http://localhost:3000/quan-tri/xe**. Tài khoản NHA_XE dùng nút **Quản lý nhà xe**. Trên điện thoại, mở menu ☰ ở đầu trang để vào khu vực quản lý; menu bên của khu vực này có nút ☰ riêng để mở các chức năng.
 
 Nếu chưa có ADMIN, đăng ký `admin.t10@example.test` tại `/dang-ky`, tự đặt mật khẩu và ghi nhớ. Tại terminal gốc:
 

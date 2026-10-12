@@ -30,7 +30,16 @@ function sql(statement) {
     await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/tai-khoan');
-    await page.getByRole('link', { name: 'Quản lý xe, đăng kiểm và sơ đồ ghế' }).click();
+    await page.getByRole('link', { name: 'Quản trị', exact: true }).click();
+    const navigation = page.getByRole('navigation', { name: 'Điều hướng quản lý' });
+    await navigation.getByRole('link', { name: 'Nhà xe', exact: true }).waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await navigation.isVisible(), false);
+    await page.getByRole('button', { name: 'Menu quản lý', exact: true }).click();
+    await navigation.getByRole('link', { name: 'Xe và sơ đồ ghế', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: 'Menu quản lý', exact: true }).getAttribute('aria-expanded'), 'false');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert.equal(await navigation.getByRole('link', { name: 'Xe và sơ đồ ghế', exact: true }).getAttribute('aria-current'), 'page');
     await page.getByRole('heading', { name: 'Quản lý xe và sơ đồ ghế' }).waitFor();
     await page.getByRole('button', { name: 'Loại xe', exact: true }).click();
     for (const field of await page.locator('form input[required]:enabled').all()) {

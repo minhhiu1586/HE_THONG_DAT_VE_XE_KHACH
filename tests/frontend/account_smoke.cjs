@@ -77,14 +77,15 @@ async function shown(locator) { await locator.waitFor({ state: 'visible', timeou
     assert.equal((await context.request.get(base+'/api/tai-khoan/me')).status(),401);
     await page.getByLabel('Email',{exact:true}).fill(email); await page.getByLabel('Mật khẩu',{exact:true}).fill(changedPassword);
     await page.getByRole('button',{name:'Đăng nhập',exact:true}).click(); await page.waitForURL(url=>url.pathname==='/tai-khoan');
-    await page.goto(base + '/quan-tri/tai-khoan'); await shown(page.getByText('Bạn không có quyền quản lý tài khoản.',{exact:false}));
+    await page.goto(base + '/quan-tri/tai-khoan'); await shown(page.getByText('Bạn không có quyền truy cập khu vực quản lý.',{exact:true}));
     sql(`UPDATE nguoi_dung SET trang_thai='KHOA' WHERE ma_nguoi_dung='${userId}'`);
     await page.goto(base + '/tai-khoan'); await page.waitForURL(url => url.pathname === '/dang-nhap' && url.searchParams.has('next'));
     await shown(page.getByText('Vui lòng đăng nhập để tiếp tục.',{exact:false}).first());
     sql(`UPDATE nguoi_dung SET trang_thai='HOAT_DONG',loai_tai_khoan='ADMIN' WHERE ma_nguoi_dung='${userId}'`);
     await page.getByLabel('Email',{exact:true}).fill(email); await page.getByLabel('Mật khẩu',{exact:true}).fill(changedPassword);
     await page.getByRole('button',{name:'Đăng nhập',exact:true}).click(); await page.waitForURL(url=>url.pathname==='/tai-khoan');
-    await page.getByRole('link',{name:'Quản lý trạng thái tài khoản'}).click();
+    await page.getByRole('link',{name:'Quản trị',exact:true}).click();
+    await page.getByRole('navigation',{name:'Điều hướng quản lý'}).getByRole('link',{name:'Tài khoản',exact:true}).click();
     await shown(page.getByRole('heading',{name:'Quản lý tài khoản'}));
     const targetEmail = `qa_target_${tag}@example.test`;
     const targetContext = await browser.newContext();
