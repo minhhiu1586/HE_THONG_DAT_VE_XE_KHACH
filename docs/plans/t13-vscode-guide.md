@@ -152,21 +152,45 @@ Các bản ghi `NHAP` hoặc `CHUA_KHOI_HANH` không tự xuất hiện như chu
 
 ## 7. Chuẩn bị ít nhất một chuyến mở bán hợp lệ
 
-Nếu database đã có chuyến `DANG_MO_BAN` ở ngày tương lai và đủ điều kiện, dùng chuyến đó.
+Nếu database đã có chuyến `DANG_MO_BAN` ở ngày tương lai và đủ điều kiện, dùng chuyến đó. Seed T11 cũng cung cấp sẵn một bộ chuyến đi-về để thử mở bán; `CX_6_1` được cấu hình làm chuyến TP. Hồ Chí Minh → Đà Lạt, xe `XE_006` và nhân viên cùng nhà xe. Chuyến này có một tài xế chính, một tài xế phụ, một phụ xe và tuyến về `CX_6_2` nối đúng bến. Trong database được seed mới, đây là dữ liệu kiểm thử có thể đủ điều kiện mở bán sau khi backend kiểm tra.
 
-Nếu chưa có:
+### Nạp seed T11 vào database đã tồn tại
 
-1. Sau khi frontend chạy ở bước 8, đăng nhập tài khoản ADMIN hoặc NHA_XE có quyền.
-2. Mở **Quản lý → Chuyến xe và mở bán**.
-3. Tạo chuyến nháp trên tuyến đang khai thác, chọn ngày tương lai, xe đúng nhà xe.
-4. Mở phần chi tiết/điều kiện mở bán.
-5. Phân công nhân viên bằng API T11 theo [hướng dẫn T12](t12-vscode-guide.md) và [API nhân viên T11](../api/t11-employees.md). T11 hiện chưa có giao diện phân công đầy đủ.
-6. Kiểm tra từng nhóm điều kiện; sửa dữ liệu bị báo lỗi.
-7. Chỉ nhấn mở bán khi đủ điều kiện.
+Docker chỉ tự chạy các file seed khi khởi tạo volume PostgreSQL lần đầu. Vì vậy pull code hoặc khởi động lại container không tự tạo `CX_6_1`. Các seed có phụ thuộc; không chạy riêng `006_t11_staff.sql` trước seed vận tải T06.
 
-**Kết quả mong đợi:** chuyến chuyển thành `DANG_MO_BAN` qua nghiệp vụ backend. Không đổi trạng thái trực tiếp bằng SQL để bỏ qua kiểm tra.
+Tại thư mục gốc repository, nếu các seed nền chưa có, nạp theo thứ tự:
 
-Không có tài khoản quản trị mặc định. Nếu cần tạo tài khoản kiểm thử quản trị trên database phát triển, làm theo [hướng dẫn T07](t07-vscode-guide.md).
+```bash
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/001_demo.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/002_fleet_demo.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/003_t06_transport.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/005_t06_display_alignment.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/006_t11_staff.sql
+```
+
+Nếu đã xác nhận `001_demo.sql`, `002_fleet_demo.sql` và `005_t06_display_alignment.sql` có đủ dữ liệu, có thể chỉ cần chạy `003_t06_transport.sql` rồi `006_t11_staff.sql`. Ví dụ đang ở terminal `src/frontend`, đường dẫn file lần lượt bắt đầu bằng `../../docs/...`.
+
+Các script seed dùng mã cố định và phần lớn bỏ qua bản ghi đã tồn tại; không xóa volume bằng `docker compose down -v`. Nếu một script báo lỗi, dừng tại đó, đọc lỗi và bổ sung đúng seed phụ thuộc trước khi chạy bước tiếp theo. `006_t11_staff.sql` nằm trong transaction; khi gặp lỗi giữa chừng, các thay đổi của lần chạy lỗi được rollback.
+
+Kiểm tra chuyến và ngày giờ thực tế trong database:
+
+```bash
+docker compose exec postgres psql -U datvexe_user -d datvexe -c "SELECT ma_chuyen, ma_tuyen, ma_xe, ngay_khoi_hanh, gio_khoi_hanh, gio_den_du_kien, trang_thai FROM chuyen_xe WHERE ma_chuyen='CX_6_1';"
+```
+
+**Kết quả mong đợi:** một dòng `CX_6_1`; ngày khởi hành là ngày nạp seed cộng một ngày trong lần nạp thành công đầu tiên, giờ đi `08:00`. Chạy lại seed không dời ngày của chuyến đã tồn tại. Nếu ngày này đã qua, chuyến không thể dùng để mở bán; hãy dùng chuyến tương lai khác hoặc tạo bộ dữ liệu kiểm thử có ngày tương lai.
+
+### Mở bán `CX_6_1`
+
+1. Đảm bảo backend và frontend đang chạy theo các bước 5 và 8; đăng nhập tài khoản ADMIN hoặc NHA_XE có quyền quản lý.
+2. Mở **Quản lý → Chuyến xe và mở bán**. Bộ lọc trạng thái ban đầu có thể đang chọn **Đang mở bán**; đổi thành **Tất cả trạng thái** hoặc **Chưa mở bán (dữ liệu cũ)** rồi bấm **Lọc chuyến**.
+3. Tìm `CX_6_1`, chọn **Chi tiết / mở bán** và xem từng ô trong phần **Điều kiện mở bán**.
+4. Nếu tất cả điều kiện xanh, bấm **Mở bán chuyến**. Nếu có điều kiện đỏ, xử lý đúng nguyên nhân hiển thị. Không ép trạng thái bằng SQL.
+5. Nạp lại chi tiết hoặc danh sách và xác nhận trạng thái là **Đang mở bán**. Nếu chuyến bị từ chối, ghi lại lý do; dữ liệu hiện có trong database như lịch xe/nhân viên vẫn được Backend kiểm tra nên không thể khẳng định chuyến luôn hợp lệ ở mọi máy.
+
+**Kết quả mong đợi:** trong bộ seed T11 nguyên vẹn, lịch xe và nhân viên của `CX_6_1` được bố trí để nối đúng với chuyến về `CX_6_2`, và đã có đủ vai trò. Khi các dữ liệu liên quan còn hợp lệ và chuyến chưa quá hạn, quy tắc T12 cho phép mở bán. Chuyến seed ban đầu có trạng thái `CHUA_KHOI_HANH`, nên T13 chưa tìm thấy cho đến khi mở bán thành công.
+
+Nếu không có tài khoản quản trị, không có giao diện phân công nhân viên đầy đủ trong T11; xem [hướng dẫn T12](t12-vscode-guide.md) và [API nhân viên T11](../api/t11-employees.md) để chuẩn bị dữ liệu qua API. Không có tài khoản quản trị mặc định. Nếu cần tạo tài khoản kiểm thử quản trị trên database phát triển, làm theo [hướng dẫn T07](t07-vscode-guide.md).
 
 Mặc định ngừng nhận đặt 60 phút trước khởi hành. Nên chọn chuyến ngày mai hoặc xa hơn để tránh hết hạn trong lúc kiểm tra. Xe/nhân viên cần có đăng kiểm, bằng lái và lịch vận hành hợp lệ cho ngày đó.
 

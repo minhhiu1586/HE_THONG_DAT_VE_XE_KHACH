@@ -273,6 +273,118 @@
   font-size: var(--font-size-sm);
 }
 
+/* Database-backed home sections: keep route and station data real while
+   providing the illustrated card treatment that does not depend on mock rows. */
+.section {
+  margin: 0 auto var(--space-3xl);
+}
+
+.sectionTitle {
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
+  font-size: var(--font-size-2xl);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+
+.grid .routeCard,
+.grid .stationCard {
+  min-width: 0;
+  flex: initial;
+  scroll-snap-align: initial;
+  color: inherit;
+  text-decoration: none;
+}
+
+.stationCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stationCard:hover {
+  color: inherit;
+}
+
+.routeArtwork,
+.stationArtwork {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  height: 168px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #d7eaff, #a9d7f7 55%, #e1f4ff);
+}
+
+.routeArtworkBlue { background: linear-gradient(135deg, #cce5ff, #74b9ee 58%, #d7f1ff); }
+.routeArtworkTeal { background: linear-gradient(135deg, #c9f1ec, #65c7bd 58%, #d9f5e8); }
+.routeArtworkSunset { background: linear-gradient(135deg, #ffe0bf, #f4a17f 58%, #ffe8cc); }
+.routeArtworkGreen { background: linear-gradient(135deg, #d8efc9, #90c987 58%, #e4f5d6); }
+
+.artSun {
+  position: absolute;
+  z-index: -1;
+  top: 22px;
+  right: 22%;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 242, 190, .9);
+}
+
+.artMountainBack,
+.artMountainFront {
+  position: absolute;
+  z-index: -1;
+  bottom: -42px;
+  width: 72%;
+  height: 130px;
+  border-radius: 48% 52% 0 0;
+  transform: rotate(-9deg);
+  background: rgba(255, 255, 255, .45);
+}
+
+.artMountainBack { left: -13%; }
+.artMountainFront { right: -16%; bottom: -58px; transform: rotate(12deg); background: rgba(20, 93, 139, .18); }
+
+.artDestination,
+.artBus,
+.stationBuilding,
+.stationBus {
+  position: absolute;
+  filter: drop-shadow(0 5px 6px rgba(28, 54, 77, .18));
+}
+
+.artDestination { top: 22px; left: 26px; font-size: 2.6rem; }
+.artBus { right: 24px; bottom: 17px; font-size: 3.4rem; }
+.stationBuilding { top: 25px; left: 50%; transform: translateX(-50%); font-size: 4.2rem; }
+.stationBus { right: 18%; bottom: 15px; font-size: 2.4rem; }
+
+.grid .routeInfo,
+.grid .stationInfo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.grid .routeName,
+.grid .stationName { margin: 0; }
+.grid .stationCity { margin: 0; }
+.grid .price { font-size: var(--font-size-base); }
+
 /* Responsive */
 @media (max-width: 1024px) {
   .routeCard {
@@ -283,6 +395,8 @@
   .stationsGrid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 768px) {
@@ -331,4 +445,9 @@
   .stationsGrid {
     grid-template-columns: 1fr;
   }
+
+  .grid { grid-template-columns: 1fr; }
+
+  .routeArtwork,
+  .stationArtwork { height: 150px; }
 }

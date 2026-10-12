@@ -19,9 +19,9 @@ export default function RootLayout({
       <body>
         <AuthProvider>
         <Header />
-        <main style={{ minHeight: "calc(100vh - 300px)" }}>
+        <div style={{ minHeight: "calc(100vh - 300px)" }}>
           {children}
-        </main>
+        </div>
         <Footer />
         </AuthProvider>
       </body>

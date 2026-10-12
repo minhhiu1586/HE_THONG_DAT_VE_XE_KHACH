@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SearchOption } from '@/lib/api';
+import { clearValidation, vietnameseValidation } from '@/lib/form-validation';
 import styles from './Home.module.css';
 
 function dateInVietnam(daysToAdd = 0) {
@@ -45,13 +46,13 @@ export default function HeroBanner({ options, loadError }: { options: SearchOpti
         <div className="container">
           <div className={styles.heroContent}>
             <h1 className={styles.heroTitle}>Tìm chuyến xe khách phù hợp với hành trình của bạn</h1>
-            <form className={styles.searchForm} onSubmit={submit}>
+            <form className={styles.searchForm} onSubmit={submit} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation}>
               <div className={styles.searchInputs}>
                 <div className={styles.inputGroup}>
                   <span className={styles.inputIcon}>📍</span>
                   <div className={styles.inputField}>
                     <label htmlFor="home-from">Nơi xuất phát</label>
-                    <select id="home-from" value={from} onChange={event => setFrom(event.target.value)} required disabled={!options.length}>
+                    <select id="home-from" data-validation-label="nơi xuất phát" value={from} onChange={event => setFrom(event.target.value)} required disabled={!options.length}>
                       <LocationOptions options={options} />
                     </select>
                   </div>
@@ -61,7 +62,7 @@ export default function HeroBanner({ options, loadError }: { options: SearchOpti
                   <span className={styles.inputIcon}>🎯</span>
                   <div className={styles.inputField}>
                     <label htmlFor="home-to">Nơi đến</label>
-                    <select id="home-to" value={to} onChange={event => setTo(event.target.value)} required disabled={!options.length}>
+                    <select id="home-to" data-validation-label="nơi đến" value={to} onChange={event => setTo(event.target.value)} required disabled={!options.length}>
                       <LocationOptions options={options} />
                     </select>
                   </div>
@@ -70,7 +71,7 @@ export default function HeroBanner({ options, loadError }: { options: SearchOpti
                   <span className={styles.inputIcon}>📅</span>
                   <div className={styles.inputField}>
                     <label htmlFor="home-date">Ngày đi</label>
-                    <input id="home-date" type="date" value={date} min={minDate} onChange={event => setDate(event.target.value)} required />
+                    <input id="home-date" data-validation-label="ngày đi" type="date" value={date} min={minDate} onChange={event => setDate(event.target.value)} required />
                   </div>
                 </div>
               </div>
