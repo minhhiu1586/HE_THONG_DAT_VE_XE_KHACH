@@ -154,3 +154,5 @@ Ghi lý do → trao đổi với frontend/backend liên quan → cập nhật co
 Kết quả bàn giao là danh sách API, cấu trúc dữ liệu, quy tắc xử lý lỗi và ví dụ trong ba file trên. Không kèm mock server, bộ kiểm thử hoặc mã triển khai nghiệp vụ.
 
 Backend hiện có còn trả tiền dạng JSON number, một số danh sách dạng array và lỗi `{"error":"..."}`. Việc áp dụng hợp đồng cần được phối hợp với frontend/backend khi triển khai; báo cáo này chưa thay đổi ứng dụng.
+
+- [T12 — Quản lý chuyến và mở bán](t12-trip-management.md).

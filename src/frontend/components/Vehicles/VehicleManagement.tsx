@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
+import { useManagementFocus } from '@/lib/use-management-focus';
 import styles from './VehicleManagement.module.css';
 
 type Kind = { maLoaiXe: string; tenLoaiXe: string; soChoNgoi: number; soTang: number; moTa: string | null };
@@ -36,6 +37,9 @@ export default function VehicleManagement() {
   const [filterType, setFilterType] = useState(''); const [filterOwner, setFilterOwner] = useState(''); const [filterState, setFilterState] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('');
   const sending = useRef(false); const revision = useRef(0);
+  const [typeFormTarget, focusTypeForm] = useManagementFocus<HTMLElement>();
+  const [vehicleFormTarget, focusVehicleForm] = useManagementFocus<HTMLElement>();
+  const [detailTarget, focusDetail] = useManagementFocus<HTMLElement>();
   function clearNotice() { revision.current++; setError(''); setSuccess(''); }
   function interaction(event: React.SyntheticEvent<HTMLDivElement>) { if (event.target instanceof Element && event.target.closest('button,input,select,textarea,a')) clearNotice(); }
   async function loadVehicles() {
@@ -58,17 +62,25 @@ export default function VehicleManagement() {
       .catch(failure => { if (active) setError(errorMessage(failure)); });
     return () => { active = false; };
   }, [allowed, loading, user, router, request]);
-  async function detail(vehicle: Vehicle) {
+  async function detail(vehicle: Vehicle, navigate = true) {
+    let loaded = false;
     await action(async () => {
       const [current, map] = await Promise.all([request<Vehicle>(`/xe/${encodeURIComponent(vehicle.maXe)}`), request<Seat[]>(`/xe/${encodeURIComponent(vehicle.maXe)}/ghe`)]);
       setSelected(current); setSeats(map);
+      loaded = true;
     }, '');
+    if (navigate && loaded) focusDetail();
   }
   function editVehicle(vehicle: Vehicle) {
     setEditingVehicle(true);
     setVehicleForm({ maXe: vehicle.maXe, bienSo: vehicle.bienSo, maLoaiXe: vehicle.maLoaiXe, maNhaXe: vehicle.maNhaXe,
       ngayDangKiem: vehicle.ngayDangKiem ?? '', hanDangKiem: vehicle.hanDangKiem ?? '', trangThai: vehicle.trangThai,
       namSanXuat: vehicle.namSanXuat?.toString() ?? '', dungTichXang: vehicle.dungTichXang?.toString() ?? '', tocDo: vehicle.tocDo?.toString() ?? '' });
+    focusVehicleForm('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
+  }
+  function editType(type: Kind) {
+    setEditingType(true); setTypeForm({ ...type, soChoNgoi: String(type.soChoNgoi), soTang: String(type.soTang), moTa: type.moTa ?? '' });
+    focusTypeForm('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
   }
   function submitType(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,6 +99,7 @@ export default function VehicleManagement() {
           dungTichXang: vehicleForm.dungTichXang ? Number(vehicleForm.dungTichXang) : null, tocDo: vehicleForm.tocDo ? Number(vehicleForm.tocDo) : null });
       await loadVehicles(); setSelected(current); setSeats(await request<Seat[]>(`/xe/${encodeURIComponent(current.maXe)}/ghe`));
       setEditingVehicle(false); setVehicleForm(emptyVehicle);
+      focusDetail();
     }, editingVehicle ? 'Đã cập nhật xe.' : 'Đã thêm xe và tạo sơ đồ ghế.');
   }
   function updateSeat(index: number, changes: Partial<Seat>) { setSeats(current => current.map((seat, i) => i === index ? { ...seat, ...changes } : seat)); }
@@ -99,7 +112,7 @@ export default function VehicleManagement() {
     <nav className={styles.tabs}><button aria-pressed={tab === 'vehicles'} onClick={() => setTab('vehicles')}>Xe và ghế</button>
       {isAdmin && <button aria-pressed={tab === 'types'} onClick={() => setTab('types')}>Loại xe</button>}</nav>
     {busy && <p role="status">Đang xử lý…</p>}{error && <p className={styles.error} role="alert">{error}</p>}{success && <p className={styles.success} role="status">{success}</p>}
-    {tab === 'types' && isAdmin && <section className={styles.panel}><h2>{editingType ? 'Sửa loại xe' : 'Thêm loại xe'}</h2>
+    {tab === 'types' && isAdmin && <section ref={typeFormTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editingType ? 'Sửa loại xe' : 'Thêm loại xe'}</h2>
       <form className={styles.form} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} onSubmit={submitType}>
         <Field label="Mã loại xe" required maxLength={40} disabled={editingType} value={typeForm.maLoaiXe} onChange={e => setTypeForm({ ...typeForm, maLoaiXe: e.target.value })} />
         <Field label="Tên loại xe" required maxLength={120} value={typeForm.tenLoaiXe} onChange={e => setTypeForm({ ...typeForm, tenLoaiXe: e.target.value })} />
@@ -113,12 +126,12 @@ export default function VehicleManagement() {
         <button onClick={() => void action(async () => setTypeResults(await request<Kind[]>(`/loai-xe?q=${encodeURIComponent(typeQuery)}`)), '')}>Tìm loại xe</button></div>
       <div className={styles.scroll}><table><thead><tr><th>Mã</th><th>Loại xe</th><th>Sức chứa</th><th>Tầng</th><th>Thao tác</th></tr></thead><tbody>
         {typeResults.map(type => <tr key={type.maLoaiXe}><td>{type.maLoaiXe}</td><td>{type.tenLoaiXe}</td><td>{type.soChoNgoi}</td><td>{type.soTang}</td><td>
-          <button onClick={() => { setEditingType(true); setTypeForm({ ...type, soChoNgoi: String(type.soChoNgoi), soTang: String(type.soTang), moTa: type.moTa ?? '' }); }}>Sửa</button>
+          <button onClick={() => editType(type)}>Sửa</button>
           <button disabled={busy} onClick={() => { if (window.confirm(`Xóa loại xe ${type.tenLoaiXe}?`)) void action(async () => { await request(`/loai-xe/${encodeURIComponent(type.maLoaiXe)}`, 'DELETE'); const kinds = await request<Kind[]>('/loai-xe'); setTypes(kinds); setTypeResults(kinds); setTypeQuery(''); }, 'Đã xóa loại xe.'); }}>Xóa</button>
         </td></tr>)}</tbody></table></div>
     </section>}
     {tab === 'vehicles' && <>
-      <section className={styles.panel}><h2>{editingVehicle ? `Sửa xe ${vehicleForm.maXe}` : 'Thêm xe'}</h2>
+      <section ref={vehicleFormTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editingVehicle ? `Sửa xe ${vehicleForm.maXe}` : 'Thêm xe'}</h2>
         <p>Sức chứa lấy từ loại xe. Xe không đủ đăng kiểm hoặc đang bảo trì không được gán vào chuyến mới.</p>
         <form className={styles.form} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} onSubmit={submitVehicle}>
           <Field label="Mã xe" required maxLength={40} disabled={editingVehicle} value={vehicleForm.maXe} onChange={e => setVehicleForm({ ...vehicleForm, maXe: e.target.value })} />
@@ -149,7 +162,7 @@ export default function VehicleManagement() {
           </td></tr>)}{vehicles.length === 0 && <tr><td colSpan={7}>Không có xe phù hợp.</td></tr>}
         </tbody></table></div>
       </section>
-      {selected && <section className={styles.panel}><h2>Chi tiết xe · {selected.bienSo}</h2>
+      {selected && <section ref={detailTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>Chi tiết xe · {selected.bienSo}</h2>
         <p>Nhà xe: {operators.find(owner => owner.maNhaXe === selected.maNhaXe)?.tenNhaXe || selected.maNhaXe}. Đăng kiểm: {selected.ngayDangKiem} → {selected.hanDangKiem}.</p>
         <p>Loại xe: {layoutType?.tenLoaiXe || selected.maLoaiXe} · Sức chứa: {selected.soChoNgoi} · Trạng thái: {vehicleStates[selected.trangThai]}.</p>
         <p>Năm sản xuất: {selected.namSanXuat ?? 'Chưa nhập'} · Dung tích nhiên liệu: {selected.dungTichXang == null ? 'Chưa nhập' : `${selected.dungTichXang} lít`} · Tốc độ: {selected.tocDo == null ? 'Chưa nhập' : `${selected.tocDo} km/giờ`}.</p>
@@ -170,7 +183,7 @@ export default function VehicleManagement() {
           </tr>)}</tbody></table></div>
           <div className={styles.buttons}><button type="button" disabled={!selected.coTheSuaSoDo || busy} onClick={() => setSeats(current => [...current, { maGhe: null, viTri: '', tang: 1, trangThai: 'HOAT_DONG' }])}>Thêm vị trí</button>
             <button disabled={!selected.coTheSuaSoDo || busy || seats.length !== selected.soChoNgoi}>Lưu sơ đồ ghế</button>
-            <button type="button" disabled={busy} onClick={() => void detail(selected)}>Tải lại sơ đồ</button></div>
+            <button type="button" disabled={busy} onClick={() => void detail(selected, false)}>Tải lại sơ đồ</button></div>
           {seats.length !== selected.soChoNgoi && <p className={styles.warning}>Danh sách đang có {seats.length} ghế; cần đúng {selected.soChoNgoi} ghế để lưu. Các thay đổi chưa được lưu.</p>}
         </form>
       </section>}

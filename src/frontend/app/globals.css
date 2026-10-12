@@ -138,7 +138,31 @@ button {
   outline: none;
   font-family: var(--font-family);
   font-size: var(--font-size-base);
-  transition: all var(--transition-fast);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast), background-color var(--transition-fast);
+}
+
+button:not(:disabled):hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+button:not(:disabled):active {
+  filter: brightness(0.92);
+  transform: translateY(0) scale(0.98);
+}
+
+button:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+[data-management-focus] {
+  scroll-margin-block: 96px;
 }
 
 input, select, textarea {
@@ -160,6 +184,13 @@ input:focus, select:focus, textarea:focus {
 
 input::placeholder {
   color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 ul, ol {

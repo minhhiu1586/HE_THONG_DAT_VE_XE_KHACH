@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
+import { useManagementFocus } from '@/lib/use-management-focus';
 import styles from './RouteManagement.module.css';
 
 type City = { maTinhThanh: string; tenTinhThanh: string; khuVuc: string | null };
@@ -31,6 +32,10 @@ export default function RouteManagement() {
   const [selectedRoute, setSelectedRoute] = useState(''); const [editingStop, setEditingStop] = useState('');
   const [stopForm, setStopForm] = useState({ maDiemDung: '', tenDiemDung: '', diaChi: '', thoiGianDung: '0', loaiDiemDung: 'CA_HAI' });
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('');
+  const [cityTarget, focusCity] = useManagementFocus<HTMLElement>();
+  const [stationTarget, focusStation] = useManagementFocus<HTMLElement>();
+  const [routeTarget, focusRoute] = useManagementFocus<HTMLElement>();
+  const [stopTarget, focusStop] = useManagementFocus<HTMLElement>();
   const noticeVersion = useRef(0);
   function clearNotices() { noticeVersion.current++; setError(''); setSuccess(''); }
   function clearOnInteraction(event: React.SyntheticEvent<HTMLDivElement>) {
@@ -62,6 +67,24 @@ export default function RouteManagement() {
     return () => { active = false; };
   }, [loading, user, mayManage, router, request]);
   const currentRoute = useMemo(() => routes.find(route => route.maTuyen === selectedRoute) ?? routes[0], [routes, selectedRoute]);
+
+  function editCity(city: City) {
+    setCityForm({ maTinhThanh: city.maTinhThanh, tenTinhThanh: city.tenTinhThanh, khuVuc: city.khuVuc || '' });
+    setEditingCity(true); focusCity('input:not(:disabled):not([readonly])');
+  }
+  function editStation(station: Station) {
+    setStationForm({ ...station, soDienThoai: station.soDienThoai || '' });
+    setEditingStation(true); focusStation('input:not(:disabled):not([readonly]),select:not(:disabled)');
+  }
+  function chooseRoute(routeCode: string) {
+    setSelectedRoute(routeCode); setEditingStop(''); focusStop();
+  }
+  function editStop(stop: Stop) {
+    setEditingStop(stop.maDiemDung);
+    setStopForm({ maDiemDung: stop.maDiemDung, tenDiemDung: stop.tenDiemDung, diaChi: stop.diaChi,
+      thoiGianDung: String(stop.thoiGianDung), loaiDiemDung: stop.loaiDiemDung });
+    focusStop('input:not(:disabled):not([readonly]),select:not(:disabled)');
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>, action: () => Promise<unknown>, message: string) {
     event.preventDefault(); clearNotices(); const version = noticeVersion.current; setBusy(true);
@@ -101,6 +124,7 @@ export default function RouteManagement() {
     setRouteForm({ maTuyen: route.maTuyen, tenTuyen: route.tenTuyen, tramKhoiHanh: route.tramKhoiHanh, tramDen: route.tramDen,
       thoiGianKhoiHanh: route.thoiGianKhoiHanh?.slice(0, 5) ?? '', khoangCachKM: route.khoangCachKM?.toString() ?? '',
       thoiGianDuKien: route.thoiGianDuKien?.toString() ?? '', giaCoBan: route.giaCoBan.toString(), moTa: route.moTa ?? '', trangThai: route.trangThai });
+    focusRoute('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
   }
   async function mutate(path: string, method: string, body?: unknown, message = 'Đã cập nhật dữ liệu.') {
     clearNotices(); const version = noticeVersion.current; setBusy(true);
@@ -119,8 +143,8 @@ export default function RouteManagement() {
     </nav>
     {error && <p className={styles.error} role="alert">{error}</p>}{success && <p className={styles.success} role="status">{success}</p>}
 
-    {tab === 'cities' && isAdmin && <section className={styles.panel}>
-      <div className={styles.sectionTitle}><div><h2>Tỉnh/thành phố</h2><p>Danh mục tỉnh thành được dùng để xác định tỉnh đi và tỉnh đến qua bến xe.</p></div><div className={styles.search}><input aria-label="Tìm tỉnh thành" placeholder="Tìm theo mã hoặc tên" value={citySearch} onChange={e => setCitySearch(e.target.value)} /><button onClick={() => void loadCities()}>Tìm</button></div></div>
+    {tab === 'cities' && isAdmin && <section ref={cityTarget} className={styles.panel}>
+      <div className={styles.sectionTitle}><div><h2 data-management-focus tabIndex={-1}>Tỉnh/thành phố</h2><p>Danh mục tỉnh thành được dùng để xác định tỉnh đi và tỉnh đến qua bến xe.</p></div><div className={styles.search}><input aria-label="Tìm tỉnh thành" placeholder="Mã hoặc tên tỉnh/thành" value={citySearch} onChange={e => setCitySearch(e.target.value)} /><button onClick={() => void loadCities()}>Tìm</button></div></div>
       <form onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} className={styles.form} onSubmit={citySubmit}><label>Mã tỉnh/thành<input data-validation-label="mã tỉnh/thành" value={cityForm.maTinhThanh} disabled={editingCity} maxLength={40} required onChange={e => setCityForm({ ...cityForm, maTinhThanh: e.target.value })} /></label>
         <label>Tên<input data-validation-label="tên tỉnh/thành phố" value={cityForm.tenTinhThanh} maxLength={120} required onChange={e => setCityForm({ ...cityForm, tenTinhThanh: e.target.value })} /></label>
         <label>Khu vực<input data-validation-label="khu vực" value={cityForm.khuVuc} maxLength={80} onChange={e => setCityForm({ ...cityForm, khuVuc: e.target.value })} /></label>
@@ -128,13 +152,13 @@ export default function RouteManagement() {
       </form>
       <div className={styles.tableWrap}><table><thead><tr><th>Mã</th><th>Tỉnh/thành</th><th>Khu vực</th><th>Thao tác</th></tr></thead><tbody>
         {cities.map(city => <tr key={city.maTinhThanh}><td>{city.maTinhThanh}</td><td>{city.tenTinhThanh}</td><td>{city.khuVuc || '—'}</td><td className={styles.actions}>
-          <button onClick={() => { setCityForm({ maTinhThanh: city.maTinhThanh, tenTinhThanh: city.tenTinhThanh, khuVuc: city.khuVuc || '' }); setEditingCity(true); }}>Sửa</button>
+          <button onClick={() => editCity(city)}>Sửa</button>
           <button disabled={busy} onClick={() => { if (window.confirm(`Xóa ${city.tenTinhThanh}?`)) void mutate(`/tinh-thanh/${encodeURIComponent(city.maTinhThanh)}`, 'DELETE', undefined, 'Đã xóa tỉnh/thành phố.'); }}>Xóa</button>
         </td></tr>)}{cities.length === 0 && <tr><td colSpan={4}>Chưa có tỉnh/thành phù hợp.</td></tr>}</tbody></table></div>
     </section>}
 
-    {tab === 'stations' && isAdmin && <section className={styles.panel}>
-      <div className={styles.sectionTitle}><div><h2>Bến xe</h2><p>Mỗi bến thuộc một tỉnh/thành phố; bến đã gắn tuyến không thể xóa.</p></div><div className={styles.search}><input aria-label="Tìm bến xe" placeholder="Tìm theo mã hoặc tên" value={stationSearch} onChange={e => setStationSearch(e.target.value)} /><button onClick={() => void loadStations()}>Tìm</button></div></div>
+    {tab === 'stations' && isAdmin && <section ref={stationTarget} className={styles.panel}>
+      <div className={styles.sectionTitle}><div><h2 data-management-focus tabIndex={-1}>Bến xe</h2><p>Mỗi bến thuộc một tỉnh/thành phố; bến đã gắn tuyến không thể xóa.</p></div><div className={styles.search}><input aria-label="Tìm bến xe" placeholder="Mã hoặc tên bến xe" value={stationSearch} onChange={e => setStationSearch(e.target.value)} /><button onClick={() => void loadStations()}>Tìm</button></div></div>
       <div className={styles.filters}><label>Tỉnh/thành<select data-validation-label="tỉnh/thành" value={stationCity} onChange={e => setStationCity(e.target.value)}><option value="">Tất cả</option>{cities.map(city => <option key={city.maTinhThanh} value={city.maTinhThanh}>{city.tenTinhThanh}</option>)}</select></label>
         <label>Trạng thái<select data-validation-label="trạng thái" value={stationStatus} onChange={e => setStationStatus(e.target.value)}><option value="">Tất cả</option>{['HOAT_DONG','TAM_NGUNG','DONG_CUA','BAO_TRI'].map(s => <option key={s}>{s}</option>)}</select></label><button onClick={() => void loadStations()}>Lọc bến xe</button></div>
       <form onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} className={styles.form} onSubmit={stationSubmit}><label>Mã bến<input data-validation-label="mã bến" value={stationForm.maBenXe} disabled={editingStation} maxLength={40} required onChange={e => setStationForm({ ...stationForm, maBenXe: e.target.value })} /></label>
@@ -147,15 +171,15 @@ export default function RouteManagement() {
       </form>
       <div className={styles.tableWrap}><table><thead><tr><th>Mã</th><th>Bến xe</th><th>Tỉnh</th><th>Địa chỉ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
         {stations.map(station => <tr key={station.maBenXe}><td>{station.maBenXe}</td><td>{station.tenBenXe}</td><td>{cities.find(c => c.maTinhThanh === station.maTinhThanh)?.tenTinhThanh || station.maTinhThanh}</td><td>{station.diaChi}</td><td>{station.trangThai}</td><td className={styles.actions}>
-          <button onClick={() => { setStationForm({ ...station, soDienThoai: station.soDienThoai || '' }); setEditingStation(true); }}>Sửa</button>
+          <button onClick={() => editStation(station)}>Sửa</button>
           <button disabled={busy} onClick={() => { if (window.confirm(`Xóa ${station.tenBenXe}?`)) void mutate(`/ben-xe/${encodeURIComponent(station.maBenXe)}`, 'DELETE', undefined, 'Đã xóa bến xe.'); }}>Xóa</button>
         </td></tr>)}{stations.length === 0 && <tr><td colSpan={6}>Chưa có bến xe phù hợp.</td></tr>}</tbody></table></div>
     </section>}
 
     {tab === 'routes' && <>
-      <section className={styles.panel}>
-        <div className={styles.sectionTitle}><div><h2>{editingRoute ? `Cập nhật tuyến ${routeForm.maTuyen}` : 'Tạo tuyến xe'}</h2><p>Thời lượng dự kiến là thuộc tính tuyến; giờ khởi hành thực tế được lưu riêng cho từng chuyến.</p></div>
-          <button type="button" onClick={() => { setRouteForm(emptyRoute); setEditingRoute(false); }}>Tuyến mới</button></div>
+      <section ref={routeTarget} className={styles.panel}>
+        <div className={styles.sectionTitle}><div><h2 data-management-focus tabIndex={-1}>{editingRoute ? `Cập nhật tuyến ${routeForm.maTuyen}` : 'Tạo tuyến xe'}</h2><p>Thời lượng dự kiến là thuộc tính tuyến; giờ khởi hành thực tế được lưu riêng cho từng chuyến.</p></div>
+          <button type="button" onClick={() => { setRouteForm(emptyRoute); setEditingRoute(false); focusRoute('input:not(:disabled):not([readonly]),select:not(:disabled)'); }}>Tuyến mới</button></div>
         <form onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} className={styles.form} onSubmit={routeSubmit}>
           <label>Mã tuyến<input data-validation-label="mã tuyến" disabled={editingRoute} required maxLength={40} value={routeForm.maTuyen} onChange={e => setRouteForm({ ...routeForm, maTuyen: e.target.value })} /></label>
           <label>Tên tuyến<input data-validation-label="tên tuyến" required maxLength={160} value={routeForm.tenTuyen} onChange={e => setRouteForm({ ...routeForm, tenTuyen: e.target.value })} /></label>
@@ -182,10 +206,10 @@ export default function RouteManagement() {
         <div className={styles.tableWrap}><table><thead><tr><th>Mã tuyến</th><th>Tuyến</th><th>Thời lượng</th><th>Nhà xe</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
           {routes.map(route => <tr key={route.maTuyen}><td>{route.maTuyen}</td><td>{stations.find(s => s.maBenXe === route.tramKhoiHanh)?.tenBenXe || route.tramKhoiHanh} → {stations.find(s => s.maBenXe === route.tramDen)?.tenBenXe || route.tramDen}</td>
             <td>{route.thoiGianDuKien ?? '—'} giờ</td><td>{route.maNhaXe || '—'}</td><td><span aria-label={`Trạng thái tuyến ${route.maTuyen}`}>{statusLabels[route.trangThai] || route.trangThai}</span></td>
-            <td className={styles.actions}><button onClick={() => editRoute(route)}>Sửa</button><button onClick={() => setSelectedRoute(route.maTuyen)}>Điểm dừng</button><button disabled={busy} onClick={() => { if (window.confirm(`Xóa tuyến ${route.maTuyen}?`)) void mutate(`/tuyen-xe/${encodeURIComponent(route.maTuyen)}`, 'DELETE', undefined, 'Đã xóa tuyến.'); }}>Xóa</button></td></tr>)}
+            <td className={styles.actions}><button onClick={() => editRoute(route)}>Sửa</button><button onClick={() => chooseRoute(route.maTuyen)}>Điểm dừng</button><button disabled={busy} onClick={() => { if (window.confirm(`Xóa tuyến ${route.maTuyen}?`)) void mutate(`/tuyen-xe/${encodeURIComponent(route.maTuyen)}`, 'DELETE', undefined, 'Đã xóa tuyến.'); }}>Xóa</button></td></tr>)}
           {routes.length === 0 && <tr><td colSpan={6}>Chưa có tuyến phù hợp.</td></tr>}</tbody></table></div>
       </section>
-      {currentRoute && <section className={styles.panel}><div className={styles.sectionTitle}><div><h2>Điểm dừng · {currentRoute.maTuyen}</h2><p>Điểm dừng không bắt buộc. Thứ tự bắt đầu từ 1 và cập nhật trong cùng một giao dịch.</p></div></div>
+      {currentRoute && <section ref={stopTarget} className={styles.panel}><div className={styles.sectionTitle}><div><h2 data-management-focus tabIndex={-1}>Điểm dừng · {currentRoute.maTuyen}</h2><p>Điểm dừng không bắt buộc. Thứ tự bắt đầu từ 1 và cập nhật trong cùng một giao dịch.</p></div></div>
         <form onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} className={styles.form} onSubmit={event => {
           const body = { tenDiemDung: stopForm.tenDiemDung, diaChi: stopForm.diaChi,
             thoiGianDung: Number(stopForm.thoiGianDung), loaiDiemDung: stopForm.loaiDiemDung };
@@ -204,7 +228,7 @@ export default function RouteManagement() {
           {editingStop && <button type="button" onClick={() => { setEditingStop(''); setStopForm({ maDiemDung: '', tenDiemDung: '', diaChi: '', thoiGianDung: '0', loaiDiemDung: 'CA_HAI' }); }}>Hủy sửa</button>}
         </form>
         <ol className={styles.stopList}>{currentRoute.tramTrungGian.map((stop, index) => <li key={stop.maDiemDung}><span><b>{stop.thuTu}. {stop.tenDiemDung}</b><small>{stop.diaChi} · dừng {stop.thoiGianDung} phút</small></span><span className={styles.actions}>
-          <button disabled={busy} onClick={() => { setEditingStop(stop.maDiemDung); setStopForm({ maDiemDung: stop.maDiemDung, tenDiemDung: stop.tenDiemDung, diaChi: stop.diaChi, thoiGianDung: String(stop.thoiGianDung), loaiDiemDung: stop.loaiDiemDung }); }}>Sửa</button>
+          <button disabled={busy} onClick={() => editStop(stop)}>Sửa</button>
           <button disabled={busy || index === 0} onClick={() => void mutate(`/tuyen-xe/${encodeURIComponent(currentRoute.maTuyen)}/diem-dung/sap-xep`, 'PUT', { maDiemDungTheoThuTu: currentRoute.tramTrungGian.map((_, i, all) => all[i === index - 1 ? index : i === index ? index - 1 : i].maDiemDung) }, 'Đã đổi thứ tự điểm dừng.')}>↑</button>
           <button disabled={busy || index === currentRoute.tramTrungGian.length - 1} onClick={() => void mutate(`/tuyen-xe/${encodeURIComponent(currentRoute.maTuyen)}/diem-dung/sap-xep`, 'PUT', { maDiemDungTheoThuTu: currentRoute.tramTrungGian.map((_, i, all) => all[i === index + 1 ? index : i === index ? index + 1 : i].maDiemDung) }, 'Đã đổi thứ tự điểm dừng.')}>↓</button>
           <button disabled={busy} onClick={() => { if (window.confirm(`Xóa điểm dừng ${stop.tenDiemDung}?`)) void mutate(`/tuyen-xe/${encodeURIComponent(currentRoute.maTuyen)}/diem-dung/${encodeURIComponent(stop.maDiemDung)}`, 'DELETE', undefined, 'Đã xóa điểm dừng.'); }}>Xóa</button>

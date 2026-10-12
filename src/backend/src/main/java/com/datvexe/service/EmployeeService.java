@@ -72,7 +72,7 @@ public final class EmployeeService {
         NhanVien employee=AccessControl.resource(em,NhanVien.class,text(id,40)); scope(user,employee,true);
         ChuyenXe trip=AccessControl.resource(em,ChuyenXe.class,text(tripId,40));
         if(user!=null) AccessControl.operator(user,trip.tuyenXe.nhaXe);
-        if(trip.trangThai!=TrangThaiChuyen.CHUA_KHOI_HANH) throw new DomainException(409,"Chỉ phân công chuyến chưa khởi hành.");
+        if(!TripSaleRules.scheduled(trip)) throw new DomainException(409,"Chỉ phân công chuyến chưa khởi hành.");
         AssignmentRules.validate(em,trip,employee,role,null);
         return Map.of("maNhanVien",id,"maChuyen",tripId,"duDieuKienCoBan",true,
             "canKiemTraKeHoachLaiNghi",AssignmentRules.needsDrivingPlan(trip),"heThongKiemChungGioNghi",false,
@@ -117,7 +117,7 @@ public final class EmployeeService {
         if(em.createQuery("select count(n) from NhanVien n where n.maNhanVien <> :id and (lower(n.email)=:email or n.soDienThoai=:phone)",Long.class)
             .setParameter("id",employee.maNhanVien).setParameter("email",email).setParameter("phone",phone).getSingleResult()>0)
             throw new DomainException(409,"Email hoặc điện thoại đã được sử dụng.");
-        for(PhanCongChuyenXe p:employee.danhSachPhanCong) if(p.chuyenXe.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH || p.chuyenXe.trangThai==TrangThaiChuyen.DANG_CHAY) {
+        for(PhanCongChuyenXe p:employee.danhSachPhanCong) if(TripSaleRules.scheduled(p.chuyenXe) || p.chuyenXe.trangThai==TrangThaiChuyen.DANG_CHAY) {
             if(input.trangThai()!=TrangThaiNhanVien.DANG_LAM_VIEC || input.loaiNhanVien()!=employee.loaiNhanVien)
                 throw new DomainException(409,"Cần xử lý phân công đang hoạt động trước khi đổi vai trò/trạng thái.");
             if(p.vaiTro!=VaiTroChuyen.PHU_XE && (license==null || input.ngayHetHanBangLai()==null || input.ngayHetHanBangLai().isBefore(p.chuyenXe.gioDenDuKien.toLocalDate())))

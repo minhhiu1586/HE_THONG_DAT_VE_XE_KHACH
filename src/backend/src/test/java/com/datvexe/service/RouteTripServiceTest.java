@@ -28,7 +28,7 @@ class RouteTripServiceTest {
         service = new RouteTripService(factory);
         try (EntityManager em = factory.createEntityManager()) {
             em.getTransaction().begin();
-            for (String name : List.of("ChuyenXe", "DiemDung", "TuyenXe", "Ghe", "Xe", "LoaiXe", "NhaXe", "BenXe", "TinhThanh"))
+            for (String name : List.of("PhanCongChuyenXe", "NhanVien", "ChuyenXe", "DiemDung", "TuyenXe", "Ghe", "Xe", "LoaiXe", "NhaXe", "BenXe", "TinhThanh"))
                 em.createQuery("delete from " + name).executeUpdate();
             em.getTransaction().commit();
         }
@@ -158,8 +158,10 @@ class RouteTripServiceTest {
         assertEquals(LocalDateTime.of(2030, 1, 1, 14, 30), first.get("gioDenDuKien"));
         service.createChuyenXe(new Inputs.ChuyenXe("C2", "R", date, LocalTime.of(9, 0), null));
         assertEquals(409, assertThrows(DomainException.class, () -> service.assignVehicle("C2", "X")).status());
-        assertEquals(2, service.searchChuyenXe("HCM", "LD", date).size());
-        assertEquals(2, service.searchChuyenXe("MD", "DL", date).size());
+        assertTrue(service.searchChuyenXe("HCM", "LD", date).isEmpty());
+        PublishedTripFixture.open(factory,"C1");
+        assertEquals(1, service.searchChuyenXe("HCM", "LD", date).size());
+        assertEquals(1, service.searchChuyenXe("MD", "DL", date).size());
         service.transition("C1", TrangThaiChuyen.DANG_CHAY);
         assertEquals(409, assertThrows(DomainException.class,
             () -> service.updateChuyenXe("C1", new Inputs.CapNhatChuyen(date, LocalTime.NOON))).status());
@@ -177,6 +179,7 @@ class RouteTripServiceTest {
         service.createTuyenXe(route("R"));
         service.createChuyenXe(new Inputs.ChuyenXe("LATE", "R", date, LocalTime.of(22, 0), null));
         service.createChuyenXe(new Inputs.ChuyenXe("EARLY", "R", date, LocalTime.of(8, 0), null));
+        PublishedTripFixture.open(factory,"EARLY"); PublishedTripFixture.open(factory,"LATE");
         assertEquals(List.of("EARLY", "LATE"), service.searchChuyenXe(" MD ", " DL ", date)
             .stream().map(x -> x.get("maChuyen")).toList());
         assertTrue(service.searchChuyenXe("DL", "MD", date).isEmpty());
@@ -201,8 +204,8 @@ class RouteTripServiceTest {
             new Inputs.CapNhatChuyen(date, LocalTime.of(12, 0)))).status());
         assertEquals(LocalTime.of(15, 0), service.getChuyenXe("C2").get("gioKhoiHanh"));
         service.updateChuyenXe("C2", new Inputs.CapNhatChuyen(date.plusDays(1), LocalTime.of(10, 0)));
-        assertEquals(1, service.searchChuyenXe("MD", "DL", date).size());
-        assertEquals(1, service.searchChuyenXe("DL", "MD", date.plusDays(1)).size());
+        assertTrue(service.searchChuyenXe("MD", "DL", date).isEmpty());
+        assertTrue(service.searchChuyenXe("DL", "MD", date.plusDays(1)).isEmpty());
         service.transition("C1", TrangThaiChuyen.DA_HUY);
         service.updateChuyenXe("C2", new Inputs.CapNhatChuyen(date, LocalTime.of(8, 0)));
     }

@@ -166,7 +166,7 @@ public final class VehicleService {
         check(x.danhSachChuyenXe.stream().noneMatch(VehicleService::active),"Xe đang có lịch chuyến; không thể xóa ghế");
         throw new DomainException(409,"Không xóa riêng một ghế làm thiếu sức chứa; hãy lưu toàn bộ sơ đồ thay thế.");
     }); }
-    public static boolean active(ChuyenXe c) { return c.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH || c.trangThai==TrangThaiChuyen.DANG_CHAY; }
+    public static boolean active(ChuyenXe c) { return TripSaleRules.scheduled(c) || c.trangThai==TrangThaiChuyen.DANG_CHAY; }
     /** Checks eligibility without changing the trip or another module's service. */
     public Map<String,Object> vehicleEligibility(String vehicle, String trip) { return tx(em -> {
         Xe x=found(new XeRepository(em).find(text(vehicle,40)));
@@ -282,11 +282,11 @@ public final class VehicleService {
         ChuyenXe previousTrip=id==null?null:em.find(ChuyenXe.class,p.chuyenXe.maChuyen,LockModeType.PESSIMISTIC_WRITE);
         if(previousTrip!=null) previousTrip=(ChuyenXe)org.hibernate.Hibernate.unproxy(previousTrip);
         if(id==null) { p.maPhanCong=text(input.maPhanCong(),40); check(repo.find(p.maPhanCong)==null,"Mã phân công đã tồn tại"); }
-        if(id!=null) check(p.chuyenXe.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH,"Không sửa phân công chuyến đã khởi hành");
+        if(id!=null) check(TripSaleRules.scheduled(p.chuyenXe),"Không sửa phân công chuyến đã khởi hành");
         ChuyenXe c=found(em.find(ChuyenXe.class,text(input.maChuyen(),40),LockModeType.PESSIMISTIC_WRITE));
         c=(ChuyenXe)org.hibernate.Hibernate.unproxy(c);
         c.tuyenXe=(TuyenXe)org.hibernate.Hibernate.unproxy(c.tuyenXe);
-        check(c.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH,"Chỉ phân công chuyến chưa khởi hành");
+        check(TripSaleRules.scheduled(c),"Chỉ phân công chuyến chưa khởi hành");
         NhanVien n=found(em.find(NhanVien.class,text(input.maNhanVien(),40),LockModeType.PESSIMISTIC_WRITE));
         n=(NhanVien)org.hibernate.Hibernate.unproxy(n);
         AssignmentRules.validate(em,c,n,input.vaiTro(),p.maPhanCong);
@@ -302,8 +302,8 @@ public final class VehicleService {
         p.ghiChu=note.isEmpty()?null:note; p.chuyenXe=c; p.nhanVien=n; p.vaiTro=input.vaiTro();
         if(id==null) repo.save(p);
         em.flush();
-        if(VehicleRules.hasTicketsOrHolds(em,c)) AssignmentRules.readyForOperation(em,c);
-        if(previousTrip!=null && !previousTrip.maChuyen.equals(c.maChuyen) && VehicleRules.hasTicketsOrHolds(em,previousTrip))
+        if(c.trangThai==TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em,c)) AssignmentRules.readyForOperation(em,c);
+        if(previousTrip!=null && !previousTrip.maChuyen.equals(c.maChuyen) && (previousTrip.trangThai==TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em,previousTrip)))
             AssignmentRules.readyForOperation(em,previousTrip);
         return view(p);
     }); }
@@ -313,9 +313,9 @@ public final class VehicleService {
             case "xe" -> { var r=new XeRepository(em); var x=found(r.lock(text(id,40))); check(x.danhSachChuyenXe.isEmpty(),"Xe đã có lịch sử chuyến"); for(Ghe g:x.danhSachGhe) check(g.danhSachVe.isEmpty() && g.danhSachGiuCho.isEmpty(),"Ghế đã được sử dụng"); r.delete(x); }
             case "phan-cong" -> {
                 var r=new PhanCongChuyenXeRepository(em); var x=found(r.lock(text(id,40)));
-                check(x.chuyenXe.trangThai==TrangThaiChuyen.CHUA_KHOI_HANH,"Chuyến đã khởi hành");
+                check(TripSaleRules.scheduled(x.chuyenXe),"Chuyến đã khởi hành");
                 ChuyenXe trip=em.find(ChuyenXe.class,x.chuyenXe.maChuyen,LockModeType.PESSIMISTIC_WRITE);
-                boolean sold=VehicleRules.hasTicketsOrHolds(em,trip);
+                boolean sold=trip.trangThai==TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em,trip);
                 r.delete(x); em.flush();
                 if(sold) AssignmentRules.readyForOperation(em,trip);
             }

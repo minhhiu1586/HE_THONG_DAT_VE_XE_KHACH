@@ -101,6 +101,7 @@ class AccessControlTest {
         });
     }
     @Test void suspendedOperatorCanReadOwnHistoryButCannotWriteOrSell() throws Exception {
+        com.datvexe.service.PublishedTripFixture.open(factory,"CB");
         tx(em -> em.find(NhaXe.class, "A").trangThai = TrangThaiNhaXe.TAM_NGUNG);
         context("NX", "GET", "/api/tuyen-xe/RA", null);
         tx(em -> AccessPolicy.guard(em));

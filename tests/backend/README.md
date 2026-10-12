@@ -64,3 +64,5 @@ NODE_PATH=/duong/dan/node_modules node tests/frontend/account_smoke.cjs
 ```
 
 Yêu cầu frontend localhost:3000, backend localhost:8080, Chromium `/usr/bin/chromium` (hoặc `CHROMIUM_PATH`), PostgreSQL container phát triển. Có thể thay `FRONTEND_URL`, `API_BASE_URL`, `DB_CONTAINER`. Test chỉ tạo/xóa tài khoản riêng. Xem [ma trận](../../docs/tasks/T07-test-matrix.md) và [hướng dẫn tích hợp](../../docs/tasks/T07.1-integration.md).
+
+T12: `python3 tests/backend/trip_sale_smoke.py`; cấu hình `API_BASE_URL` và `DB_NAME` phải trỏ cùng database. Hướng dẫn: `docs/plans/t12-vscode-guide.md`.

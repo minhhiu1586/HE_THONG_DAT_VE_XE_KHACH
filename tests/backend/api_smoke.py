@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from auth_fixture import AdminFixture
+from prepare_published_trip import publish_trip
 AUTH = AdminFixture(os.environ.get("API_BASE_URL", "http://localhost:8080/api").rstrip("/"))
 
 BASE = os.environ.get("API_BASE_URL", "http://localhost:8080/api").rstrip("/")
@@ -63,7 +64,7 @@ def station(name, city="CITY_A"):
 def route(name="R"):
     return {"maTuyen": ident(name), "tenTuyen": "Tuyến thử", "tramKhoiHanh": ident("A"),
             "tramDen": ident("B"), "thoiGianKhoiHanh": "08:00:00", "thoiGianDuKien": 6.5,
-            "giaCoBan": 250000, "trangThai": "DANG_KHAI_THAC"}
+            "giaCoBan": 250000, "trangThai": "DANG_KHAI_THAC", "maNhaXe": ident("NX")}
 
 
 def search(date="2030-01-01", origin="A", destination="B"):
@@ -140,8 +141,9 @@ def stops():
 
 def trips():
     assert search() == []
+    call("POST", "/tuyen-xe", route("RETURN") | {"tramKhoiHanh":ident("B"),"tramDen":ident("A")},201)
     for name, time in (("C1", "08:00:00"), ("C2", "09:00:00"), ("NIGHT", "22:00:00")):
-        trip = call("POST", "/chuyen-xe", {"maChuyen": ident(name), "maTuyen": ident("R"),
+        trip = call("POST", "/chuyen-xe", {"maChuyen": ident(name), "maTuyen": ident("RETURN" if name == "C2" else "R"),
                     "ngayKhoiHanh": "2030-01-01", "gioKhoiHanh": time}, 201)
         assert trip["ngayKhoiHanh"] == "2030-01-01" and trip["gioKhoiHanh"] == time
     assert call("GET", "/chuyen-xe/" + ident("NIGHT"))["gioDenDuKien"] == "2030-01-02T04:30:00"
@@ -152,10 +154,10 @@ def trips():
     assert assign("C1", "X")["maXe"] == ident("X")
     assign("C2", "X", 409)
     assert call("GET", "/chuyen-xe/" + ident("C2"))["maXe"] is None
-    call("PUT", "/chuyen-xe/" + ident("C2"), {"ngayKhoiHanh": "2030-01-01", "gioKhoiHanh": "14:30:00"})
+    call("PUT", "/chuyen-xe/" + ident("C2"), {"ngayKhoiHanh": "2030-01-01", "gioKhoiHanh": "15:00:00"})
     assign("C2", "X")
     call("PUT", "/chuyen-xe/" + ident("C2"), {"ngayKhoiHanh": "2030-01-01", "gioKhoiHanh": "12:00:00"}, 409)
-    assert call("GET", "/chuyen-xe/" + ident("C2"))["gioKhoiHanh"] == "14:30:00"
+    assert call("GET", "/chuyen-xe/" + ident("C2"))["gioKhoiHanh"] == "15:00:00"
     call("PUT", "/chuyen-xe/" + ident("C2"), {"ngayKhoiHanh": "2030-01-02", "gioKhoiHanh": "08:00:00"})
     call("DELETE", "/tuyen-xe/" + ident("R"), expected=409)
     call("PUT", "/tuyen-xe/" + ident("R"), route() | {"tenTuyen": "Đổi sau chuyến"}, expected=409)
@@ -171,8 +173,10 @@ def trips():
 
 
 def search_and_status():
-    assert [x["maChuyen"] for x in search()] == [ident("C1"), ident("NIGHT")]
-    assert [x["maChuyen"] for x in search(origin="CITY_A", destination="CITY_B")] == [ident("C1"), ident("NIGHT")]
+    assert search() == []  # Legacy scheduled rows are not automatically opened.
+    publish_trip(AUTH,ident("C1"))
+    assert [x["maChuyen"] for x in search()] == [ident("C1")]
+    assert [x["maChuyen"] for x in search(origin="CITY_A", destination="CITY_B")] == [ident("C1")]
     assert search("2030-01-03") == [] and search(origin="B", destination="A") == []
     assert search(origin="UNKNOWN") == []
     call("POST", "/chuyen-xe/" + ident("NIGHT") + "/bat-dau", expected=409)
@@ -209,8 +213,8 @@ def validation():
 
 
 def cleanup():
-    for table, key in (("chuyen_xe", "ma_chuyen"), ("diem_dung", "ma_diem_dung"),
-                       ("tuyen_xe", "ma_tuyen"), ("ghe", "ma_ghe"), ("xe", "ma_xe"), ("loai_xe", "ma_loai_xe"), ("nha_xe", "ma_nha_xe"), ("ben_xe", "ma_ben_xe"),
+    for table, key in (("phan_cong_chuyen_xe","ma_phan_cong"), ("chuyen_xe", "ma_chuyen"), ("diem_dung", "ma_diem_dung"),
+                       ("tuyen_xe", "ma_tuyen"), ("ghe", "ma_ghe"), ("xe", "ma_xe"), ("loai_xe", "ma_loai_xe"), ("nhan_vien","ma_nhan_vien"), ("nha_xe", "ma_nha_xe"), ("ben_xe", "ma_ben_xe"),
                        ("tinh_thanh", "ma_tinh_thanh")):
         # Prefix contains only ASCII letters, digits and underscores, generated here.
         sql(f"DELETE FROM {table} WHERE left({key}, {len(PREFIX)}) = '{PREFIX}'")

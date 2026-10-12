@@ -66,8 +66,8 @@ public final class AssignmentRules {
         trip.tuyenXe=(TuyenXe)org.hibernate.Hibernate.unproxy(trip.tuyenXe);
         ChuyenXe previous=null,next=null;
         LocalDateTime start=LocalDateTime.of(trip.ngayKhoiHanh,trip.gioKhoiHanh);
-        for(ChuyenXe other:em.createQuery("select c from ChuyenXe c where c.xe.maXe=:vehicle and c.maChuyen<>:id and c.trangThai not in (:cancel,:done)",ChuyenXe.class)
-            .setParameter("vehicle",vehicleId).setParameter("id",trip.maChuyen).setParameter("cancel",TrangThaiChuyen.DA_HUY).setParameter("done",TrangThaiChuyen.HOAN_TAT).getResultList()) {
+        for(ChuyenXe other:em.createQuery("select c from ChuyenXe c where c.xe.maXe=:vehicle and c.maChuyen<>:id and c.trangThai in (:sale,:running)",ChuyenXe.class)
+            .setParameter("vehicle",vehicleId).setParameter("id",trip.maChuyen).setParameter("sale",TrangThaiChuyen.DANG_MO_BAN).setParameter("running",TrangThaiChuyen.DANG_CHAY).getResultList()) {
             LocalDateTime otherStart=LocalDateTime.of(other.ngayKhoiHanh,other.gioKhoiHanh);
             require(!start.isBefore(other.gioDenDuKien) || !otherStart.isBefore(trip.gioDenDuKien),"Xe đã có chuyến trùng lịch.");
             if(!start.isBefore(other.gioDenDuKien) && (previous==null || other.gioDenDuKien.isAfter(previous.gioDenDuKien))) previous=other;

@@ -59,10 +59,9 @@ public final class AccessControl {
         if (trip.tuyenXe.nhaXe == null)
             throw new AccountException(409, "OPERATOR_UNASSIGNED", "Chuyến chưa có nhà xe vận hành; không thể bán vé.");
         businessAllowed(em, trip.tuyenXe.nhaXe);
-        if (trip.trangThai != TrangThaiChuyen.CHUA_KHOI_HANH || trip.tuyenXe.trangThai != TrangThaiTuyenXe.DANG_KHAI_THAC)
-            throw new AccountException(409, "INVALID_STATE_TRANSITION", "Chuyến không còn mở bán.");
-        if (trip.xe == null) throw new AccountException(409, "VEHICLE_UNASSIGNED", "Chuyến chưa có xe; không thể bán vé.");
-        com.datvexe.service.VehicleRules.ready(em, trip.xe.maXe, trip);
+        com.datvexe.service.TripSaleRules.ensureSellable(em,trip,java.time.LocalDateTime.now(com.datvexe.service.TripSaleRules.ZONE));
+        if(!java.time.LocalDateTime.now(com.datvexe.service.TripSaleRules.ZONE).isBefore(com.datvexe.service.TripSaleRules.cutoff(trip)))
+            throw new AccountException(409,"INVALID_STATE_TRANSITION","Đã đến thời điểm ngừng nhận đặt vé.");
     }
     public static void businessAllowed(EntityManager em, NhaXe operator) {
         if (operator != null && resource(em, NhaXe.class, operator.maNhaXe).trangThai != TrangThaiNhaXe.HOAT_DONG)

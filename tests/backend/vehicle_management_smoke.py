@@ -8,6 +8,7 @@ import subprocess
 import urllib.request
 import urllib.error
 from auth_fixture import AdminFixture
+from prepare_published_trip import publish_trip
 
 BASE = os.environ.get('API_BASE_URL', 'http://localhost:8080/api').rstrip('/')
 AUTH = AdminFixture(BASE)
@@ -34,8 +35,8 @@ def vehicle(name, owner='A', **changes):
 def cleanup():
     if AUTH.user_id:
         sql(f"UPDATE nguoi_dung SET loai_tai_khoan='ADMIN',ma_nha_xe=NULL WHERE ma_nguoi_dung='{AUTH.user_id}'")
-    for table, key in [('giu_cho','ma_giu_cho'),('ve_xe','ma_ve'),('don_dat_ve','ma_don'),('chuyen_xe','ma_chuyen'),('ghe','ma_ghe'),('xe','ma_xe'),
-                       ('loai_xe','ma_loai_xe'),('tuyen_xe','ma_tuyen'),('ben_xe','ma_ben_xe'),('tinh_thanh','ma_tinh_thanh'),('nha_xe','ma_nha_xe')]:
+    for table, key in [('giu_cho','ma_giu_cho'),('ve_xe','ma_ve'),('don_dat_ve','ma_don'),('phan_cong_chuyen_xe','ma_phan_cong'),('chuyen_xe','ma_chuyen'),('ghe','ma_ghe'),('xe','ma_xe'),
+                       ('loai_xe','ma_loai_xe'),('tuyen_xe','ma_tuyen'),('ben_xe','ma_ben_xe'),('tinh_thanh','ma_tinh_thanh'),('nhan_vien','ma_nhan_vien'),('nha_xe','ma_nha_xe')]:
         if table == 'ghe':
             sql(f"DELETE FROM ghe WHERE ma_xe LIKE '{PREFIX}%' AND left(ma_xe,{len(PREFIX)})='{PREFIX}'")
         else: sql(f"DELETE FROM {table} WHERE left({key},{len(PREFIX)})='{PREFIX}'")
@@ -95,6 +96,7 @@ def main():
     call('POST','/tuyen-xe',dict(maTuyen=ident('R'),tenTuyen='T10',tramKhoiHanh=ident('START'),tramDen=ident('END'),thoiGianDuKien=2,
                                thoiGianKhoiHanh='08:00',giaCoBan=100000,trangThai='DANG_KHAI_THAC',maNhaXe=ident('A')),201)
     call('GET','/tuyen-xe/'+ident('R')+'/ghe',expected=404)
+    call('POST','/tuyen-xe',dict(maTuyen=ident('RETURN'),tenTuyen='Return',tramKhoiHanh=ident('END'),tramDen=ident('START'),thoiGianDuKien=2,giaCoBan=100000,trangThai='DANG_KHAI_THAC',maNhaXe=ident('A')),201)
     trip = dict(maChuyen=ident('C1'),maTuyen=ident('R'),ngayKhoiHanh='2030-01-01',gioKhoiHanh='08:00',maXe=ident('X1'))
     call('PUT',path,vehicle('X1',trangThai='BAO_TRI'))
     call('POST','/chuyen-xe',trip,409)
@@ -102,8 +104,9 @@ def main():
     call('POST','/chuyen-xe',trip,409)
     call('PUT',path,vehicle('X1'))
     call('POST','/chuyen-xe',trip,201)
-    call('POST','/chuyen-xe',trip | dict(maChuyen=ident('C2'),ngayKhoiHanh='2030-01-02'),201)
+    call('POST','/chuyen-xe',trip | dict(maChuyen=ident('C2'),maTuyen=ident('RETURN'),ngayKhoiHanh='2030-01-02'),201)
     call('POST','/xe',vehicle('X3'),201)
+    publish_trip(AUTH,ident('C1'));publish_trip(AUTH,ident('C2'))
     order,ticket=ident('O'),ident('V')
     sql(f"INSERT INTO don_dat_ve(ma_don,ma_nguoi_dung,ngay_dat,tong_tien,tien_giam,khach_dat_ten,khach_dat_so_dien_thoai,kenh_dat,trang_thai) VALUES "
         f"('{order}','{AUTH.user_id}',LOCALTIMESTAMP,100000,0,'Test','0901234567','WEB','DA_THANH_TOAN');"

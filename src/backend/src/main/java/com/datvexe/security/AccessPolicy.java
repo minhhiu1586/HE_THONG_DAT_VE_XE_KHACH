@@ -18,6 +18,11 @@ public final class AccessPolicy {
     }
     public static void role(CurrentUser user, String path) { role(user, path, "POST"); }
     public static void role(CurrentUser user, String path, String method) {
+        if(path.equals("/api/quan-ly/chuyen-xe") || path.startsWith("/api/quan-ly/chuyen-xe/")) {
+            if(user.loaiTaiKhoan()!=LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan()!=LoaiTaiKhoan.NHA_XE) throw AccessControl.denied();
+            if(user.loaiTaiKhoan()==LoaiTaiKhoan.NHA_XE && user.maNhaXe()==null) throw AccessControl.denied();
+            return;
+        }
         if(path.startsWith("/api/nhan-vien")) {
             if(user.loaiTaiKhoan()!=LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan()!=LoaiTaiKhoan.NHA_XE
                 && !(user.loaiTaiKhoan()==LoaiTaiKhoan.NHAN_VIEN && method.equals("GET"))) throw AccessControl.denied();
@@ -47,7 +52,8 @@ public final class AccessPolicy {
             context.user().sessionHash());
         role(current, path, context.method());
         RequestIdentity.set(new RequestIdentity.Context(current, context.method(), path, context.body()));
-        String[] p = path.substring("/api/".length()).split("/");
+        String resourcePath=path.replaceFirst("^/api/quan-ly/chuyen-xe(?=/|$)","/api/chuyen-xe");
+        String[] p = resourcePath.substring("/api/".length()).split("/");
         if (user.loaiTaiKhoan == LoaiTaiKhoan.NHA_XE) {
             AccessControl.operator(user, user.nhaXe);
             if (!Set.of("GET", "HEAD").contains(context.method())) AccessControl.activeOperator(em, user);
@@ -77,7 +83,8 @@ public final class AccessPolicy {
                 String route = text(body, "maTuyen"), vehicle = text(body, "maXe"), trip = text(body, "maChuyen"), employee = text(body, "maNhanVien");
                 if (route != null && !(p[0].equals("tuyen-xe") && p.length == 1)) AccessControl.route(em, user, route);
                 if (vehicle != null && !(p[0].equals("xe") && p.length == 1 && context.method().equals("POST"))) AccessControl.vehicle(em, user, vehicle);
-                if (trip != null) AccessControl.trip(em, user, trip);
+                if (trip != null && !(p[0].equals("chuyen-xe") && p.length==1 && context.method().equals("POST")))
+                    AccessControl.trip(em, user, trip);
                 if (employee != null && !(p[0].equals("nhan-vien") && p.length==1 && context.method().equals("POST")))
                     AccessControl.employee(em, user, employee);
             }

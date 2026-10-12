@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage, Profile } from '@/lib/account-api';
+import { useManagementFocus } from '@/lib/use-management-focus';
 import styles from './OperatorManagement.module.css';
 
 type Status = 'CHO_PHE_DUYET' | 'HOAT_DONG' | 'TAM_NGUNG' | 'NGUNG_HOAT_DONG';
@@ -33,6 +34,7 @@ export default function OperatorManagement() {
   const [accountId, setAccountId] = useState(''), [busy, setBusy] = useState(false);
   const [loadingList, setLoadingList] = useState(true), [loadingManagers, setLoadingManagers] = useState(false);
   const [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [detailsTarget, focusDetails] = useManagementFocus<HTMLElement>();
   const load = useCallback(async () => {
     setLoadingList(true);
     const params = new URLSearchParams({ page: String(page), size: '20' });
@@ -60,6 +62,7 @@ export default function OperatorManagement() {
   }, [user, page, search, filter, request]);
   async function choose(operator: Operator) {
     setSelected(operator); setForm(formOf(operator)); setError(''); setNotice('');
+    focusDetails('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');
     setLoadingManagers(true);
     try {
       const [grants, available] = await Promise.all([
@@ -124,7 +127,7 @@ export default function OperatorManagement() {
   if (user.loaiTaiKhoan !== 'ADMIN') return <main className={styles.page} role="alert">Bạn không có quyền quản lý nhà xe.</main>;
   return <main className={styles.page}>
     <header className={styles.heading}><div><h1>Quản lý nhà xe</h1><p>Hồ sơ, trạng thái và tài khoản quản lý</p></div>
-      <button disabled={busy} onClick={() => { setSelected(null); setForm(empty); setManagers([]); setNotice(''); }}>+ Thêm nhà xe</button></header>
+      <button disabled={busy} onClick={() => { setSelected(null); setForm(empty); setManagers([]); setNotice(''); focusDetails('input:not(:disabled):not([readonly])'); }}>+ Thêm nhà xe</button></header>
     {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
     <div className={styles.grid}>
       <section className={styles.card}><h2>Danh sách</h2>
@@ -141,7 +144,7 @@ export default function OperatorManagement() {
         <div className={styles.pager}><button disabled={page <= 1} onClick={() => { setLoadingList(true); setPage(page - 1); }}>Trước</button><span>Trang {page}</span>
           <button disabled={page >= totalPages} onClick={() => { setLoadingList(true); setPage(page + 1); }}>Sau</button></div>
       </section>
-      <div className={styles.details}><section className={styles.card}><h2>{selected ? `Hồ sơ ${selected.maNhaXe}` : 'Tạo nhà xe'}</h2>
+      <div className={styles.details}><section ref={detailsTarget} className={styles.card}><h2 data-management-focus tabIndex={-1}>{selected ? `Hồ sơ ${selected.maNhaXe}` : 'Tạo nhà xe'}</h2>
         <form className={styles.form} onSubmit={save}>
           <label>Mã nhà xe<input required maxLength={40} disabled={!!selected || busy} value={form.maNhaXe} onChange={e => setForm({ ...form, maNhaXe: e.target.value })} /></label>
           <label>Tên nhà xe<input required maxLength={160} disabled={busy} value={form.tenNhaXe} onChange={e => setForm({ ...form, tenNhaXe: e.target.value })} /></label>
