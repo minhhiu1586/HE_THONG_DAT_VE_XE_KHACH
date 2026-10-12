@@ -162,6 +162,14 @@ class RouteTripServiceTest {
         PublishedTripFixture.open(factory,"C1");
         assertEquals(1, service.searchChuyenXe("HCM", "LD", date).size());
         assertEquals(1, service.searchChuyenXe("MD", "DL", date).size());
+        var searchable = service.searchChuyenXe("CITY:HCM", "STATION:DL", date).getFirst();
+        assertEquals("Miền Đông", searchable.get("tenBenDi"));
+        assertEquals("Đà Lạt", searchable.get("tenBenDen"));
+        assertEquals("Test", searchable.get("tenNhaXe"));
+        assertEquals(40, searchable.get("soChoNgoi"));
+        assertEquals(40L, searchable.get("tongSoGhe"));
+        assertEquals(40L, searchable.get("soGheTrong"));
+        assertEquals(true, searchable.get("coTheDatVe"));
         service.transition("C1", TrangThaiChuyen.DANG_CHAY);
         assertEquals(409, assertThrows(DomainException.class,
             () -> service.updateChuyenXe("C1", new Inputs.CapNhatChuyen(date, LocalTime.NOON))).status());

@@ -97,6 +97,27 @@ public final class KhuyenMaiService {
         }
     }
 
+    /** Returns only promotions that are currently usable, for the public storefront. */
+    public List<KhuyenMaiDto.Response> danhSachCongKhai() {
+        try (EntityManager em = factory.createEntityManager()) {
+            EntityTransaction tx = em.getTransaction();
+            tx.begin();
+            try {
+                AccessPolicy.guard(em);
+                LocalDateTime capturedNow = now();
+                List<KhuyenMaiDto.Response> result = new KhuyenMaiRepository(em, capturedNow)
+                        .dangHieuLuc(0, 100).stream()
+                        .map(promotion -> toResponse(promotion, capturedNow))
+                        .toList();
+                tx.commit();
+                return result;
+            } catch (RuntimeException e) {
+                if (tx.isActive()) tx.rollback();
+                throw e;
+            }
+        }
+    }
+
     public KhuyenMaiDto.Response chiTiet(String maKhuyenMai) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction tx = em.getTransaction();

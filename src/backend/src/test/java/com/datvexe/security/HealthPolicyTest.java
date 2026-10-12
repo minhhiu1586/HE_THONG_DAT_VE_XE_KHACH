@@ -7,5 +7,7 @@ class HealthPolicyTest {
     @Test void healthCheckIsPublicReadOnly() {
         assertTrue(AccessPolicy.publicEndpoint("GET", "/api/health"));
         assertFalse(AccessPolicy.publicEndpoint("POST", "/api/health"));
+        assertTrue(AccessPolicy.publicEndpoint("GET", "/api/khuyen-mai"));
+        assertFalse(AccessPolicy.publicEndpoint("POST", "/api/khuyen-mai"));
     }
 }
