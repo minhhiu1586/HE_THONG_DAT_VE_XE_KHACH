@@ -31,8 +31,17 @@ public final class AccessControl {
     public static void operator(NguoiDung caller, NhaXe owner) {
         role(caller, LoaiTaiKhoan.NHA_XE, LoaiTaiKhoan.ADMIN);
         if (caller.loaiTaiKhoan == LoaiTaiKhoan.ADMIN) return;
-        if (owner == null || caller.nhaXe == null || !owner.maNhaXe.equals(caller.nhaXe.maNhaXe)
-                || caller.nhaXe.trangThai != TrangThaiNhaXe.HOAT_DONG) throw denied();
+        if (owner == null || caller.nhaXe == null || !owner.maNhaXe.equals(caller.nhaXe.maNhaXe)) throw denied();
+    }
+    public static void activeOperator(NguoiDung caller) {
+        if (caller.loaiTaiKhoan == LoaiTaiKhoan.NHA_XE &&
+                (caller.nhaXe == null || caller.nhaXe.trangThai != TrangThaiNhaXe.HOAT_DONG)) throw denied();
+    }
+    public static void activeOperator(EntityManager em, NguoiDung caller) {
+        if (caller.loaiTaiKhoan != LoaiTaiKhoan.NHA_XE) return;
+        if (caller.nhaXe == null) throw denied();
+        NhaXe owner = resource(em, NhaXe.class, caller.nhaXe.maNhaXe);
+        if (owner.trangThai != TrangThaiNhaXe.HOAT_DONG) throw denied();
     }
     public static <T> T resource(EntityManager em, Class<T> type, String id) {
         if (id == null || id.isBlank()) throw AccountException.invalid("id", "Mã tài nguyên là bắt buộc.");
@@ -45,6 +54,16 @@ public final class AccessControl {
     public static void trip(EntityManager em, NguoiDung caller, String id) { operator(caller, resource(em, ChuyenXe.class, id).tuyenXe.nhaXe); }
     public static void vehicle(EntityManager em, NguoiDung caller, String id) { operator(caller, resource(em, Xe.class, id).nhaXe); }
     public static void employee(EntityManager em, NguoiDung caller, String id) { operator(caller, resource(em, NhanVien.class, id).nhaXe); }
+    public static void saleAllowed(EntityManager em, String tripId) {
+        ChuyenXe trip = resource(em, ChuyenXe.class, tripId);
+        if (trip.tuyenXe.nhaXe == null)
+            throw new AccountException(409, "OPERATOR_UNASSIGNED", "Chuyến chưa có nhà xe vận hành; không thể bán vé.");
+        businessAllowed(em, trip.tuyenXe.nhaXe);
+    }
+    public static void businessAllowed(EntityManager em, NhaXe operator) {
+        if (operator != null && resource(em, NhaXe.class, operator.maNhaXe).trangThai != TrangThaiNhaXe.HOAT_DONG)
+            throw new AccountException(409, "OPERATOR_SUSPENDED", "Nhà xe chưa hoạt động; không thể bán vé mới.");
+    }
     public static void orderOwner(EntityManager em, NguoiDung caller, String id) {
         role(caller, LoaiTaiKhoan.KHACH_HANG);
         DonDatVe order = resource(em, DonDatVe.class, id);

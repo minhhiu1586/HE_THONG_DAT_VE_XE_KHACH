@@ -97,6 +97,32 @@ class AccessControlTest {
             AccessControl.trip(em, user(em, "AD"), "CB");
         });
     }
+    @Test void suspendedOperatorCanReadOwnHistoryButCannotWriteOrSell() throws Exception {
+        tx(em -> em.find(NhaXe.class, "A").trangThai = TrangThaiNhaXe.TAM_NGUNG);
+        context("NX", "GET", "/api/tuyen-xe/RA", null);
+        tx(em -> AccessPolicy.guard(em));
+        context("NX", "PUT", "/api/tuyen-xe/RA", "{}");
+        tx(em -> forbidden(() -> AccessPolicy.guard(em)));
+        tx(em -> {
+            assertEquals(409, assertThrows(AccountException.class, () -> AccessControl.saleAllowed(em, "CA")).status());
+            AccessControl.saleAllowed(em, "CB");
+        });
+    }
+    @Test void saleRequiresAnAssignedOperator() {
+        tx(em -> {
+            TuyenXe route = new TuyenXe(); route.maTuyen = "RU"; route.tenTuyen = "Chung";
+            route.tramKhoiHanh = em.find(BenXe.class, "S"); route.tramDen = em.find(BenXe.class, "D");
+            route.giaCoBan = BigDecimal.TEN; route.thoiGianDuKien = BigDecimal.ONE; em.persist(route);
+            ChuyenXe trip = new ChuyenXe(); trip.maChuyen = "CU"; trip.tuyenXe = route;
+            trip.ngayKhoiHanh = LocalDate.of(2030, 1, 1); trip.gioKhoiHanh = LocalTime.NOON;
+            trip.gioDenDuKien = trip.ngayKhoiHanh.atTime(13, 0); em.persist(trip);
+        });
+        tx(em -> {
+            AccountException error = assertThrows(AccountException.class, () -> AccessControl.saleAllowed(em, "CU"));
+            assertEquals(409, error.status());
+            assertEquals("OPERATOR_UNASSIGNED", error.code());
+        });
+    }
     @Test void employeeMustHaveCurrentAssignmentAndActiveEmployment() {
         tx(em -> { AccessControl.assigned(em, user(em, "NV"), "CA"); forbidden(() -> AccessControl.assigned(em, user(em, "NV"), "CB")); });
         tx(em -> em.remove(em.find(PhanCongChuyenXe.class, "P")));

@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: datvexe_test
+      POSTGRES_USER: datvexe_test
+      POSTGRES_PASSWORD: datvexe_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datvexe_test -d datvexe_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ../../docs/database/schema/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
+      - ../../docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
+      - ../../docs/database/schema/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
+      - ../../docs/database/seed/001_demo.sql:/docker-entrypoint-initdb.d/004_demo.sql:ro
+      - ../../docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/005_fleet_demo.sql:ro
+      - ../../docs/database/seed/003_t06_transport.sql:/docker-entrypoint-initdb.d/006_transport.sql:ro
+      - ../../docs/database/seed/004_t06_scenarios.sql:/docker-entrypoint-initdb.d/007_scenarios.sql:ro
+      - ../../docs/database/seed/005_t06_display_alignment.sql:/docker-entrypoint-initdb.d/008_display_alignment.sql:ro

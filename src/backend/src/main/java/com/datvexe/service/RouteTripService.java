@@ -383,6 +383,7 @@ public class RouteTripService {
         return write(em -> {
             newId(em, ChuyenXe.class, input.maChuyen());
             TuyenXe route = found(em, TuyenXe.class, input.maTuyen());
+            AccessControl.businessAllowed(em, route.nhaXe);
             if (route.trangThai != TrangThaiTuyenXe.DANG_KHAI_THAC)
                 throw new DomainException(409, "Tuyến chưa hoạt động");
             if (route.tramKhoiHanh.trangThai != TrangThaiBenXe.HOAT_DONG || route.tramDen.trangThai != TrangThaiBenXe.HOAT_DONG)
@@ -458,12 +459,13 @@ public class RouteTripService {
         String fromId = text(from, "Điểm đi", 40, true);
         String toId = text(to, "Điểm đến", 40, true);
         if (date == null) throw new DomainException(400, "Ngày đi là bắt buộc");
-        return read(em -> em.createQuery("select c from ChuyenXe c where c.ngayKhoiHanh = :date and c.trangThai in (:scheduled, :running) and c.tuyenXe.trangThai = :active and " +
+        return read(em -> em.createQuery("select c from ChuyenXe c left join c.tuyenXe.nhaXe n where c.ngayKhoiHanh = :date and c.trangThai in (:scheduled, :running) and c.tuyenXe.trangThai = :active and (n is null or n.trangThai = :activeOperator) and " +
                 "(c.tuyenXe.tramKhoiHanh.maBenXe = :from or c.tuyenXe.tramKhoiHanh.tinhThanh.maTinhThanh = :from) and " +
                 "(c.tuyenXe.tramDen.maBenXe = :to or c.tuyenXe.tramDen.tinhThanh.maTinhThanh = :to) order by c.gioKhoiHanh", ChuyenXe.class)
             .setParameter("date", date).setParameter("scheduled", TrangThaiChuyen.CHUA_KHOI_HANH)
             .setParameter("running", TrangThaiChuyen.DANG_CHAY)
             .setParameter("active", TrangThaiTuyenXe.DANG_KHAI_THAC)
+            .setParameter("activeOperator", TrangThaiNhaXe.HOAT_DONG)
             .setParameter("from", fromId).setParameter("to", toId)
             .getResultList().stream().map(RouteTripService::view).toList());
     }
