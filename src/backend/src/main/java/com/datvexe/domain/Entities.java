@@ -333,6 +333,18 @@ public final class Entities {
         public TrangThaiPhuongThuc trangThai = TrangThaiPhuongThuc.HOAT_DONG;
         @OneToMany(mappedBy = "phuongThucThanhToan") public List<ThanhToan> danhSachThanhToan = new ArrayList<>();
         public PhuongThucThanhToan() {}
+
+        /** Trả true nếu trạng thái thay đổi; giữ nguyên trạng thái trả false. */
+        public Boolean capNhatTrangThai(TrangThaiPhuongThuc trangThaiMoi) {
+            if (trangThaiMoi == null) {
+                throw new IllegalArgumentException("Trạng thái không được null.");
+            }
+            if (trangThai == trangThaiMoi) {
+                return false;
+            }
+            trangThai = trangThaiMoi;
+            return true;
+        }
     }
 
     @Entity(name = "ChinhSachHoanVe") @Table(name = "chinh_sach_hoan_ve")
@@ -368,5 +380,55 @@ public final class Entities {
         public TrangThaiKhuyenMai trangThai = TrangThaiKhuyenMai.HOAT_DONG;
         @OneToMany(mappedBy = "khuyenMaiDaApDung") public List<DonDatVe> danhSachDonDat = new ArrayList<>();
         public KhuyenMai() {}
+
+        /** Ưu tiên hết hạn khi đồng thời hết thời hạn và hết lượt. */
+        public TrangThaiKhuyenMai xacDinhTrangThai(LocalDateTime now) {
+            if (!now.isBefore(ngayKetThuc)) {
+                return TrangThaiKhuyenMai.HET_HAN;
+            }
+            if (soLuongDaDung >= soLuong) {
+                return TrangThaiKhuyenMai.HET_LUOT;
+            }
+            return TrangThaiKhuyenMai.HOAT_DONG;
+        }
+
+        public Boolean kiemTraHieuLuc() {
+            return kiemTraHieuLuc(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")));
+        }
+
+        /** Khoảng hiệu lực gồm thời điểm bắt đầu, không gồm thời điểm kết thúc. */
+        public boolean kiemTraHieuLuc(LocalDateTime now) {
+            return now != null && ngayBatDau != null && ngayKetThuc != null
+                    && !now.isBefore(ngayBatDau) && now.isBefore(ngayKetThuc)
+                    && soLuongDaDung >= 0 && soLuongDaDung < soLuong;
+        }
+
+        public Boolean kiemTraDieuKien(BigDecimal tongTien) {
+            return kiemTraDieuKien(tongTien, LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")));
+        }
+
+        public boolean kiemTraDieuKien(BigDecimal tongTien, LocalDateTime now) {
+            return kiemTraHieuLuc(now) && tongTien != null && tongTien.signum() >= 0
+                    && donToiThieu != null && tongTien.compareTo(donToiThieu) >= 0;
+        }
+
+        public BigDecimal tinhTienGiam(BigDecimal tongTien) {
+            return tinhTienGiam(tongTien, LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")));
+        }
+
+        /** Tính chính xác bằng BigDecimal; bước chốt giá sẽ quyết định làm tròn. */
+        public BigDecimal tinhTienGiam(BigDecimal tongTien, LocalDateTime now) {
+            if (!kiemTraDieuKien(tongTien, now)) {
+                return BigDecimal.ZERO;
+            }
+            BigDecimal tienGiam = switch (loaiGiam) {
+                case PHAN_TRAM -> tongTien.multiply(giaTriGiam).movePointLeft(2);
+                case SO_TIEN_CO_DINH -> giaTriGiam;
+            };
+            if (giaTriToiDa != null) {
+                tienGiam = tienGiam.min(giaTriToiDa);
+            }
+            return tienGiam.min(tongTien);
+        }
     }
 }

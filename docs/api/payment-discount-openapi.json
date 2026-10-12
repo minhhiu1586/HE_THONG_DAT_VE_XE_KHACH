@@ -1,0 +1,1620 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Khuyến mãi và phương thức thanh toán API",
+    "version": "0.1.0",
+    "description": "API Servlet/JPA quản lý khuyến mãi và danh mục phương thức thanh toán. Không gồm đặt chỗ, cổng thanh toán, giữ lượt hoặc frontend."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Backend phát triển. Các path đã bao gồm tiền tố /api."
+    }
+  ],
+  "tags": [
+    {
+      "name": "Khuyến mãi"
+    },
+    {
+      "name": "Phương thức thanh toán"
+    }
+  ],
+  "paths": {
+    "/api/quan-tri/khuyen-mai": {
+      "get": {
+        "tags": [
+          "Khuyến mãi"
+        ],
+        "operationId": "listKhuyenMai",
+        "summary": "Danh sách khuyến mãi",
+        "description": "Chỉ ADMIN. Trả trang khuyến mãi. page bắt đầu từ 1, mặc định 1; size từ 1 đến 100, mặc định 20. tuNgay và denNgay lọc ngày lịch của ngayBatDau theo Asia/Ho_Chi_Minh, bao gồm cả hai ngày. Sắp xếp ổn định theo ngayBatDau giảm dần rồi maKhuyenMai tăng dần; không nhận tham số sort.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "parameters": [
+          {
+            "name": "tuKhoa",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "trangThai",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PromotionStatus"
+            }
+          },
+          {
+            "name": "tuNgay",
+            "in": "query",
+            "description": "Ngày bắt đầu lọc theo ngày lịch của ngayBatDau tại Asia/Ho_Chi_Minh; bao gồm ngày này.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "denNgay",
+            "in": "query",
+            "description": "Ngày kết thúc lọc theo ngày lịch của ngayBatDau tại Asia/Ho_Chi_Minh; bao gồm ngày này.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Số trang, bắt đầu từ 1.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Số phần tử mỗi trang.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PromotionList"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Khuyến mãi"
+        ],
+        "operationId": "createKhuyenMai",
+        "summary": "Tạo khuyến mãi",
+        "description": "Chỉ ADMIN. Mã phải duy nhất; ngayKetThuc phải sau ngayBatDau. Với PHAN_TRAM, giaTriGiam tối đa 100.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionCreateRequest"
+              },
+              "example": {
+                "maKhuyenMai": "KM2026",
+                "tenKhuyenMai": "Ưu đãi tháng 10",
+                "moTa": "Giảm giá chuyến đi tháng 10.",
+                "loaiGiam": "PHAN_TRAM",
+                "giaTriGiam": 15,
+                "giamToiDa": "100000",
+                "donToiThieu": "300000",
+                "soLuong": 500,
+                "ngayBatDau": "2026-10-01T00:00:00+07:00",
+                "ngayKetThuc": "2026-10-31T23:59:59+07:00"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/PromotionCreated"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "409": {
+            "$ref": "#/components/responses/DuplicateCode"
+          }
+        }
+      }
+    },
+    "/api/quan-tri/khuyen-mai/{maKhuyenMai}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MaKhuyenMai"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Khuyến mãi"
+        ],
+        "operationId": "getKhuyenMai",
+        "summary": "Chi tiết khuyến mãi",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PromotionItem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Khuyến mãi"
+        ],
+        "operationId": "updateKhuyenMai",
+        "summary": "Cập nhật khuyến mãi",
+        "description": "Chỉ ADMIN. Thay toàn bộ trường sửa được, mã lấy từ URL. ngayKetThuc phải sau ngayBatDau. Mã đã được sử dụng hoặc tham chiếu trong đơn đặt vé trả 409 để bảo vệ lịch sử; không cập nhật soLuongDaDung qua API này.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionUpdateRequest"
+              },
+              "example": {
+                "tenKhuyenMai": "Ưu đãi tháng 10",
+                "moTa": "Áp dụng tháng 10.",
+                "loaiGiam": "SO_TIEN_CO_DINH",
+                "giaTriGiam": "50000",
+                "giamToiDa": null,
+                "donToiThieu": "300000",
+                "soLuong": 600,
+                "ngayBatDau": "2026-10-01T00:00:00+07:00",
+                "ngayKetThuc": "2026-10-31T23:59:59+07:00"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PromotionItem"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PromotionConflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Khuyến mãi"
+        ],
+        "operationId": "deleteKhuyenMai",
+        "summary": "Xóa khuyến mãi",
+        "description": "Chỉ ADMIN. Chỉ trả 409 nếu khuyến mãi đã được sử dụng hoặc tham chiếu.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "responses": {
+          "204": {
+            "$ref": "#/components/responses/NoContent"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/PromotionInUse"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/quan-tri/phuong-thuc-thanh-toan": {
+      "get": {
+        "tags": [
+          "Phương thức thanh toán"
+        ],
+        "operationId": "listPhuongThucThanhToanAdmin",
+        "summary": "Danh sách phương thức thanh toán quản trị",
+        "description": "Chỉ ADMIN; gồm mọi trạng thái.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PaymentMethodList"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Phương thức thanh toán"
+        ],
+        "operationId": "createPhuongThucThanhToan",
+        "summary": "Tạo phương thức thanh toán",
+        "description": "Chỉ ADMIN. Mã phương thức phải duy nhất.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentMethodCreateRequest"
+              },
+              "example": {
+                "maPhuongThuc": "CHUYEN_KHOAN",
+                "tenPhuongThuc": "Chuyển khoản ngân hàng",
+                "moTa": "Thanh toán qua chuyển khoản."
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/PaymentMethodCreated"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "409": {
+            "$ref": "#/components/responses/DuplicateCode"
+          }
+        }
+      }
+    },
+    "/api/quan-tri/phuong-thuc-thanh-toan/{maPhuongThuc}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MaPhuongThuc"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Phương thức thanh toán"
+        ],
+        "operationId": "getPhuongThucThanhToanAdmin",
+        "summary": "Chi tiết phương thức thanh toán quản trị",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PaymentMethodItem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Phương thức thanh toán"
+        ],
+        "operationId": "updatePhuongThucThanhToan",
+        "summary": "Cập nhật phương thức thanh toán",
+        "description": "Chỉ ADMIN. Thay toàn bộ trường chỉnh sửa được; mã lấy từ URL và không thể đổi.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentMethodUpdateRequest"
+              },
+              "example": {
+                "tenPhuongThuc": "Chuyển khoản ngân hàng",
+                "moTa": "Chuyển khoản đến tài khoản được hướng dẫn."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PaymentMethodItem"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/quan-tri/phuong-thuc-thanh-toan/{maPhuongThuc}/trang-thai": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MaPhuongThuc"
+        }
+      ],
+      "put": {
+        "tags": [
+          "Phương thức thanh toán"
+        ],
+        "operationId": "updateTrangThaiPhuongThucThanhToan",
+        "summary": "Cập nhật trạng thái phương thức thanh toán",
+        "description": "Chỉ ADMIN. Đặt trạng thái gửi lên; không phải thao tác bật/tắt.",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentMethodStatusRequest"
+              },
+              "example": {
+                "trangThai": "TAM_NGUNG"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PaymentMethodItem"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/phuong-thuc-thanh-toan": {
+      "get": {
+        "tags": [
+          "Phương thức thanh toán"
+        ],
+        "operationId": "listPhuongThucThanhToanPublic",
+        "summary": "Danh sách phương thức thanh toán đang hoạt động",
+        "description": "Truy cập công khai; chỉ trả phương thức có trạng thái HOAT_DONG.",
+        "x-roles": [
+          "public"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/PaymentMethodList"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "datvexe_session",
+        "description": "Cookie phiên HttpOnly do AuthFilter phát hành; Path=/api, SameSite=Lax."
+      }
+    },
+    "headers": {
+      "TraceId": {
+        "description": "Mã truy vết; khớp traceId trong lỗi JSON.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parameters": {
+      "CsrfToken": {
+        "name": "X-CSRF-Token",
+        "in": "header",
+        "required": true,
+        "description": "Lấy từ đăng nhập hoặc GET /api/tai-khoan/me.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "MaKhuyenMai": {
+        "name": "maKhuyenMai",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]{1,40}$",
+          "maxLength": 40
+        }
+      },
+      "MaPhuongThuc": {
+        "name": "maPhuongThuc",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]{1,40}$",
+          "maxLength": 40
+        }
+      }
+    },
+    "responses": {
+      "PromotionList": {
+        "description": "Trang khuyến mãi. totalItems và totalPages là 0 chỉ khi không có kết quả phù hợp; page vượt trang cuối trả items rỗng và giữ nguyên tổng.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PromotionPage"
+            },
+            "examples": {
+              "matchingResults": {
+                "summary": "Trang có kết quả",
+                "value": {
+                  "items": [
+                    {
+                      "maKhuyenMai": "KM2026",
+                      "tenKhuyenMai": "Ưu đãi tháng 10",
+                      "moTa": "Giảm giá tháng 10.",
+                      "loaiGiam": "PHAN_TRAM",
+                      "giaTriGiam": 15,
+                      "giamToiDa": "100000",
+                      "donToiThieu": "300000",
+                      "soLuong": 500,
+                      "soLuongDaDung": 42,
+                      "ngayBatDau": "2026-10-01T00:00:00+07:00",
+                      "ngayKetThuc": "2026-10-31T23:59:59+07:00",
+                      "trangThai": "HOAT_DONG"
+                    }
+                  ],
+                  "page": 1,
+                  "size": 20,
+                  "totalItems": 1,
+                  "totalPages": 1
+                }
+              },
+              "beyondLastPage": {
+                "summary": "Trang vượt trang cuối giữ nguyên tổng",
+                "value": {
+                  "items": [],
+                  "page": 3,
+                  "size": 20,
+                  "totalItems": 21,
+                  "totalPages": 2
+                }
+              },
+              "noMatches": {
+                "summary": "Không có kết quả phù hợp",
+                "value": {
+                  "items": [],
+                  "page": 1,
+                  "size": 20,
+                  "totalItems": 0,
+                  "totalPages": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "PromotionItem": {
+        "description": "Thông tin khuyến mãi.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Promotion"
+            },
+            "example": {
+              "maKhuyenMai": "KM2026",
+              "tenKhuyenMai": "Ưu đãi tháng 10",
+              "moTa": "Giảm giá tháng 10.",
+              "loaiGiam": "PHAN_TRAM",
+              "giaTriGiam": 15,
+              "giamToiDa": "100000",
+              "donToiThieu": "300000",
+              "soLuong": 500,
+              "soLuongDaDung": 42,
+              "ngayBatDau": "2026-10-01T00:00:00+07:00",
+              "ngayKetThuc": "2026-10-31T23:59:59+07:00",
+              "trangThai": "HOAT_DONG"
+            }
+          }
+        }
+      },
+      "PromotionCreated": {
+        "description": "Khuyến mãi đã tạo.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          },
+          "Location": {
+            "description": "Đường dẫn tra cứu khuyến mãi vừa tạo.",
+            "schema": {
+              "type": "string",
+              "format": "uri-reference",
+              "example": "/api/quan-tri/khuyen-mai/KM2026"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Promotion"
+            },
+            "example": {
+              "maKhuyenMai": "KM2026",
+              "tenKhuyenMai": "Ưu đãi tháng 10",
+              "moTa": "Giảm giá tháng 10.",
+              "loaiGiam": "PHAN_TRAM",
+              "giaTriGiam": 15,
+              "giamToiDa": "100000",
+              "donToiThieu": "300000",
+              "soLuong": 500,
+              "soLuongDaDung": 0,
+              "ngayBatDau": "2026-10-01T00:00:00+07:00",
+              "ngayKetThuc": "2026-10-31T23:59:59+07:00",
+              "trangThai": "HOAT_DONG"
+            }
+          }
+        }
+      },
+      "PaymentMethodList": {
+        "description": "Mảng phương thức thanh toán.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/PaymentMethod"
+              }
+            },
+            "example": [
+              {
+                "maPhuongThuc": "CHUYEN_KHOAN",
+                "tenPhuongThuc": "Chuyển khoản ngân hàng",
+                "moTa": "Thanh toán qua chuyển khoản.",
+                "trangThai": "HOAT_DONG"
+              }
+            ]
+          }
+        }
+      },
+      "PaymentMethodItem": {
+        "description": "Thông tin phương thức thanh toán.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PaymentMethod"
+            },
+            "example": {
+              "maPhuongThuc": "CHUYEN_KHOAN",
+              "tenPhuongThuc": "Chuyển khoản ngân hàng",
+              "moTa": "Thanh toán qua chuyển khoản.",
+              "trangThai": "HOAT_DONG"
+            }
+          }
+        }
+      },
+      "PaymentMethodCreated": {
+        "description": "Phương thức thanh toán đã tạo.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          },
+          "Location": {
+            "description": "Đường dẫn tra cứu phương thức thanh toán vừa tạo.",
+            "schema": {
+              "type": "string",
+              "format": "uri-reference",
+              "example": "/api/quan-tri/phuong-thuc-thanh-toan/CHUYEN_KHOAN"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/PaymentMethod"
+            },
+            "example": {
+              "maPhuongThuc": "CHUYEN_KHOAN",
+              "tenPhuongThuc": "Chuyển khoản ngân hàng",
+              "moTa": "Thanh toán qua chuyển khoản.",
+              "trangThai": "HOAT_DONG"
+            }
+          }
+        }
+      },
+      "NoContent": {
+        "description": "Đã xóa khuyến mãi.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Query hoặc body sai định dạng hoặc vi phạm ràng buộc; mã VALIDATION_ERROR.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "VALIDATION_ERROR",
+              "message": "Request không hợp lệ.",
+              "details": {
+                "fieldErrors": [
+                  {
+                    "field": "giaTriGiam",
+                    "code": "INVALID_VALUE",
+                    "message": "Giá trị giảm phải lớn hơn 0."
+                  }
+                ]
+              },
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-validation-001"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Cookie phiên thiếu, hết hạn hoặc bị thu hồi; mã UNAUTHENTICATED.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "UNAUTHENTICATED",
+              "message": "Cần xác thực.",
+              "details": {},
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-auth-001"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Không có quyền ADMIN hoặc thiếu/sai X-CSRF-Token khi ghi; mã FORBIDDEN.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "FORBIDDEN",
+              "message": "Không có quyền thực hiện thao tác.",
+              "details": {},
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-auth-002"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Không tìm thấy tài nguyên; mã RESOURCE_NOT_FOUND.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "RESOURCE_NOT_FOUND",
+              "message": "Không tìm thấy tài nguyên.",
+              "details": {},
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-not-found-001"
+            }
+          }
+        }
+      },
+      "PromotionInUse": {
+        "description": "Không thể xóa khuyến mãi đã được sử dụng hoặc được tài nguyên khác tham chiếu; mã INVALID_STATE_TRANSITION.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "INVALID_STATE_TRANSITION",
+              "message": "Không thể xóa khuyến mãi đã được sử dụng.",
+              "details": {},
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-promotion-delete-001"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Lỗi máy chủ; mã INTERNAL_ERROR.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "INTERNAL_ERROR",
+              "message": "Không thể xử lý yêu cầu lúc này.",
+              "details": {},
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-server-001"
+            }
+          }
+        }
+      },
+      "DuplicateCode": {
+        "description": "Mã khuyến mãi hoặc mã phương thức thanh toán đã tồn tại; mã CONFLICT.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "CONFLICT",
+              "message": "Mã đã tồn tại.",
+              "details": {},
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-duplicate-001"
+            }
+          }
+        }
+      },
+      "PromotionConflict": {
+        "description": "Không thể cập nhật khuyến mãi vì nội dung đã được dùng trong dữ liệu lịch sử; mã CONFLICT.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": "CONFLICT",
+              "message": "Không thể thay đổi khuyến mãi đã được dùng trong lịch sử đặt vé.",
+              "details": {},
+              "timestamp": "2026-10-11T09:30:00Z",
+              "traceId": "req-promotion-002"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "DiscountType": {
+        "type": "string",
+        "enum": [
+          "PHAN_TRAM",
+          "SO_TIEN_CO_DINH"
+        ]
+      },
+      "PromotionStatus": {
+        "type": "string",
+        "enum": [
+          "HOAT_DONG",
+          "HET_HAN",
+          "HET_LUOT"
+        ],
+        "description": "Tính theo thời hạn và số lượt: ưu tiên HET_HAN nếu đã tới ngayKetThuc, sau đó HET_LUOT nếu đã hết lượt. HOAT_DONG vẫn cần kiểm tra đã tới ngayBatDau trước khi áp dụng."
+      },
+      "PaymentMethodStatus": {
+        "type": "string",
+        "enum": [
+          "HOAT_DONG",
+          "TAM_NGUNG",
+          "NGUNG_HOAT_DONG"
+        ]
+      },
+      "PromotionCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maKhuyenMai",
+          "tenKhuyenMai",
+          "loaiGiam",
+          "giaTriGiam",
+          "donToiThieu",
+          "soLuong",
+          "ngayBatDau",
+          "ngayKetThuc"
+        ],
+        "properties": {
+          "maKhuyenMai": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,40}$",
+            "maxLength": 40
+          },
+          "tenKhuyenMai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          },
+          "loaiGiam": {
+            "$ref": "#/components/schemas/DiscountType"
+          },
+          "giaTriGiam": {
+            "description": "PHAN_TRAM dùng số từ lớn hơn 0 đến 100; SO_TIEN_CO_DINH dùng chuỗi số nguyên VND dương. Phần trăm tối đa 2 chữ số thập phân theo numeric(14,2).",
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100,
+                "example": 15,
+                "multipleOf": 0.01
+              },
+              {
+                "$ref": "#/components/schemas/PositiveVndAmount"
+              }
+            ]
+          },
+          "giamToiDa": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Có thể null; nếu có phải là số nguyên VND dương dạng chuỗi.",
+            "example": "100000",
+            "maxLength": 12
+          },
+          "donToiThieu": {
+            "$ref": "#/components/schemas/VndAmount"
+          },
+          "soLuong": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "ngayBatDau": {
+            "$ref": "#/components/schemas/ThoiDiem"
+          },
+          "ngayKetThuc": {
+            "$ref": "#/components/schemas/ThoiDiem"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "loaiGiam",
+              "giaTriGiam"
+            ],
+            "properties": {
+              "loaiGiam": {
+                "type": "string",
+                "enum": [
+                  "PHAN_TRAM"
+                ]
+              },
+              "giaTriGiam": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100,
+                "multipleOf": 0.01
+              }
+            }
+          },
+          {
+            "required": [
+              "loaiGiam",
+              "giaTriGiam"
+            ],
+            "properties": {
+              "loaiGiam": {
+                "type": "string",
+                "enum": [
+                  "SO_TIEN_CO_DINH"
+                ]
+              },
+              "giaTriGiam": {
+                "$ref": "#/components/schemas/PositiveVndAmount"
+              }
+            }
+          }
+        ]
+      },
+      "PromotionUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenKhuyenMai",
+          "loaiGiam",
+          "giaTriGiam",
+          "donToiThieu",
+          "soLuong",
+          "ngayBatDau",
+          "ngayKetThuc"
+        ],
+        "description": "Thay toàn bộ trường sửa được; mã lấy từ URL và bất biến.",
+        "properties": {
+          "tenKhuyenMai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          },
+          "loaiGiam": {
+            "$ref": "#/components/schemas/DiscountType"
+          },
+          "giaTriGiam": {
+            "description": "PHAN_TRAM dùng số từ lớn hơn 0 đến 100; SO_TIEN_CO_DINH dùng chuỗi số nguyên VND dương. Phần trăm tối đa 2 chữ số thập phân theo numeric(14,2).",
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100,
+                "example": 15,
+                "multipleOf": 0.01
+              },
+              {
+                "$ref": "#/components/schemas/PositiveVndAmount"
+              }
+            ]
+          },
+          "giamToiDa": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Có thể null; nếu có phải là số nguyên VND dương dạng chuỗi.",
+            "example": "100000",
+            "maxLength": 12
+          },
+          "donToiThieu": {
+            "$ref": "#/components/schemas/VndAmount"
+          },
+          "soLuong": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "ngayBatDau": {
+            "$ref": "#/components/schemas/ThoiDiem"
+          },
+          "ngayKetThuc": {
+            "$ref": "#/components/schemas/ThoiDiem"
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "loaiGiam",
+              "giaTriGiam"
+            ],
+            "properties": {
+              "loaiGiam": {
+                "type": "string",
+                "enum": [
+                  "PHAN_TRAM"
+                ]
+              },
+              "giaTriGiam": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100,
+                "multipleOf": 0.01
+              }
+            }
+          },
+          {
+            "required": [
+              "loaiGiam",
+              "giaTriGiam"
+            ],
+            "properties": {
+              "loaiGiam": {
+                "type": "string",
+                "enum": [
+                  "SO_TIEN_CO_DINH"
+                ]
+              },
+              "giaTriGiam": {
+                "$ref": "#/components/schemas/PositiveVndAmount"
+              }
+            }
+          }
+        ]
+      },
+      "Promotion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maKhuyenMai",
+          "tenKhuyenMai",
+          "moTa",
+          "loaiGiam",
+          "giaTriGiam",
+          "giamToiDa",
+          "donToiThieu",
+          "soLuong",
+          "soLuongDaDung",
+          "ngayBatDau",
+          "ngayKetThuc",
+          "trangThai"
+        ],
+        "properties": {
+          "maKhuyenMai": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,40}$",
+            "maxLength": 40
+          },
+          "tenKhuyenMai": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          },
+          "loaiGiam": {
+            "$ref": "#/components/schemas/DiscountType"
+          },
+          "giaTriGiam": {
+            "description": "PHAN_TRAM dùng số từ lớn hơn 0 đến 100; SO_TIEN_CO_DINH dùng chuỗi số nguyên VND dương. Phần trăm tối đa 2 chữ số thập phân theo numeric(14,2).",
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100,
+                "example": 15,
+                "multipleOf": 0.01
+              },
+              {
+                "$ref": "#/components/schemas/PositiveVndAmount"
+              }
+            ]
+          },
+          "giamToiDa": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Có thể null; nếu có phải là số nguyên VND dương dạng chuỗi.",
+            "example": "100000",
+            "maxLength": 12
+          },
+          "donToiThieu": {
+            "$ref": "#/components/schemas/VndAmount"
+          },
+          "soLuong": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "soLuongDaDung": {
+            "type": "integer",
+            "minimum": 0,
+            "readOnly": true,
+            "maximum": 2147483647
+          },
+          "ngayBatDau": {
+            "$ref": "#/components/schemas/ThoiDiem"
+          },
+          "ngayKetThuc": {
+            "$ref": "#/components/schemas/ThoiDiem"
+          },
+          "trangThai": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PromotionStatus"
+              }
+            ],
+            "readOnly": true
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "loaiGiam",
+              "giaTriGiam"
+            ],
+            "properties": {
+              "loaiGiam": {
+                "type": "string",
+                "enum": [
+                  "PHAN_TRAM"
+                ]
+              },
+              "giaTriGiam": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100,
+                "multipleOf": 0.01
+              }
+            }
+          },
+          {
+            "required": [
+              "loaiGiam",
+              "giaTriGiam"
+            ],
+            "properties": {
+              "loaiGiam": {
+                "type": "string",
+                "enum": [
+                  "SO_TIEN_CO_DINH"
+                ]
+              },
+              "giaTriGiam": {
+                "$ref": "#/components/schemas/PositiveVndAmount"
+              }
+            }
+          }
+        ]
+      },
+      "PaymentMethodCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maPhuongThuc",
+          "tenPhuongThuc"
+        ],
+        "properties": {
+          "maPhuongThuc": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,40}$",
+            "maxLength": 40
+          },
+          "tenPhuongThuc": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          }
+        }
+      },
+      "PaymentMethodUpdateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenPhuongThuc"
+        ],
+        "description": "Thay toàn bộ trường sửa được; mã lấy từ URL và bất biến.",
+        "properties": {
+          "tenPhuongThuc": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          }
+        }
+      },
+      "PaymentMethodStatusRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trangThai"
+        ],
+        "properties": {
+          "trangThai": {
+            "$ref": "#/components/schemas/PaymentMethodStatus"
+          }
+        }
+      },
+      "PaymentMethod": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maPhuongThuc",
+          "tenPhuongThuc",
+          "moTa",
+          "trangThai"
+        ],
+        "properties": {
+          "maPhuongThuc": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,40}$",
+            "maxLength": 40
+          },
+          "tenPhuongThuc": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "moTa": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 1000
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/PaymentMethodStatus"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "details",
+          "timestamp",
+          "traceId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "fieldErrors": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FieldError"
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        }
+      },
+      "FieldError": {
+        "type": "object",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ThoiDiem": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Thời điểm RFC3339 có offset; lưu và trả theo Asia/Ho_Chi_Minh. Khuyến mãi có hiệu lực từ ngayBatDau (bao gồm) đến trước ngayKetThuc.",
+        "example": "2026-10-12T08:00:00+07:00"
+      },
+      "VndAmount": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(0|[1-9][0-9]*)$",
+        "description": "Số tiền nguyên VND không âm, biểu diễn bằng chuỗi số thập phân chuẩn. Tối đa 12 chữ số nguyên, phù hợp cột numeric(14,2).",
+        "example": "250000",
+        "maxLength": 12
+      },
+      "PositiveVndAmount": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[1-9][0-9]*$",
+        "description": "Số tiền nguyên VND dương, biểu diễn bằng chuỗi số thập phân chuẩn. Tối đa 12 chữ số nguyên, phù hợp cột numeric(14,2).",
+        "example": "50000",
+        "maxLength": 12
+      },
+      "PromotionPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "size",
+          "totalItems",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Promotion"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "totalItems": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
