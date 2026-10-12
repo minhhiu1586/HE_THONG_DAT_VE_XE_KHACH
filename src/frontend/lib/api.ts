@@ -161,7 +161,7 @@ export async function getTripSeats(tripId: string): Promise<TripSeatResponse> {
 
 export async function getPopularRoutes(): Promise<PopularRoute[]> {
   const [routes, stations, cities] = await Promise.all([
-    apiGet<RawRoute[]>('/tuyen-xe?trangThai=DANG_KHAI_THAC'),
+    apiGet<RawRoute[]>('/tuyen-xe/cong-khai'),
     apiGet<StationRecord[]>('/ben-xe?trangThai=HOAT_DONG'),
     apiGet<CityRecord[]>('/tinh-thanh'),
   ]);
