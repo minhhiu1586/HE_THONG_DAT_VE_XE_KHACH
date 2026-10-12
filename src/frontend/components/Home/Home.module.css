@@ -273,6 +273,67 @@
   font-size: var(--font-size-sm);
 }
 
+/* Trang chủ: danh sách tuyến, bến và ô ưu đãi như giao diện ban đầu. */
+.homeRouteList,
+.homeStationList {
+  display: flex;
+  flex-direction: column;
+}
+
+.homeRouteCard {
+  display: block;
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.homeRouteCard:hover,
+.homeStationItem:hover,
+.homePromotionCard:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.homeRouteCard .routeName {
+  margin-bottom: var(--space-sm);
+}
+
+.homeStationItem {
+  display: block;
+  padding: var(--space-md) var(--space-xs);
+  color: inherit;
+  text-decoration: none;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.homePromotionGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+
+.homePromotionCard {
+  min-width: 0;
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.homePromotionArtwork {
+  height: 200px;
+  display: grid;
+  place-items: center;
+  background: #fff3de;
+  font-size: 4rem;
+}
+
+.homePromotionCard:nth-child(4n + 2) .homePromotionArtwork { background: #e1f2ff; }
+.homePromotionCard:nth-child(4n + 3) .homePromotionArtwork { background: #e8f5ea; }
+.homePromotionCard:nth-child(4n + 4) .homePromotionArtwork { background: #f5e8f5; }
+
 /* Responsive */
 @media (max-width: 1024px) {
   .routeCard {
@@ -283,6 +344,8 @@
   .stationsGrid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .homePromotionGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 768px) {
@@ -331,4 +394,6 @@
   .stationsGrid {
     grid-template-columns: 1fr;
   }
+
+  .homePromotionGrid { grid-template-columns: 1fr; }
 }

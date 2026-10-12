@@ -4,8 +4,9 @@ import styles from './Home.module.css';
 export default function AdsSection({ promotions }: { promotions: ActivePromotion[] }) {
   return <div className="container" style={{ marginTop: '2rem' }}>
     <section className={styles.sectionBlock}>
-      <h2 className="section-title">Khuyến mãi đang áp dụng</h2>
-      {promotions.length ? <div className={styles.stationsGrid}>{promotions.map(promotion => <article key={promotion.maKhuyenMai} className={styles.stationCard}>
+      <h2 className="section-title">Ưu đãi nổi bật</h2>
+      {promotions.length ? <div className={styles.homePromotionGrid}>{promotions.map((promotion, index) => <article key={promotion.maKhuyenMai} className={styles.homePromotionCard}>
+        <div className={styles.homePromotionArtwork} aria-hidden="true">{['🎟️', '⚡', '🆕', '🎁'][index % 4]}</div>
         <div className={styles.stationInfo}><h3 className={styles.stationName}>{promotion.tenKhuyenMai}</h3>
           {promotion.moTa && <p className={styles.stationCity}>{promotion.moTa}</p>}
           <p className={styles.stationCity}>Mã: {promotion.maKhuyenMai}</p>
