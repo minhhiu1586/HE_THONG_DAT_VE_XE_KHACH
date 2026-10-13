@@ -1,5 +1,6 @@
 """T11 real cookie/CSRF/PostgreSQL checks. Development database only; own records cleaned."""
 import json
+import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
@@ -7,7 +8,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from auth_fixture import AdminFixture
 
-BASE = 'http://localhost:8080/api'
+BASE = os.environ.get('API_BASE_URL', 'http://localhost:8080/api').rstrip('/')
 PREFIX = 'EMP_' + uuid.uuid4().hex[:8] + '_'
 auth = AdminFixture(BASE)
 other_auth = AdminFixture(BASE)
@@ -80,6 +81,17 @@ def main():
     finally:
         auth.csrf=saved_csrf
     call('POST', '/phan-cong', assignment, 201)
+    updated=call('PUT', '/phan-cong/' + ident('PC'), assignment | dict(ghiChu='Updated through T11 API'))
+    assert updated['ghiChu']=='Updated through T11 API'
+    call('PUT', '/nhan-vien/' + ident('D2'), employee('D2') | dict(trangThai='TAM_NGHI'))
+    call('POST', '/phan-cong', assignment | dict(maPhanCong=ident('INACTIVE'), maNhanVien=ident('D2'), maChuyen=ident('OVERLAP')), 409)
+    call('PUT', '/nhan-vien/' + ident('D2'), employee('D2') | dict(ngayHetHanBangLai=str(date.today())))
+    call('POST', '/phan-cong', assignment | dict(maPhanCong=ident('EXPIRED'), maNhanVien=ident('D2'), maChuyen=ident('OVERLAP')), 409)
+    call('PUT', '/nhan-vien/' + ident('D2'), employee('D2'))
+    call('POST', '/phan-cong', assignment | dict(maPhanCong=ident('WRONG_ROLE'), maNhanVien=ident('P')), 409)
+    call('POST', '/phan-cong', assignment | dict(maPhanCong=ident('SECOND_MAIN'), maNhanVien=ident('D2')), 409)
+    call('POST', '/phan-cong', assignment | dict(maPhanCong=ident('MISSING_EMP'), maNhanVien=ident('MISSING')), 404)
+    call('POST', '/phan-cong', assignment | dict(maPhanCong=ident('MISSING_TRIP'), maChuyen=ident('MISSING')), 404)
     call('PUT', '/nhan-vien/' + ident('D'), employee('D') | dict(trangThai='TAM_NGHI'), 409)
     call('DELETE', '/nhan-vien/' + ident('D'), expected=409)
     call('POST', '/phan-cong', assignment | dict(maPhanCong=ident('DUP')), 409)

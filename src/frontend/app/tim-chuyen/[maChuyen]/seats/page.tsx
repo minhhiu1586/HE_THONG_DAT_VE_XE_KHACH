@@ -16,7 +16,7 @@ export default function SeatsPage() {
   const [map, setMap] = useState<SeatMap>();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  
+
   // State mới để khóa nút bấm khi đang gọi API giữ ghế
   const [isHolding, setIsHolding] = useState(false);
 
@@ -44,7 +44,7 @@ export default function SeatsPage() {
   // Hàm xử lý giữ ghế trước khi sang trang Checkout
   const handleContinue = async () => {
     if (booking.selectedSeats.length === 0) return;
-    
+
     setIsHolding(true);
     try {
       // Gọi trực tiếp hàm holdSeats

@@ -35,6 +35,8 @@ public final class AssignmentRules {
         LocalDateTime start=LocalDateTime.of(trip.ngayKhoiHanh,trip.gioKhoiHanh);
         ChuyenXe previous=null,next=null;
         for(PhanCongChuyenXe other:new PhanCongChuyenXeRepository(em).list()) {
+            other.chuyenXe=(ChuyenXe)org.hibernate.Hibernate.unproxy(other.chuyenXe);
+            other.nhanVien=(NhanVien)org.hibernate.Hibernate.unproxy(other.nhanVien);
             if(other.maPhanCong.equals(excludedId)
                 || other.chuyenXe.trangThai==TrangThaiChuyen.DA_HUY || other.chuyenXe.trangThai==TrangThaiChuyen.HOAN_TAT) continue;
             if(other.chuyenXe.maChuyen.equals(trip.maChuyen)) {

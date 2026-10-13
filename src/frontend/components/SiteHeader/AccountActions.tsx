@@ -13,6 +13,7 @@ export default function AccountActions() {
   const [error, setError] = useState('');
 
   async function logout() {
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
@@ -30,6 +31,7 @@ export default function AccountActions() {
   if (!user) return <Link className="ghost-button" href="/dang-nhap">Đăng nhập</Link>;
   return <div className="account-actions">
     {canManage(user.loaiTaiKhoan) && <Link href="/quan-tri">Quản lý</Link>}
+    {user.loaiTaiKhoan === 'NHAN_VIEN' && <Link href="/nhan-vien">Lịch chuyến của tôi</Link>}
     <Link href="/tai-khoan">{user.hoTen}</Link>
     <button className="ghost-button" type="button" disabled={busy} onClick={() => void logout()}>Đăng xuất</button>
     {error && <span role="alert">{error}</span>}

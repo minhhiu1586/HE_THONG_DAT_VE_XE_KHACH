@@ -18,8 +18,8 @@ services:
       - ../../docs/database/schema/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
       - ../../docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
       - ../../docs/database/schema/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
-      - ../../docs/database/seed/001_demo.sql:/docker-entrypoint-initdb.d/004_demo.sql:ro
-      - ../../docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/005_fleet_demo.sql:ro
-      - ../../docs/database/seed/003_t06_transport.sql:/docker-entrypoint-initdb.d/006_transport.sql:ro
-      - ../../docs/database/seed/004_t06_scenarios.sql:/docker-entrypoint-initdb.d/007_scenarios.sql:ro
-      - ../../docs/database/seed/005_t06_display_alignment.sql:/docker-entrypoint-initdb.d/008_display_alignment.sql:ro
+      - ../../tests/backend/fixtures/sql/001_base.sql:/docker-entrypoint-initdb.d/004_demo.sql:ro
+      - ../../tests/backend/fixtures/sql/002_fleet.sql:/docker-entrypoint-initdb.d/005_fleet_demo.sql:ro
+      - ../../tests/backend/fixtures/sql/003_transport.sql:/docker-entrypoint-initdb.d/006_transport.sql:ro
+      - ../../tests/backend/fixtures/sql/004_scenarios.sql:/docker-entrypoint-initdb.d/007_scenarios.sql:ro
+      - ../../tests/backend/fixtures/sql/005_alignment.sql:/docker-entrypoint-initdb.d/008_display_alignment.sql:ro

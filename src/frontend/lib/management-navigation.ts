@@ -1,6 +1,7 @@
 import type { Profile } from './account-api';
 
 export const managementItems = [
+  { href: '/quan-tri/nhan-vien', label: 'Nhân viên và phân công', icon: '👥', description: 'Hồ sơ nhân viên và lịch phân công chuyến.', adminOnly: false },
   { href: '/quan-tri/tai-khoan', label: 'Tài khoản', icon: '👤', description: 'Quản lý trạng thái tài khoản người dùng.', adminOnly: true },
   { href: '/quan-tri/nha-xe', label: 'Nhà xe', icon: '🏢', description: 'Hồ sơ nhà xe và tài khoản quản lý.', adminOnly: true },
   { href: '/quan-tri/tuyen-duong', label: 'Tuyến đường và bến xe', icon: '🗺️', description: 'Tỉnh thành, bến xe, tuyến xe và điểm dừng.', adminOnly: false },

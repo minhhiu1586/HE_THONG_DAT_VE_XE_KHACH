@@ -9,7 +9,7 @@ public final class Jpa {
 
     private static final EntityManagerFactory FACTORY = Persistence.createEntityManagerFactory("datvexe", Map.of(
         "jakarta.persistence.jdbc.driver", System.getProperty("db.driver", "org.postgresql.Driver"),
-        "jakarta.persistence.jdbc.url", System.getProperty("db.url", System.getenv().getOrDefault("DATABASE_URL", "jdbc:postgresql://localhost:5432/datvexe")),
+        "jakarta.persistence.jdbc.url", System.getProperty("db.url", System.getenv().getOrDefault("DATABASE_URL", "jdbc:postgresql://localhost:5432/datvexe_project")),
         "jakarta.persistence.jdbc.user", System.getProperty("db.user", System.getenv().getOrDefault("POSTGRES_USER", "datvexe_user")),
         "jakarta.persistence.jdbc.password", System.getProperty("db.password", System.getenv().getOrDefault("POSTGRES_PASSWORD", "datvexe_password")),
         "hibernate.hbm2ddl.auto", System.getProperty("db.ddl", "validate")

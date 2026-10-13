@@ -2,15 +2,15 @@ param([string]$Container = 'datvexe-postgres', [string]$Database = 'datvexe', [s
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$seed = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'docs/database/seed/001_demo.sql')
-$seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'docs/database/seed/002_fleet_demo.sql'))
-$seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'docs/database/seed/003_t06_transport.sql'))
+$seed = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/fixtures/sql/001_base.sql')
+$seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/fixtures/sql/002_fleet.sql'))
+$seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/fixtures/sql/003_transport.sql'))
 $checks = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/t06_transport_assertions.sql')
 if ($IncludeScenarios) {
-    $seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'docs/database/seed/004_t06_scenarios.sql'))
+    $seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/fixtures/sql/004_scenarios.sql'))
     $checks += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/t06_scenario_assertions.sql'))
 }
-$seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'docs/database/seed/005_t06_display_alignment.sql'))
+$seed += "`n" + (Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/fixtures/sql/005_alignment.sql'))
 function Run-Sql([string]$Sql) {
     $Sql | docker exec -i $Container psql -U $User -d $Database -v ON_ERROR_STOP=1
     if ($LASTEXITCODE -ne 0) { throw 'SQL failed; transaction not committed.' }

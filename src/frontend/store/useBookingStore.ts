@@ -4,10 +4,10 @@ import { useCallback, useSyncExternalStore } from "react";
 
 import type { Passenger, TripDetail } from "../types";
 
-type State = { 
-  trip?: TripDetail; 
-  selectedSeats: string[]; 
-  passenger?: Passenger; 
+type State = {
+  trip?: TripDetail;
+  selectedSeats: string[];
+  passenger?: Passenger;
   orderId?: string;
   expiredAt?: string;
 };

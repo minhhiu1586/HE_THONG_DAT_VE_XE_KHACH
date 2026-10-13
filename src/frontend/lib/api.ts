@@ -148,7 +148,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
     cache: 'no-store'
   });
-  
+
   if (!response.ok) {
     let message = `Máy chủ trả về lỗi ${response.status}.`;
     try {
@@ -239,4 +239,3 @@ export async function getPopularStations(): Promise<Station[]> {
 export async function getActivePromotions(): Promise<ActivePromotion[]> {
   return apiGet<ActivePromotion[]>('/khuyen-mai');
 }
-
