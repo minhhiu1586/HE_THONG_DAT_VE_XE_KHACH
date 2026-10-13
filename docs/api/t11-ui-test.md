@@ -1,5 +1,25 @@
 # Test giao diện T11
 
+## Không gian theo vai trò
+
+Đăng nhập không có đường dẫn `next` sẽ mở khu vực phù hợp:
+
+| Tài khoản | Trang mở | Nội dung |
+| --- | --- | --- |
+| Admin | `/quan-tri` | Tổng quan quản trị, quản lý toàn phạm vi, liên kết hồ sơ cá nhân |
+| Quản lý nhà xe / điều hành | `/quan-tri/nhan-vien` | Hồ sơ, vai trò, trạng thái và phân công trong nhà xe |
+| Tài xế | `/nhan-vien` | Tổng quan cá nhân, hồ sơ và số/hạn bằng, lịch riêng |
+| Phụ xe | `/nhan-vien` | Tổng quan cá nhân, hồ sơ công việc và lịch riêng |
+| Khách hàng | `/tai-khoan` | Hồ sơ tài khoản T07.1 hiện có |
+
+Trang nhân viên lấy hồ sơ từ phiên đăng nhập; tên, lịch và vai trò là của người đang đăng nhập. Hồ sơ nghiệp vụ do admin/quản lý cập nhật; thông tin tài khoản và mật khẩu dùng trang `/tai-khoan`.
+
+Kiểm tra bằng `tx1.futa@datvexe.test`, `px1.futa@datvexe.test`, `dieuhanh.futa@datvexe.test`, `admin1@datvexe.test`, `khach1@datvexe.test`, mật khẩu khởi tạo trong `accounts.md`. Đăng xuất trước mỗi lần đổi người. Tại trang nhân viên, thử cả ba mục Tổng quan/Hồ sơ nhân viên/Lịch phân công, lọc ngày có lịch và ngày không có lịch, kiểm tra trên màn hình nhỏ.
+
+Đã kiểm trực tiếp đăng nhập cả 5 nhóm trên: tài xế nhận NV_FUTA_01 và 28 chuyến; phụ xe nhận NV_FUTA_05 và hồ sơ phụ xe; điều hành chỉ thấy 7 nhân viên FUTA; admin mở tổng quan quản trị; khách mở hồ sơ tài khoản. Lint riêng phần bổ sung, TypeScript và build production đạt. Việc nghiệm thu chung luồng chuyến nháp → phân công → mở bán vẫn cần reviewer theo T11.
+
+Đã kiểm bộ lọc lịch: ngày 14/10/2026 hiển thị 2 chuyến của NV_FUTA_01; ngày 01/01/2026 hiển thị trạng thái không có chuyến. Hồ sơ trên khung 390px không tràn ngang. Các smoke test T10/T12/tuyến đường dùng `next=/tai-khoan` để tiếp tục kiểm luồng hồ sơ cũ; mặc định đăng nhập mới kiểm theo bảng vai trò bên trên.
+
 ## Ghi chú riêng frontend T11
 
 Copy thông tin đăng nhập tại [danh sách 47 tài khoản](../database/seed/accounts.md).
@@ -12,6 +32,18 @@ Copy thông tin đăng nhập tại [danh sách 47 tài khoản](../database/see
 - Quy tắc backend: `t11-employees.md`. Dữ liệu: `docs/database/seed/README.md`. Danh sách có thẻ tên/vai trò/trạng thái; lịch quản lý chia 5 chuyến/trang, lịch cá nhân 8 chuyến/trang; ngày giờ hiển thị theo định dạng Việt Nam.
 
 ## Chạy và nạp dữ liệu
+
+### Máy thành viên không đăng nhập được tài khoản seed
+
+Pull code chỉ tải file SQL, không tự nạp vào database đang có. Backend và PostgreSQL cùng dùng `datvexe`; kiểm tra `POSTGRES_DB=datvexe` trong `.env`. Chạy loader `--activate` bên dưới để nạp và cấu hình đúng database. Nạp lại giữ nguyên tài khoản/mật khẩu hiện có.
+
+Kiểm tra tài khoản đã có trên máy:
+
+```powershell
+docker exec datvexe-postgres psql -U datvexe_user -d datvexe -c "SELECT email, loai_tai_khoan, trang_thai FROM nguoi_dung WHERE email = 'tx1.futa@datvexe.test';"
+```
+
+Tài khoản cần có trạng thái `HOAT_DONG`. Nếu đã đổi mật khẩu thì dùng mật khẩu mới. Hồ sơ nhân viên và tài khoản đăng nhập là hai bản ghi khác nhau: tạo hồ sơ nhân viên không tự tạo tài khoản đăng nhập.
 
 Tại thư mục gốc dự án, PowerShell:
 
@@ -42,7 +74,7 @@ $ngayChuyen = (Get-Date).AddDays(1).ToString('yyyyMMdd')
 
 ## Dữ liệu dùng để kiểm tra
 
-Seed dự án: `docs/database/seed/001_catalog.sql`, `002_accounts_staff_fleet.sql`, `003_routes_trips.sql`. Gồm 5 nhà xe, 35 nhân viên, 10 xe, 320 ghế, 20 tuyến và 210 chuyến mở bán trong 14 ngày. Database là `datvexe_project`. Các mã chuyến chứa ngày; chạy loader lại để bổ sung lịch mới, không dời lịch đã có.
+Seed dự án: `docs/database/seed/001_catalog.sql`, `002_accounts_staff_fleet.sql`, `003_routes_trips.sql`. Gồm 5 nhà xe, 35 nhân viên, 10 xe, 320 ghế, 20 tuyến và 210 chuyến mở bán trong 14 ngày. Database là `datvexe`. Các mã chuyến chứa ngày; chạy loader lại để bổ sung lịch mới, không dời lịch đã có.
 
 | Mã | Dùng để test |
 | --- | --- |

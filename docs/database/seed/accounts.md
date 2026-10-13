@@ -6,8 +6,8 @@ Nguồn: `002_accounts_staff_fleet.sql`. Danh sách gồm 47 tài khoản khởi
 
 | Tên | Email | Mật khẩu khởi tạo |
 | --- | --- | --- |
-| Quản trị hệ thống 1 | `admin1@datvexe.test` | `DatVeXe2026!` |
-| Quản trị hệ thống 2 | `admin2@datvexe.test` | `DatVeXe2026!` |
+| Nguyễn Minh Khang | `admin1@datvexe.test` | `DatVeXe2026!` |
+| Trần Ngọc Linh | `admin2@datvexe.test` | `DatVeXe2026!` |
 
 ## Phương Trang
 

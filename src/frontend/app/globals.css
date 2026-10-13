@@ -173,7 +173,7 @@ nav a:first-child{
     font-weight:600;
     flex:1
 }
-.search-form input,.passenger-form input,.passenger-form textarea,.filters select,.promo input{
+.search-form input,.search-form select,.passenger-form input,.passenger-form textarea,.filters select,.promo input{
     border:1px solid var(--line);
     border-radius:7px;
     padding:13px 14px;
@@ -181,7 +181,7 @@ nav a:first-child{
     background:#fff;
     outline:none
 }
-.search-form input:focus,.passenger-form input:focus,.passenger-form textarea:focus{
+.search-form input:focus,.search-form select:focus,.passenger-form input:focus,.passenger-form textarea:focus{
     border-color:var(--teal);
     box-shadow:0 0 0 3px #0e8c8515
 }
@@ -613,7 +613,12 @@ footer strong{
     grid-template-columns:repeat(6,1fr);
     gap:10px
 }
+.driver-position{display:flex;align-items:center;gap:12px;width:max-content;max-width:100%;padding:12px 16px;margin:0 0 20px;background:#fef2f2;border:1px solid #f5b5b5;border-radius:10px;color:#a52c2c}
+.driver-position>span{font-size:28px}
+.driver-position strong,.driver-position small{display:block}
+.driver-position small{margin-top:4px;font-size:12px}
 .seat{
+    width:100%;
     height:43px;
     border-radius:7px;
     background:#edf7f3;

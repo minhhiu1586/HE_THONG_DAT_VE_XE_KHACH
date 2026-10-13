@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--api', default='http://localhost:8080/api')
-    parser.add_argument('--database', default='datvexe_project')
+    parser.add_argument('--database', default='datvexe')
     parser.add_argument('--check-reload', action='store_true')
     parser.add_argument('--skip-logins', action='store_true', help='Repeat data/search checks after account logins have already passed')
     args = parser.parse_args()

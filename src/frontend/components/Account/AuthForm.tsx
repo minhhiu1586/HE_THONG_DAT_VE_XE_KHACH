@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { accountRequest, errorMessage, Profile, Session } from '@/lib/account-api';
 import { useAuth } from './AuthProvider';
+import { roleHome } from '@/lib/role-home';
 import styles from './Account.module.css';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
 
@@ -27,9 +28,10 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
         setSuccess('Đăng ký thành công. Bạn có thể đăng nhập ngay.');
         formElement.reset();
       } else {
-        accept(await accountRequest<Session>('/auth/dang-nhap', 'POST', { email, matKhau }));
+        const session = await accountRequest<Session>('/auth/dang-nhap', 'POST', { email, matKhau });
+        accept(session);
         const next = new URLSearchParams(window.location.search).get('next');
-        router.replace(next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/tai-khoan');
+        router.replace(next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : roleHome(session.nguoiDung.loaiTaiKhoan));
       }
     } catch (error) { setError(errorMessage(error)); }
     finally { sending.current = false; setBusy(false); }

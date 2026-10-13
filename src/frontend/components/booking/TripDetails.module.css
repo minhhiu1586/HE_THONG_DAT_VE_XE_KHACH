@@ -6,6 +6,17 @@
   border: 1px solid #c8e7de;
   border-radius: 14px;
 }
+.stops { margin: 24px 0; padding: 24px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.stops h2 { margin: 0 0 16px; font-size: 20px; }
+.stops ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.stops li { display: flex; justify-content: space-between; align-items: start; gap: 16px; padding: 16px; background: #f7faf8; border-radius: 10px; border-left: 3px solid var(--teal); }
+.stops strong { display: block; font-size: 15px; }
+.stops p { margin: 6px 0 0; color: #526b69; line-height: 1.6; }
+.stops li > span { flex-shrink: 0; border-radius: 999px; padding: 6px 10px; background: #eaf6f2; color: #087d77; font-size: 13px; }
+.bookingAction { margin: 24px 0 32px; display: flex; }
+.bookingAction a { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; }
+.bookingAction a:focus-visible { outline: 3px solid #83cfc8; outline-offset: 4px; }
+@media (max-width: 520px) { .stops { padding: 16px; } .stops li { flex-direction: column; gap: 8px; } .bookingAction a { width: 100%; } }
 .availability:focus, .seatPanel:focus { outline: 2px solid var(--teal); outline-offset: 3px; }
 .availabilityLabel { display: block; color: #496765; font-size: 14px; font-weight: 600; }
 .availability strong { display: block; margin-top: 7px; color: #087d77; font-size: 36px; line-height: 1.2; }

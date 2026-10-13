@@ -26,7 +26,7 @@ function sql(statement) {
     await page.getByRole('button', { name: 'Đăng ký', exact: true }).click();
     userId = (await (await registered).json()).maNguoiDung;
     sql(`UPDATE nguoi_dung SET loai_tai_khoan='ADMIN' WHERE ma_nguoi_dung='${userId}'`);
-    await page.goto(`${base}/dang-nhap`);
+    await page.goto(`${base}/dang-nhap?next=/tai-khoan`);
     await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/tai-khoan');

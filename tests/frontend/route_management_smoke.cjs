@@ -36,7 +36,7 @@ function sql(statement) {
     if (outcome !== 'success') throw new Error(outcome);
     assert(ids.user, 'Không nhận được mã tài khoản từ API đăng ký');
     sql(`UPDATE nguoi_dung SET loai_tai_khoan='ADMIN' WHERE ma_nguoi_dung='${ids.user}'`);
-    await page.goto(`${base}/dang-nhap`);
+    await page.goto(`${base}/dang-nhap?next=/tai-khoan`);
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();

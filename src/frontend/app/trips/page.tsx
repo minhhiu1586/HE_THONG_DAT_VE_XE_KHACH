@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 
 import SearchForm from "@/components/booking/SearchForm";
 import TripCard from "@/components/booking/TripCard";
-import { searchTrips, type SearchTrip } from "@/lib/api";
+import { getSearchOptions, searchTrips, type SearchOption, type SearchTrip } from "@/lib/api";
 import type { SearchValues } from "@/types";
 
 function TripsContent() {
@@ -17,6 +17,14 @@ function TripsContent() {
     date: params.get("date") ?? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
   };
   const [trips, setTrips] = useState<SearchTrip[]>([]);
+  const [locations, setLocations] = useState<SearchOption[]>([]);
+  useEffect(() => {
+    let active = true;
+    getSearchOptions().then(data => { if (active) setLocations(data); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const locationName = (value: string, fallback: string) =>
+    locations.find(option => option.value === value)?.label ?? (value.startsWith('CITY:') || value.startsWith('STATION:') ? fallback : value || fallback);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [timeFilter, setTimeFilter] = useState('all');
@@ -92,8 +100,8 @@ function TripsContent() {
             <div>
               <span className="eyebrow">KẾT QUẢ TÌM KIẾM</span>
               <h1>
-                {values.from || "Điểm đi"} <span>→</span>{" "}
-                {values.to || "Điểm đến"}
+                {locationName(values.from, 'Điểm đi')} <span>→</span>{" "}
+                {locationName(values.to, 'Điểm đến')}
               </h1>
               <p>
                 {values.date} ·{" "}

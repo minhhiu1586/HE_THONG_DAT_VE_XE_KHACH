@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { getTrip, getTripSeats, holdSeats } from "@/lib/api";
+import { getTrip, getTripSeats, type SearchTrip, type HoldSeatResponse } from "@/lib/api";
+import { useAuth } from '@/components/Account/AuthProvider';
 import { bookingStore, useBookingStore } from "@/store/useBookingStore";
 import SeatLayout from "@/components/booking/SeatLayout";
-import type { SeatMap, TripDetail } from "@/types";
+import type { SeatMap } from "@/types";
 
 export default function SeatsPage() {
-  const { tripId } = useParams<{ tripId: string }>();
+  const { maChuyen: tripId } = useParams<{ maChuyen: string }>();
+  const { user, request } = useAuth();
   const router = useRouter();
   const booking = useBookingStore();
-  const [trip, setTrip] = useState<TripDetail>();
+  const [trip, setTrip] = useState<SearchTrip>();
   const [map, setMap] = useState<SeatMap>();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -26,13 +28,14 @@ export default function SeatsPage() {
         if (!detail.maXe) {
           throw new Error("Chuyến chưa được gán xe nên chưa có sơ đồ ghế.");
         }
-        const seatResponse = await getTripSeats(detail.maXe); // Sửa api.seats thành getTripSeats
+        const seatResponse = await getTripSeats(tripId);
         setTrip(detail);
         setMap({
           maChuyen: tripId,
           maXe: detail.maXe,
           danhSachGhe: seatResponse.danhSachGhe,
         });
+        if (bookingStore.get().trip?.maChuyen !== tripId) bookingStore.clear();
         bookingStore.set({ trip: detail });
       })
       .catch((e) =>
@@ -44,11 +47,12 @@ export default function SeatsPage() {
   // Hàm xử lý giữ ghế trước khi sang trang Checkout
   const handleContinue = async () => {
     if (booking.selectedSeats.length === 0) return;
+    if (!user) { router.push(`/dang-nhap?next=${encodeURIComponent(`/tim-chuyen/${tripId}/seats`)}`); return; }
 
     setIsHolding(true);
     try {
       // Gọi trực tiếp hàm holdSeats
-      const response = await holdSeats({
+      const response = await request<HoldSeatResponse>('/booking/hold', 'POST', {
         maChuyen: tripId,
         danhSachMaGhe: booking.selectedSeats,
       });
@@ -57,11 +61,11 @@ export default function SeatsPage() {
       bookingStore.setHoldSession(response.maDon, response.thoiDiemHetHan);
 
       // Chuyển sang trang Checkout
-      router.push(`/${tripId}/checkout`);
+      router.push(`/tim-chuyen/${tripId}/checkout`);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Ghế đã bị người khác chọn. Vui lòng chọn ghế khác!");
       if (map?.maXe) {
-        getTripSeats(map.maXe).then(res => setMap({ ...map, danhSachGhe: res.danhSachGhe }));
+        getTripSeats(tripId).then(res => { setMap({ ...map, danhSachGhe: res.danhSachGhe }); bookingStore.set({ selectedSeats: [] }); }).catch(() => setError('Không thể cập nhật ghế. Vui lòng tải lại trang.'));
       }
     } finally {
       setIsHolding(false);
@@ -91,13 +95,13 @@ export default function SeatsPage() {
             <div className="page-title">
               <span className="eyebrow">CHI TIẾT CHUYẾN</span>
               <h1>
-                {trip.benDi?.tenBenXe ?? trip.benDi?.maBenXe ?? trip.maTuyen}{" "}
+                {trip.tenBenDi}{" "}
                 <span>→</span>{" "}
-                {trip.benDen?.tenBenXe ?? trip.benDen?.maBenXe ?? "Điểm đến"}
+                {trip.tenBenDen}
               </h1>
               <p>
                 {trip.ngayKhoiHanh} · {trip.gioKhoiHanh.slice(0, 5)} ·{" "}
-                {trip.nhaXe?.tenNhaXe ?? "Nhà xe"}
+                {trip.tenNhaXe ?? "Nhà xe"}
               </p>
             </div>
             <div className="legend">
@@ -117,7 +121,7 @@ export default function SeatsPage() {
             <SeatLayout
               seats={map.danhSachGhe}
               selected={booking.selectedSeats}
-              onToggle={bookingStore.toggleSeat}
+              onToggle={id => { if (trip.coTheDatVe && !isHolding) bookingStore.toggleSeat(id); }}
             />
           </section>
           <aside className="summary-card">
@@ -126,16 +130,16 @@ export default function SeatsPage() {
             <p>Giá tham khảo</p>
             <strong className="total">
               {(
-                booking.selectedSeats.length * Number(trip.giaThamKhao ?? 0)
+                booking.selectedSeats.length * Number(trip.giaVeDuKien ?? 0)
               ).toLocaleString("vi-VN")}
               đ
             </strong>
             <button
               className="primary-button full"
-              disabled={!booking.selectedSeats.length || isHolding}
+              disabled={!booking.selectedSeats.length || isHolding || !trip.coTheDatVe}
               onClick={handleContinue}
             >
-              {isHolding ? "Đang giữ ghế..." : "Tiếp tục <span>→</span>"}
+              {isHolding ? "Đang giữ ghế..." : 'Tiếp tục →'}
             </button>
             {!booking.selectedSeats.length && (
               <small>Chọn ít nhất một ghế để tiếp tục</small>

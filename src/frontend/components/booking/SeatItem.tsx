@@ -10,7 +10,7 @@ export default function SeatItem({
   onClick: () => void;
 }) {
   const unavailable =
-    seat.trangThai !== "HOAT_DONG" ||
+    (seat.trangThaiSuDung ?? seat.trangThai) !== "HOAT_DONG" ||
     (seat.tinhTrangKhaDung !== "TRONG" &&
       seat.tinhTrangKhaDung !== undefined);
 
@@ -20,10 +20,13 @@ export default function SeatItem({
         unavailable ? "unavailable" : ""
       }`}
       disabled={unavailable}
+      type="button"
+      aria-pressed={selected}
+      aria-label={`Ghế ${typeof seat.viTri === 'string' ? seat.viTri : seat.maGhe}${unavailable ? ', không khả dụng' : ''}`}
       onClick={onClick}
       title={unavailable ? "Ghế đã được chọn" : seat.maGhe}
     >
-      <span>{seat.maGhe}</span>
+      <span>{typeof seat.viTri === 'string' ? seat.viTri : seat.maGhe}</span>
     </button>
   );
 }

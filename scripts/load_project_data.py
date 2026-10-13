@@ -17,7 +17,7 @@ SEEDS = ('001_catalog.sql', '002_accounts_staff_fleet.sql', '003_routes_trips.sq
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--database', default='datvexe_project')
+    parser.add_argument('--database', default='datvexe')
     parser.add_argument('--container', default='datvexe-postgres')
     parser.add_argument('--user', default='datvexe_user')
     parser.add_argument('--api', default='http://localhost:8080/api')
