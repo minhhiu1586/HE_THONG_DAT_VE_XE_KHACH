@@ -1,6 +1,5 @@
 """Load the project dataset without resetting an existing database; publish through T12 APIs."""
 import argparse
-from datetime import datetime
 import http.cookiejar
 from http.client import HTTPException
 import json
@@ -24,12 +23,9 @@ def main():
     parser.add_argument('--api', default='http://localhost:8080/api')
     parser.add_argument('--activate', action='store_true', help='Configure .env and restart the existing compose services')
     parser.add_argument('--load-only', action='store_true', help='Load schema/data; leave trips unpublished')
-    parser.add_argument('--reset', action='store_true', help='Back up and replace public schema/data with the canonical seeds')
     args = parser.parse_args()
     if not re.fullmatch(r'[a-z][a-z0-9_]{0,62}', args.database):
         parser.error('Invalid database name')
-    if args.reset and not (args.activate or args.load_only):
-        parser.error('--reset requires --activate for the app or --load-only for an isolated database')
 
     def sql(statement, database=None):
         command = ['docker', 'exec', '-e', 'PGTZ=Asia/Ho_Chi_Minh', '-i', args.container, 'psql', '-U', args.user, '-d', database or args.database, '-v', 'ON_ERROR_STOP=1', '-tA']
@@ -45,36 +41,8 @@ def main():
                        sorted((ROOT / 'docs/database/schema').glob('[0-9][0-9][0-9]_*.sql')))
     data = '\n'.join((ROOT / 'docs/database/seed' / file).read_text(encoding='utf-8') for file in SEEDS)
     data = re.sub(r'^(BEGIN|COMMIT);\s*$', '', data, flags=re.M)
-    reset_sql = ''
-    backend_stopped = False
-    if args.reset:
-        if args.activate:
-            subprocess.run(['docker', 'compose', 'stop', 'backend'], cwd=ROOT, check=True)
-            backend_stopped = True
-        backup_dir = ROOT / 'src/backend/target/database-backups'
-        try:
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            backup_path = backup_dir / (args.database + '_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f') + '.dump')
-            dump = subprocess.run(['docker', 'exec', args.container, 'pg_dump', '-U', args.user,
-                                   '-d', args.database, '-Fc'], capture_output=True, check=True)
-            subprocess.run(['docker', 'exec', '-i', args.container, 'pg_restore', '--list'],
-                           input=dump.stdout, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
-            with backup_path.open('xb') as backup_file:
-                backup_file.write(dump.stdout)
-        except BaseException:
-            if backend_stopped:
-                subprocess.run(['docker', 'compose', 'start', 'backend'], cwd=ROOT, check=False)
-            raise
-        print(f'Backup verified: {backup_path.relative_to(ROOT)}', flush=True)
-        reset_sql = 'DROP SCHEMA public CASCADE;\nCREATE SCHEMA public AUTHORIZATION CURRENT_USER;\n'
-    try:
-        # Reset and seed share one transaction: any SQL failure restores the old schema/data.
-        sql('BEGIN;\n' + reset_sql + schema + '\n' + data + '\nCOMMIT;')
-    finally:
-        if backend_stopped:
-            subprocess.run(['docker', 'compose', 'start', 'backend'], cwd=ROOT, check=True)
-    print('Replaced database with canonical seeds.' if args.reset else
-          'Loaded project schema/data; existing rows and account passwords preserved.', flush=True)
+    sql('BEGIN;\n' + schema + '\n' + data + '\nCOMMIT;')
+    print('Loaded project schema/data; existing rows and account passwords preserved.', flush=True)
     if args.load_only:
         return
     if args.activate:
