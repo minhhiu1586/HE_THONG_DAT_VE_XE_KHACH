@@ -494,13 +494,15 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
 
 | ID | Phương thức + đường dẫn | Quyền | Tham số / yêu cầu | Phản hồi thành công | Lỗi nghiệp vụ chính |
 | --- | --- | --- | --- | --- | --- |
-| D01 | POST `/api/booking/{maDon}/thanh-toan` | KH | Path `maDon`; body cần `maPhuongThuc`. Số tiền và snapshot đọc từ backend; không gửi `phienBanGia`. | 201 khi khởi tạo; 202 khi đang chờ. `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 409 `PAYMENT_PROCESSING` |
-| D02 | GET `/api/thanh-toan/{maGiaoDich}` | KH; NX/AD theo quyền | Path `maGiaoDich` | 200 cùng `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 404 `RESOURCE_NOT_FOUND` |
-| D03 | GET `/api/booking/{maDon}/thanh-toan` | KH; NX/AD theo quyền | Path `maDon`; query `page`, `size`, `trangThai`, `sort` (`thoiDiemTao,asc\|desc`). | 200 `Page<PaymentResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 404 `RESOURCE_NOT_FOUND` |
-| D04 | Method chưa chốt — `/api/thanh-toan/callback/{congThanhToan}` | CG | Path dự kiến có `congThanhToan`; body, chữ ký, response/ACK phụ thuộc cổng. | Chưa định nghĩa | Chờ đặc tả provider |
-| D05 | GET `/api/ve-xe/{maVe}` | KH; NV/NX/AD theo quyền | Path `maVe` | 200 `TicketResponse` ([ví dụ](#d05--vé-điện-tử)) | 404 `RESOURCE_NOT_FOUND` |
+| D01 | POST `/api/booking/{maDon}/thanh-toan` | KH | Path `maDon`; body cần `maPhuongThuc` (`VNPAY` hoặc `MIEN_PHI`). Số tiền đọc từ giá đã chốt; không nhận tiền từ FE. | 201 khi tạo mới; 202 khi giao dịch đang chờ. `PaymentResponse` | 409 `PAYMENT_PROCESSING` |
+| D02 | GET `/api/thanh-toan/{maGiaoDich}` | KH; NX/AD theo quyền | Path `maGiaoDich` | 200 `PaymentResponse` | 404 `RESOURCE_NOT_FOUND` |
+| D03 | GET `/api/booking/{maDon}/thanh-toan` | KH | Path `maDon`; query `page`, `size`, `trangThai`, `sort` (`maGiaoDich,asc\|desc`). | 200 `Page<PaymentResponse>` | 404 `RESOURCE_NOT_FOUND` |
+| D04 | GET `/api/thanh-toan/callback/vnpay` | Cổng thanh toán | Query parameters VNPay, chữ ký `vnp_SecureHash`; chỉ xác minh IPN và trả ACK. | 200 ACK VNPay; không phát hành lại khi callback lặp | `97` chữ ký sai, `01/04` không tìm thấy hoặc sai tiền |
+| D05 | GET `/api/ve-xe/{maVe}` | KH; NV/NX/AD theo quyền | Path `maVe` | 200 `TicketResponse` | 404 `RESOURCE_NOT_FOUND` |
+| D06 | POST `/api/thanh-toan/{maGiaoDich}/xac-minh` | KH | Path `maGiaoDich`; body `{}`; backend gọi VNPay QueryDR, không nhận kết quả từ FE. | 200 `PaymentResponse` sau khi xác minh | 409 `PAYMENT_CONTEXT_MISSING`; 502 lỗi provider; 503 thiếu cấu hình |
+| D07 | GET `/api/thanh-toan/return/vnpay` | Public | Query parameters VNPay và chữ ký; chỉ kiểm tra chữ ký, không cập nhật trạng thái | 200 thông báo/JSON kết quả quay lại | 400 chữ ký hoặc tham số sai |
 
-D01 tạo giao dịch từ giá đã chốt; 201/202 không chứng minh đã thu tiền. D02/B05 là nguồn trạng thái có thẩm quyền. D04 chưa có method, schema, chữ ký hoặc ACK vì chưa chọn cổng thanh toán.
+D01 tạo giao dịch từ giá đã chốt; 201/202 không chứng minh đã thu tiền. D02/B05 là nguồn trạng thái có thẩm quyền. D04 chỉ xử lý IPN có chữ ký. D07 chỉ hiển thị kết quả quay lại; không dùng ReturnURL để cập nhật giao dịch. Trên localhost, VNPay không thể gọi IPN thật; D06 dùng QueryDR để xác minh giao dịch sandbox.
 
 ### Request body
 
@@ -508,7 +510,7 @@ D01 tạo giao dịch từ giá đã chốt; 201/202 không chứng minh đã th
 
 ```json
 {
-  "maPhuongThuc": "PT01"
+  "maPhuongThuc": "VNPAY"
 }
 ```
 
@@ -520,18 +522,35 @@ D01 tạo giao dịch từ giá đã chốt; 201/202 không chứng minh đã th
 {
   "maGiaoDich": "GD01",
   "maDon": "DDV01",
-  "maPhuongThuc": "PT01",
+  "maPhuongThuc": "VNPAY",
   "soTien": "360000",
   "donViTienTe": "VND",
   "trangThai": "CHO_XU_LY",
   "ketQuaCongDaXacDinh": false,
   "thoiDiemTao": "2026-10-11T09:33:00+07:00",
-  "urlThanhToan": "https://pay.example/checkout/GD01",
-  "thoiDiemHetHan": "2026-10-11T09:45:00+07:00"
+  "urlThanhToan": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...",
+  "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
+  "thoiGianThanhToan": null,
+  "canDoiSoat": false
 }
 ```
 
-Tra cứu dùng cùng kiểu `PaymentResponse` với D01. `urlThanhToan` và `thoiDiemHetHan` có thể là `null`; `ketQuaCongDaXacDinh: false` nghĩa là kết quả cổng chưa xác định.
+Tra cứu dùng cùng kiểu `PaymentResponse` với D01. `thoiDiemTao` có thể `null` sau khi mất context tạm trong bộ nhớ; `ketQuaCongDaXacDinh: false` nghĩa là kết quả cổng chưa xác định. `canDoiSoat: true` chỉ xuất hiện khi VNPay đã xác minh tiền thành công nhưng đơn đã hết hạn hoặc không còn đủ snapshot để phát hành; backend không tự lấy lại ghế hoặc phát hành muộn.
+
+#### D04 — VNPay IPN và D06 — xác minh QueryDR
+
+VNPay IPN dùng `GET /api/thanh-toan/callback/vnpay` với các tham số `vnp_*`. Backend kiểm tra chữ ký HMACSHA512, merchant, `vnp_TxnRef` và số tiền nhân 100. IPN thành công không đồng nghĩa với phát hành lại lần hai; trạng thái được cập nhật nguyên tử cùng toàn bộ vé. ReturnURL D07 chỉ kiểm tra chữ ký và hiển thị kết quả, không ghi database. Khi chạy localhost, dùng D06 để backend gọi QueryDR sandbox và xác minh kết quả server-to-server. Không ghi secret vào tài liệu hoặc repository.
+
+Request D06:
+
+```http
+POST /api/thanh-toan/GD01/xac-minh
+X-CSRF-Token: <csrf-token>
+```
+
+Body là `{}`. D06 không nhận `soTien`, `vnp_ResponseCode` hoặc trạng thái do trình duyệt gửi.
+
+Phương thức `MIEN_PHI` chỉ dùng khi `tongThanhToan` bằng `0`; backend xác nhận và phát hành vé trong cùng transaction, không gọi VNPay.
 
 #### D05 — Vé điện tử
 

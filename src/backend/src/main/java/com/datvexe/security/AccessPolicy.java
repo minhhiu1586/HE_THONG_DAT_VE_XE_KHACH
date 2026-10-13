@@ -12,12 +12,20 @@ public final class AccessPolicy {
     private AccessPolicy() {}
     public static boolean publicEndpoint(String method, String path) {
         if (method.equals("POST")) return Set.of("/api/auth/dang-ky", "/api/auth/dang-nhap").contains(path);
-        return method.equals("GET") && (Set.of("/api/health", "/api/tinh-thanh", "/api/ben-xe", "/api/tuyen-xe/cong-khai", "/api/chuyen-xe", "/api/phuong-thuc-thanh-toan", "/api/khuyen-mai").contains(path)
+        return method.equals("GET") && (Set.of("/api/health", "/api/tinh-thanh", "/api/ben-xe", "/api/tuyen-xe/cong-khai", "/api/chuyen-xe", "/api/phuong-thuc-thanh-toan", "/api/khuyen-mai", "/api/thanh-toan/return/vnpay", "/api/thanh-toan/callback/vnpay").contains(path)
             || path.matches("/api/tinh-thanh/[^/]+") || path.matches("/api/ben-xe/[^/]+")
             || path.matches("/api/chuyen-xe/[^/]+(?:/(?:ghe|gia|trang-thai))?"));
     }
     public static void role(CurrentUser user, String path) { role(user, path, "POST"); }
     public static void role(CurrentUser user, String path, String method) {
+        if (path.equals("/api/thanh-toan") || path.startsWith("/api/thanh-toan/")) {
+            if (method.equals("POST")) {
+                if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG) throw AccessControl.denied();
+            } else if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG
+                    && user.loaiTaiKhoan() != LoaiTaiKhoan.NHA_XE
+                    && user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN) throw AccessControl.denied();
+            return;
+        }
         if (path.equals("/api/booking") || path.startsWith("/api/booking/")) {
             if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG) throw AccessControl.denied();
             return;

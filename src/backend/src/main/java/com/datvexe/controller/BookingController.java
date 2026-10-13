@@ -8,9 +8,11 @@ import com.datvexe.dto.BookingDto.PassengerRequest;
 import com.datvexe.dto.HoldSeatRequest;
 import com.datvexe.dto.HoldSeatResponse;
 import com.datvexe.dto.PricingDto;
+import com.datvexe.dto.ThanhToanDto;
 import com.datvexe.security.AccountException;
 import com.datvexe.security.RequestIdentity;
 import com.datvexe.service.BookingService;
+import com.datvexe.service.ThanhToanService;
 import com.datvexe.service.DomainException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -48,10 +50,12 @@ public class BookingController extends HttpServlet {
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private BookingService service;
+    private ThanhToanService payments;
 
     @Override
     public void init() {
         service = new BookingService(Jpa.factory());
+        payments = new ThanhToanService(Jpa.factory());
     }
 
     /** HttpServlet has no PATCH hook, so route and dispatch the supported verbs here. */
@@ -68,7 +72,7 @@ public class BookingController extends HttpServlet {
             return;
         }
         if (!route.allows(method)) throw methodNotAllowed(response, route);
-        requireNoQuery(request);
+        if (route.kind() != Kind.PAYMENT) requireNoQuery(request);
 
         // Holding seats has its own idempotency lock. Do not serialize these requests on the session.
         if (route.kind() == Kind.HOLD) {
@@ -107,6 +111,18 @@ public class BookingController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Route route = route(request);
+        if (route.kind() == Kind.PAYMENT) {
+            Set<String> allowed = Set.of("page", "size", "trangThai", "sort");
+            request.getParameterMap().forEach((name, values) -> {
+                if (!allowed.contains(name) || values.length != 1)
+                    throw invalid("query", "Tham số lịch sử thanh toán không hợp lệ hoặc bị lặp.");
+            });
+            int page = integerQuery(request, "page", 1);
+            int size = integerQuery(request, "size", 20);
+            writeJson(response, 200, payments.history(route.maDon(), page, size,
+                    request.getParameter("trangThai"), request.getParameter("sort")));
+            return;
+        }
         List<PassengerRequest> passengers = passengers(request, route.maDon());
         writeOrder(request, response, route, service.getOrder(route.maDon(), passengers));
     }
@@ -114,6 +130,21 @@ public class BookingController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Route route = route(request);
+        if (route.kind() == Kind.PAYMENT) {
+            requireNoQuery(request);
+            JsonNode body = readObject(request, Set.of("maPhuongThuc"));
+            checkStrings(body, "maPhuongThuc");
+            BookingDto.Result result = payments.create(route.maDon(),
+                    convert(body, ThanhToanDto.CreateRequest.class), request.getHeader("Idempotency-Key"),
+                    passengers(request, route.maDon()), request.getRemoteAddr());
+            if (result.status() == 201) {
+                JsonNode output = json.valueToTree(result.body());
+                response.setHeader("Location", request.getContextPath() + "/api/thanh-toan/"
+                        + output.path("maGiaoDich").asText());
+            }
+            write(response, result);
+            return;
+        }
         if (route.kind() == Kind.HOLD) {
             JsonNode body = readObject(request, HOLD_FIELDS);
             checkStrings(body, "maChuyen");
@@ -239,6 +270,7 @@ public class BookingController extends HttpServlet {
                 case "huy" -> Kind.CANCEL;
                 case "bao-gia" -> Kind.QUOTE;
                 case "chot-gia" -> Kind.FREEZE;
+                case "thanh-toan" -> Kind.PAYMENT;
                 default -> null;
             };
             if (kind != null) return new Route(kind, part[0], null);
@@ -255,6 +287,13 @@ public class BookingController extends HttpServlet {
 
     private void requireNoQuery(HttpServletRequest request) {
         if (!request.getParameterMap().isEmpty()) throw invalid("query", "Đường dẫn này không hỗ trợ tham số query.");
+    }
+
+    private int integerQuery(HttpServletRequest request, String name, int fallback) {
+        String value = request.getParameter(name);
+        if (value == null) return fallback;
+        try { return Integer.parseInt(value); }
+        catch (NumberFormatException error) { throw invalid(name, "Tham số phải là số nguyên."); }
     }
 
     private void requireAllowed(JsonNode body, Set<String> allowed) {
@@ -432,7 +471,7 @@ public class BookingController extends HttpServlet {
         return AccountException.invalid(field, message);
     }
 
-    private enum Kind { HOLD, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL, QUOTE, FREEZE }
+    private enum Kind { HOLD, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL, QUOTE, FREEZE, PAYMENT }
 
     private record Route(Kind kind, String maDon, String maGhe) {
         boolean allows(String method) {
@@ -443,6 +482,7 @@ public class BookingController extends HttpServlet {
                 case SEAT -> method.equals("DELETE");
                 case PROMOTION -> Set.of("PUT", "DELETE").contains(method);
                 case CANCEL, QUOTE, FREEZE -> method.equals("POST");
+                case PAYMENT -> Set.of("GET", "HEAD", "POST").contains(method);
             };
         }
 
@@ -454,6 +494,7 @@ public class BookingController extends HttpServlet {
                 case SEAT -> "DELETE, OPTIONS";
                 case PROMOTION -> "PUT, DELETE, OPTIONS";
                 case CANCEL, QUOTE, FREEZE -> "POST, OPTIONS";
+                case PAYMENT -> "GET, HEAD, POST, OPTIONS";
             };
         }
     }

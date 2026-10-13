@@ -19,11 +19,14 @@ for file in /migrations/schema/[0-9][0-9][0-9]_*.sql; do
     [ -f "$file" ] || continue
     filename=${file##*/}
     version=${filename%%_*}
-    checksum=$(sha256sum "$file" | cut -d ' ' -f 1)
+    # Git on Windows may check out CRLF. Compare SQL content consistently,
+    # while accepting the raw checksum already recorded by older runners.
+    checksum=$(sed 's/\r$//' "$file" | sha256sum | cut -d ' ' -f 1)
+    raw_checksum=$(sha256sum "$file" | cut -d ' ' -f 1)
     recorded=$(psql -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atq \
         -c "SELECT checksum FROM schema_migrations WHERE version = '$version'")
     if [ -n "$recorded" ]; then
-        if [ "$recorded" != "$checksum" ]; then
+        if [ "$recorded" != "$checksum" ] && [ "$recorded" != "$raw_checksum" ]; then
             echo "Migration $filename changed after application; stop and create a new migration." >&2
             exit 1
         fi

@@ -1,0 +1,933 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "T18 VNPay sandbox and electronic ticket API",
+    "version": "0.1.0",
+    "description": "Simplified school-project contract. The backend uses the frozen T17 amount, supports VNPAY and MIEN_PHI, and keeps temporary passenger/provider context in memory."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "tags": [
+    {
+      "name": "T18 Payment and ticket"
+    }
+  ],
+  "paths": {
+    "/api/booking/{maDon}/thanh-toan": {
+      "post": {
+        "tags": [
+          "T18 Payment and ticket"
+        ],
+        "operationId": "createPayment",
+        "summary": "D01 Create a payment attempt",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaDon"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInitRequest"
+              },
+              "example": {
+                "maPhuongThuc": "VNPAY"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Giao dịch mới; đọc trangThai để biết kết quả. MIEN_PHI được xác nhận nội bộ ngay.",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/PaymentLocation"
+              },
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Existing or unresolved payment attempt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/PaymentConflict"
+          },
+          "503": {
+            "description": "Provider unavailable, invalid response or missing configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "T18 Payment and ticket"
+        ],
+        "operationId": "listOrderPayments",
+        "summary": "D03 List payment attempts for an order",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaDon"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Size"
+          },
+          {
+            "name": "trangThai",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PaymentStatus"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "maGiaoDich,asc",
+                "maGiaoDich,desc"
+              ],
+              "default": "maGiaoDich,desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged payment attempts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/thanh-toan/{maGiaoDich}": {
+      "get": {
+        "tags": [
+          "T18 Payment and ticket"
+        ],
+        "operationId": "getPayment",
+        "summary": "D02 Read a payment attempt",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaGiaoDich"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current internal payment state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/thanh-toan/{maGiaoDich}/xac-minh": {
+      "post": {
+        "tags": [
+          "T18 Payment and ticket"
+        ],
+        "operationId": "verifyPayment",
+        "summary": "D06 Verify VNPay using QueryDR",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaGiaoDich"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified payment and, when eligible, atomically issued tickets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/PaymentConflict"
+          },
+          "502": {
+            "description": "Provider unavailable, invalid response or missing configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider unavailable, invalid response or missing configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/thanh-toan/callback/vnpay": {
+      "get": {
+        "tags": [
+          "T18 Payment and ticket"
+        ],
+        "operationId": "receiveVnpayIpn",
+        "summary": "D04 Receive signed VNPay IPN",
+        "description": "Public provider callback. Verify HMACSHA512, merchant, transaction reference and amount before updating. Real VNPay IPN requires public HTTPS; localhost uses signed fixtures.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VnpayTmnCode"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayTxnRef"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayAmount"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayResponseCode"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayTransactionStatus"
+          },
+          {
+            "$ref": "#/components/parameters/VnpaySecureHash"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "VNPay acknowledgement.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VnpayAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/thanh-toan/return/vnpay": {
+      "get": {
+        "tags": [
+          "T18 Payment and ticket"
+        ],
+        "operationId": "handleVnpayReturn",
+        "summary": "D07 Handle the VNPay browser return",
+        "description": "Read-only checksum/display endpoint. It never changes payment or order state and never issues tickets.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/VnpayTmnCode"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayTxnRef"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayAmount"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayResponseCode"
+          },
+          {
+            "$ref": "#/components/parameters/VnpayTransactionStatus"
+          },
+          {
+            "$ref": "#/components/parameters/VnpaySecureHash"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed return result only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VnpayReturnResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "503": {
+            "description": "Provider unavailable, invalid response or missing configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ve-xe/{maVe}": {
+      "get": {
+        "tags": [
+          "T18 Payment and ticket"
+        ],
+        "operationId": "getTicket",
+        "summary": "D05 Read an issued electronic ticket",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaVe"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Issued ticket and opaque QR token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "datvexe_session"
+      }
+    },
+    "parameters": {
+      "MaDon": {
+        "name": "maDon",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      },
+      "MaGiaoDich": {
+        "name": "maGiaoDich",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/TransactionId"
+        }
+      },
+      "MaVe": {
+        "name": "maVe",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      },
+      "CsrfToken": {
+        "name": "X-CSRF-Token",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "Size": {
+        "name": "size",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        }
+      },
+      "VnpayTmnCode": {
+        "name": "vnp_TmnCode",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        }
+      },
+      "VnpayTxnRef": {
+        "name": "vnp_TxnRef",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/TransactionId"
+        }
+      },
+      "VnpayAmount": {
+        "name": "vnp_Amount",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        }
+      },
+      "VnpayResponseCode": {
+        "name": "vnp_ResponseCode",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9]{2}$"
+        }
+      },
+      "VnpayTransactionStatus": {
+        "name": "vnp_TransactionStatus",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9]{2}$"
+        }
+      },
+      "VnpaySecureHash": {
+        "name": "vnp_SecureHash",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "headers": {
+      "TraceId": {
+        "schema": {
+          "type": "string"
+        }
+      },
+      "PaymentLocation": {
+        "schema": {
+          "type": "string",
+          "format": "uri-reference"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Missing or expired session.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Wrong role, CSRF or ownership.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "PaymentConflict": {
+        "description": "Payment, hold, provider or idempotency conflict.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40
+      },
+      "TransactionId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80
+      },
+      "MoneyVnd": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]{0,11})$"
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "CHO_XU_LY",
+          "THANH_CONG",
+          "THAT_BAI",
+          "DA_HOAN_TIEN",
+          "HOAN_TIEN_MOT_PHAN"
+        ]
+      },
+      "PaymentInitRequest": {
+        "type": "object",
+        "required": [
+          "maPhuongThuc"
+        ],
+        "properties": {
+          "maPhuongThuc": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "required": [
+          "maGiaoDich",
+          "maDon",
+          "maPhuongThuc",
+          "soTien",
+          "donViTienTe",
+          "trangThai",
+          "ketQuaCongDaXacDinh",
+          "thoiDiemTao",
+          "urlThanhToan",
+          "thoiDiemHetHan",
+          "thoiGianThanhToan",
+          "canDoiSoat"
+        ],
+        "properties": {
+          "maGiaoDich": {
+            "$ref": "#/components/schemas/TransactionId"
+          },
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maPhuongThuc": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "soTien": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "ketQuaCongDaXacDinh": {
+            "type": "boolean"
+          },
+          "thoiDiemTao": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "urlThanhToan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "thoiDiemHetHan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "thoiGianThanhToan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "canDoiSoat": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size",
+          "totalItems",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentResponse"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "totalItems": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VnpayAck": {
+        "type": "object",
+        "required": [
+          "RspCode",
+          "Message"
+        ],
+        "properties": {
+          "RspCode": {
+            "type": "string",
+            "enum": [
+              "00",
+              "01",
+              "02",
+              "04",
+              "97",
+              "99"
+            ]
+          },
+          "Message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VnpayReturnResponse": {
+        "type": "object",
+        "required": [
+          "maGiaoDich",
+          "chuKyHopLe",
+          "responseCode",
+          "transactionStatus",
+          "message"
+        ],
+        "properties": {
+          "maGiaoDich": {
+            "$ref": "#/components/schemas/TransactionId"
+          },
+          "chuKyHopLe": {
+            "type": "boolean"
+          },
+          "responseCode": {
+            "type": "string",
+            "pattern": "^[0-9]{2}$"
+          },
+          "transactionStatus": {
+            "type": "string",
+            "pattern": "^[0-9]{2}$"
+          },
+          "message": {
+            "type": "string",
+            "description": "ReturnURL only displays the result and never updates payment state."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TicketResponse": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "maDon",
+          "maChuyen",
+          "maGhe",
+          "hoTenHanhKhach",
+          "trangThai",
+          "giaGoc",
+          "tienGiam",
+          "thanhTien",
+          "donViTienTe",
+          "qrToken",
+          "thoiDiemPhatHanh"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "hoTenHanhKhach": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "soDienThoaiHanhKhach": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20
+          },
+          "cccdHanhKhach": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20
+          },
+          "trangThai": {
+            "type": "string",
+            "enum": [
+              "DA_XUAT_VE",
+              "DA_LEN_XE",
+              "DA_HOAN",
+              "DA_HUY"
+            ]
+          },
+          "giaGoc": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tienGiam": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "thanhTien": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "qrToken": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque token without PII."
+          },
+          "thoiDiemPhatHanh": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "details",
+          "timestamp",
+          "traceId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

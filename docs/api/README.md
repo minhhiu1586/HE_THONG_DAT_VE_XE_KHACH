@@ -6,7 +6,7 @@
 
 **Trạng thái:** Bản báo cáo để nhóm xem xét và thống nhất trước khi triển khai.
 
-Mục tiêu: thống nhất cách frontend gửi yêu cầu, backend trả dữ liệu và xử lý lỗi. Phạm vi gồm 29 API thuộc nhóm A–F; không bổ sung chức năng quản trị khuyến mãi hoặc báo cáo kinh doanh. Tài liệu mô tả thiết kế mục tiêu, chưa xác nhận các API đã hoạt động.
+Mục tiêu: thống nhất cách frontend gửi yêu cầu, backend trả dữ liệu và xử lý lỗi. Phạm vi gồm 31 API thuộc nhóm A–F; không bổ sung chức năng quản trị khuyến mãi hoặc báo cáo kinh doanh. Tài liệu mô tả thiết kế mục tiêu; tình trạng triển khai và kiểm thử được ghi riêng trong tài liệu từng module.
 
 Bộ tài liệu gồm:
 
@@ -20,6 +20,7 @@ Bộ tài liệu gồm:
 - **[payment-discount.md](payment-discount.md)** và **[payment-discount-openapi.json](payment-discount-openapi.json)**: API khuyến mãi, phương thức thanh toán và báo cáo kiểm thử T14.
 - **[booking-order.md](booking-order.md)** và **[booking-order-openapi.json](booking-order-openapi.json)**: hợp đồng chi tiết cho luồng giữ chỗ và đơn đặt vé T16; tài liệu này có thẩm quyền với B01–B08 đã triển khai.
 - **[booking-pricing.md](booking-pricing.md)** và **[booking-pricing-openapi.json](booking-pricing-openapi.json)**: hợp đồng T17 cho báo giá, chốt giá và phân bổ giảm giá; C01/C02 dùng chung đơn T16.
+- **[payment-vnpay.md](payment-vnpay.md)** và **[payment-vnpay-openapi.json](payment-vnpay-openapi.json)**: thanh toán VNPay, xác minh QueryDR và phát hành vé T18; D01–D07.
 - **README.md**: quy ước chung, cách xử lý lỗi và các điểm cần thống nhất.
 - **[api-contract.md](api-contract.md)**: danh sách API, request/response và dữ liệu mẫu ngay trong từng nhóm.
 - **[openapi.yaml](openapi.yaml)**: kiểu dữ liệu, trường bắt buộc, giá trị null và ví dụ chi tiết để xem bằng công cụ hỗ trợ OpenAPI/Swagger. https://editor.swagger.io/
@@ -31,7 +32,7 @@ Bộ tài liệu gồm:
 | A | Tìm chuyến, chi tiết, ghế và giá tham khảo | 6 |
 | B | Giữ chỗ và đơn đặt vé | 7 |
 | C | Báo giá, chốt giá và phương thức thanh toán | 3 |
-| D | Thanh toán và vé điện tử | 5 |
+| D | Thanh toán và vé điện tử | 7 |
 | E | Hủy vé và hoàn tiền | 5 |
 | F | Xác minh vé và xác nhận lên xe | 3 |
 
@@ -131,7 +132,7 @@ Khóa này không thay cho transaction hoặc ràng buộc chống đặt trùng
 
 Backend kiểm tra chữ ký, tham chiếu giao dịch, số tiền/tiền tệ, kết quả cổng, trạng thái đơn và hạn giữ. Có URL thanh toán hoặc trình duyệt quay về trang thành công chưa chứng minh đã thu tiền hay được phát hành vé.
 
-D04 chờ chọn cổng sandbox, vì vậy chưa chốt method, payload, chữ ký hoặc ACK. Callback muộn vẫn phải ghi nhận kết quả tài chính. Phương án không phát hành vé, chuyển tra soát/hoàn tiền là **đề xuất chưa duyệt**; không tự tái giữ ghế.
+D04 dùng VNPay IPN qua GET, kiểm tra HMACSHA512 và trả ACK theo cổng. ReturnURL D07 chỉ thông báo; D06 xác minh qua QueryDR khi chạy localhost. Thanh toán thành công sau hết hạn hoặc khi mất dữ liệu hành khách tạm vẫn được ghi nhận, không phát hành vé và trả `canDoiSoat: true`; xử lý hoàn/đối soát thuộc bước sau. Xem giới hạn demo và kết quả thực chạy trong [payment-vnpay.md](payment-vnpay.md).
 
 ## 10. Dữ liệu mẫu và những điểm cần thống nhất
 
@@ -146,7 +147,7 @@ Các điểm cần nhóm xác nhận:
 | Đơn nháp | T16 dùng liên hệ bắt buộc trong B01–B08; T17 cần đọc và xác thực danh sách hành khách hiện có trong HTTP session trước khi chốt giá. |
 | Giá và khuyến mãi | T17 đã chốt làm tròn, giữ/trả lượt và sửa/chốt lại trong [booking-pricing.md](booking-pricing.md). Phạm vi mã theo nhà xe/tuyến chưa được mô hình hỗ trợ. |
 | Chuyến chưa gán xe | Đề xuất chi tiết cho phép null, từ chối giữ ghế; chưa có xe thì từ chối trả sơ đồ ghế. |
-| Thanh toán và hoàn | Cổng sandbox, callback muộn, chính sách/phí hoàn và thời điểm bán lại ghế. |
+| Hoàn tiền | Chính sách/phí hoàn, xử lý các giao dịch cần đối soát và thời điểm bán lại ghế. |
 
 Các điểm này cần nhóm thống nhất trước triển khai phần liên quan; không tự bổ sung enum hay thay sơ đồ lớp theo ví dụ.
 
