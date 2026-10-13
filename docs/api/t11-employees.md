@@ -56,7 +56,7 @@ python tests/backend/project_data_check.py --check-reload
 - Guard T07.1 bổ sung quyền/path nhân viên, phân biệt ID tạo mới với ID tài nguyên cũ; giữ kiểm tra nhà xe theo tài khoản thật.
 - `VehicleService` dùng `AssignmentRules`; `RouteTripService` gọi lại kiểm tra khi đổi xe/giờ. Fixture test xe/chuyến dùng lịch về đúng bến.
 - T12 gọi `AssignmentRules.validateTrip(em, trip)` khi cập nhật, `readyForOperation(em, trip)` trước mở bán trong transaction của T12. Kiểm tra xe dùng `validateVehicleSchedule`; không tạo bộ quy tắc thứ hai.
-- Không triển khai lại T12: bộ dữ liệu gọi API mở bán T12 hiện có. Không triển khai giữ ghế/tạo đơn thay task khác; checkout hiện gọi API chưa có nên seed không thể làm phát sinh vé thật.
+- Bộ dữ liệu gọi API mở bán T12 hiện có. API giữ ghế/đơn nháp sau merge thuộc T16; checkout cần dùng hợp đồng `/api/booking/...` trong `booking-order.md`.
 
 ## Kiểm tra và hướng dẫn sử dụng
 

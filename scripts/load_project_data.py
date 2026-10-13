@@ -37,8 +37,8 @@ def main():
     exists = sql(f"SELECT count(*) FROM pg_database WHERE datname='{args.database}'", 'postgres')
     if exists != '1':
         sql(f'CREATE DATABASE "{args.database}"', 'postgres')
-    schema = '\n'.join((ROOT / 'docs/database/schema' / file).read_text(encoding='utf-8') for file in
-                       ('001_route_trip.sql', '002_vehicle_alignment.sql', '003_account_auth.sql'))
+    schema = '\n'.join(file.read_text(encoding='utf-8') for file in
+                       sorted((ROOT / 'docs/database/schema').glob('[0-9][0-9][0-9]_*.sql')))
     data = '\n'.join((ROOT / 'docs/database/seed' / file).read_text(encoding='utf-8') for file in SEEDS)
     data = re.sub(r'^(BEGIN|COMMIT);\s*$', '', data, flags=re.M)
     sql('BEGIN;\n' + schema + '\n' + data + '\nCOMMIT;')

@@ -40,7 +40,7 @@ Mỗi nhà xe có 1 xe tuyến ngắn đi-về trong ngày (1 tài xế + 1 ph�
 
 Chỉ mở bán sau kiểm tra nhà xe, bến, xe/ghế, đăng kiểm, lịch và nhân sự. Dấu kế hoạch của dữ liệu khởi tạo không chứng nhận giờ lái thực tế; điều phối cần rà soát trước vận hành.
 
-Code hiện có hỗ trợ tìm chuyến, mở bán và đọc ghế trống. Chưa có API giữ ghế/tạo đơn mà checkout đang gọi; không tạo đơn/vé/thanh toán giả để thay thế phần này. Chỉ có danh mục VNPAY, không ghi sẵn giao dịch VNPAY thành công.
+Code sau merge có API giữ ghế và đơn nháp tại `/api/booking/...`, xem `docs/api/booking-order.md`. Checkout cần dùng đúng hợp đồng này. Danh mục VNPAY đã có; giao dịch và vé phát sinh từ nghiệp vụ, không khởi tạo sẵn thanh toán thành công.
 
 ## Ghi chú riêng database: đã có và còn thiếu
 

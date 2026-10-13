@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { getTrip, getTripSeats, type SearchTrip, type HoldSeatResponse } from "@/lib/api";
@@ -21,6 +21,7 @@ export default function SeatsPage() {
 
   // State mới để khóa nút bấm khi đang gọi API giữ ghế
   const [isHolding, setIsHolding] = useState(false);
+  const holdAttempt = useRef<{ body: string; key: string } | null>(null);
 
  useEffect(() => {
     getTrip(tripId) // Sửa api.trip thành getTrip
@@ -52,10 +53,13 @@ export default function SeatsPage() {
     setIsHolding(true);
     try {
       // Gọi trực tiếp hàm holdSeats
-      const response = await request<HoldSeatResponse>('/booking/hold', 'POST', {
+      const body = {
         maChuyen: tripId,
         danhSachMaGhe: booking.selectedSeats,
-      });
+      };
+      const fingerprint = JSON.stringify(body);
+      if (holdAttempt.current?.body !== fingerprint) holdAttempt.current = { body: fingerprint, key: crypto.randomUUID() };
+      const response = await request<HoldSeatResponse>('/booking/hold', 'POST', body, { 'Idempotency-Key': holdAttempt.current.key });
 
       // Lưu mã đơn và thời gian hết hạn vào Store
       bookingStore.setHoldSession(response.maDon, response.thoiDiemHetHan);

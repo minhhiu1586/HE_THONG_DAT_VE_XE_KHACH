@@ -16,7 +16,9 @@ Sơ đồ hiển thị dựa trên số chỗ, tầng và vị trí hiện có t
 
 ## Phần giữ ghế và checkout
 
-Giữ ghế dùng POST `/api/booking/hold` qua phiên đăng nhập/CSRF hiện có. Backend trả `maDon` dạng HOLD-… là mã phiên giữ ghế; hiện không tạo bản ghi DonDatVe. Checkout đang gọi `/api/giu-cho` và các API `/api/don-dat-ve/...` khác với hợp đồng này. Cần module đặt vé thống nhất hợp đồng đơn/phiên giữ trước khi nghiệm thu đặt vé và thanh toán; kết quả kiểm chọn ghế không chứng minh checkout đã hoàn thành.
+Sau merge, giữ ghế dùng POST `/api/booking/hold`, tạo đơn nháp thật và trả mã đơn. Frontend gửi cookie/CSRF cùng Idempotency-Key; retry cùng nội dung giữ nguyên key. Xem hợp đồng mới tại [booking-order.md](booking-order.md). Checkout vẫn gọi `/api/giu-cho` và `/api/don-dat-ve/...` thay vì `/api/booking/...`; cần cập nhật giao diện checkout theo T16 trước khi nghiệm thu toàn bộ đặt vé/thanh toán.
+
+Kiểm tra sau merge: migration 001–005 đạt; backend Maven package đạt (94 test đạt, 14 test tùy chọn bỏ qua); frontend build/TypeScript đạt; 52 HTTP checks T11 và 58 HTTP assertions T16 đạt. Kiểm tra backend T16 không thay thế nghiệm thu UI checkout.
 
 ## Tự kiểm trên web
 
