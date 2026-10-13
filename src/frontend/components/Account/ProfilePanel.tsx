@@ -33,10 +33,11 @@ export default function ProfilePanel() {
     finally { sending.current = false; setBusy(false); }
   }
   if (loading || !user) return <div className={styles.page}><p role="status">Đang kiểm tra phiên đăng nhập…</p></div>;
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${styles.profile}`}>
+    <header className={styles.profileHeading}><p className={styles.eyebrow}>TÀI KHOẢN CỦA BẠN</p><h1>Hồ sơ cá nhân</h1><p>Quản lý thông tin và bảo mật tài khoản.</p></header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {success && <p className={styles.success} role="status">{success}</p>}
-    <section className={styles.card}><h1>Hồ sơ cá nhân</h1><p className={styles.muted}>Vai trò: {roles[user.loaiTaiKhoan]}</p>
+    <section className={styles.card}><h2>Thông tin cá nhân</h2><p className={styles.muted}>Vai trò: {roles[user.loaiTaiKhoan]}</p>
       <form onInvalid={vietnameseValidation} onInput={clearValidation} className={styles.form} onSubmit={event => submit(event)} key={user.maNguoiDung + user.email + user.soDienThoai}>
         <label>Họ tên<input name="hoTen" defaultValue={user.hoTen} autoComplete="name" maxLength={160} required /></label>
         <label>Email<input name="email" type="email" defaultValue={user.email} autoComplete="email" maxLength={254} required /></label>
