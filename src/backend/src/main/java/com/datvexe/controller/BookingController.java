@@ -7,6 +7,7 @@ import com.datvexe.dto.BookingDto.OrderResponse;
 import com.datvexe.dto.BookingDto.PassengerRequest;
 import com.datvexe.dto.HoldSeatRequest;
 import com.datvexe.dto.HoldSeatResponse;
+import com.datvexe.dto.PricingDto;
 import com.datvexe.security.AccountException;
 import com.datvexe.security.RequestIdentity;
 import com.datvexe.service.BookingService;
@@ -129,6 +130,29 @@ public class BookingController extends HttpServlet {
             write(response, result);
             return;
         }
+        if (route.kind() == Kind.QUOTE) {
+            JsonNode body = readObject(request, Set.of("maKhuyenMai"));
+            checkStrings(body, "maKhuyenMai");
+            PricingDto.QuoteSnapshot snapshot = service.baoGia(
+                    route.maDon(),
+                    convert(body, PricingDto.QuoteRequest.class),
+                    passengers(request, route.maDon()));
+            BookingSession.saveQuote(session(request), userId(request), route.maDon(), snapshot);
+            writeJson(response, HttpServletResponse.SC_OK, snapshot.response());
+            return;
+        }
+        if (route.kind() == Kind.FREEZE) {
+            JsonNode body = readObject(request, Set.of("maBaoGia"));
+            checkStrings(body, "maBaoGia");
+            BookingDto.Result result = service.chotGia(
+                    route.maDon(),
+                    convert(body, PricingDto.FreezeRequest.class),
+                    request.getHeader("Idempotency-Key"),
+                    passengers(request, route.maDon()),
+                    BookingSession.quote(session(request), userId(request), route.maDon()));
+            write(response, result);
+            return;
+        }
         requireEmptyBody(request, "Hủy đơn chỉ nhận body vắng hoặc object rỗng.");
         writeOrder(request, response, route,
                 service.cancelOrder(route.maDon(), request.getHeader("Idempotency-Key")));
@@ -213,6 +237,8 @@ public class BookingController extends HttpServlet {
                 case "doi-ghe" -> Kind.CHANGE_SEAT;
                 case "khuyen-mai" -> Kind.PROMOTION;
                 case "huy" -> Kind.CANCEL;
+                case "bao-gia" -> Kind.QUOTE;
+                case "chot-gia" -> Kind.FREEZE;
                 default -> null;
             };
             if (kind != null) return new Route(kind, part[0], null);
@@ -305,6 +331,7 @@ public class BookingController extends HttpServlet {
             BookingDto.Result result) throws IOException {
         if (result.status() < 400 && result.body() instanceof OrderResponse order) {
             storePassengers(request, route, order);
+            clearQuoteAfterMutation(request, route);
         }
         write(response, result);
     }
@@ -321,6 +348,8 @@ public class BookingController extends HttpServlet {
 
         if (result.status() < 400 && result.body() instanceof OrderResponse order) {
             storePassengers(request, route, order);
+            // PATCH is routed through the order resource, so invalidate explicitly.
+            BookingSession.clearQuote(session(request), userId(request), route.maDon());
             String responseBody = json.writeValueAsString(order);
             BookingSession.cachePatchResponse(session, userId, path, key, responseBody);
             writeSerializedJson(response, result.status(), responseBody);
@@ -337,9 +366,21 @@ public class BookingController extends HttpServlet {
     }
 
     private void storePassengers(HttpServletRequest request, Route route, OrderResponse order) {
-        List<PassengerRequest> passengers = order.trangThaiDon() == TrangThaiDon.CHO_XU_LY
+        List<PassengerRequest> passengers = Set.of(TrangThaiDon.CHO_XU_LY, TrangThaiDon.CHO_THANH_TOAN)
+                .contains(order.trangThaiDon())
                 ? order.hanhKhach() : List.of();
         BookingSession.update(session(request), userId(request), route.maDon(), passengers);
+    }
+
+    /** A successful real mutation invalidates the volatile quote after its transaction commits. */
+    private void clearQuoteAfterMutation(HttpServletRequest request, Route route) {
+        if (route.kind() == Kind.PASSENGERS
+                || route.kind() == Kind.CHANGE_SEAT
+                || route.kind() == Kind.SEAT
+                || route.kind() == Kind.PROMOTION
+                || route.kind() == Kind.CANCEL) {
+            BookingSession.clearQuote(session(request), userId(request), route.maDon());
+        }
     }
 
     private void setHoldLocation(HttpServletRequest request, HttpServletResponse response, BookingDto.Result result) {
@@ -391,7 +432,7 @@ public class BookingController extends HttpServlet {
         return AccountException.invalid(field, message);
     }
 
-    private enum Kind { HOLD, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL }
+    private enum Kind { HOLD, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL, QUOTE, FREEZE }
 
     private record Route(Kind kind, String maDon, String maGhe) {
         boolean allows(String method) {
@@ -401,7 +442,7 @@ public class BookingController extends HttpServlet {
                 case PASSENGERS, CHANGE_SEAT -> method.equals("PUT");
                 case SEAT -> method.equals("DELETE");
                 case PROMOTION -> Set.of("PUT", "DELETE").contains(method);
-                case CANCEL -> method.equals("POST");
+                case CANCEL, QUOTE, FREEZE -> method.equals("POST");
             };
         }
 
@@ -412,7 +453,7 @@ public class BookingController extends HttpServlet {
                 case PASSENGERS, CHANGE_SEAT -> "PUT, OPTIONS";
                 case SEAT -> "DELETE, OPTIONS";
                 case PROMOTION -> "PUT, DELETE, OPTIONS";
-                case CANCEL -> "POST, OPTIONS";
+                case CANCEL, QUOTE, FREEZE -> "POST, OPTIONS";
             };
         }
     }

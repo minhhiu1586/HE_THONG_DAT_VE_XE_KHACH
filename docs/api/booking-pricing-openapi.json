@@ -1,0 +1,98 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Booking pricing API",
+    "version": "0.1.0",
+    "description": "T17 quote and freeze-price contract. This module reuses T16 orders and session passengers; it does not create ticket rows or modify the class diagram. Promotions are global because the diagram has no operator or route scope fields. T17 stores order aggregates and snapshot lines; it does not add per-ticket price columns. Passenger data is session-only, so a T18 payment callback cannot assume the session still exists. Original ticket rows and order aggregates survive partial refunds. See booking-pricing.md."
+  },
+  "servers": [{"url": "http://localhost:8080"}],
+  "tags": [{"name": "T17 Pricing"}],
+  "paths": {
+    "/api/booking/{maDon}/bao-gia": {
+      "parameters": [{"$ref": "#/components/parameters/MaDon"}],
+      "post": {
+        "tags": ["T17 Pricing"],
+        "operationId": "previewBookingPrice",
+        "summary": "C01 Preview price and promotion",
+        "description": "KHACH_HANG owner only. Requires all passenger data in the current HTTP session. Does not reserve promotion quota.",
+        "security": [{"cookieAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/QuoteRequest"}, "examples": {"withPromotion": {"value": {"maKhuyenMai": "KM10"}}, "withoutPromotion": {"value": {}}}}}},
+        "responses": {
+          "200": {"description": "Quote calculated by the server.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/QuoteResponse"}, "examples": {"withPromotion": {"value": {"maBaoGia": "BG01", "maDon": "DDV01", "donViTienTe": "VND", "thoiDiemBaoGia": "2026-10-13T09:32:00+07:00", "thoiDiemHetHan": "2026-10-13T09:45:00+07:00", "tongTienGoc": "400000", "tongTienGiam": "40000", "tongThanhToan": "360000", "chiTietGia": [{"maGhe": "G11", "giaGoc": "200000", "tienGiam": "20000", "thanhTien": "180000"}, {"maGhe": "G12", "giaGoc": "200000", "tienGiam": "20000", "thanhTien": "180000"}], "ketQuaKhuyenMai": {"hopLe": true, "duocGiam": "40000"}}}, "withoutPromotion": {"value": {"maBaoGia": "BG02", "maDon": "DDV01", "donViTienTe": "VND", "thoiDiemBaoGia": "2026-10-13T09:32:10+07:00", "thoiDiemHetHan": "2026-10-13T09:45:00+07:00", "tongTienGoc": "400000", "tongTienGiam": "0", "tongThanhToan": "400000", "chiTietGia": [{"maGhe": "G11", "giaGoc": "200000", "tienGiam": "0", "thanhTien": "200000"}, {"maGhe": "G12", "giaGoc": "200000", "tienGiam": "0", "thanhTien": "200000"}], "ketQuaKhuyenMai": null}}}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {"$ref": "#/components/responses/QuoteConflict"}
+        }
+      }
+    },
+    "/api/booking/{maDon}/chot-gia": {
+      "parameters": [{"$ref": "#/components/parameters/MaDon"}],
+      "post": {
+        "tags": ["T17 Pricing"],
+        "operationId": "freezeBookingPrice",
+        "summary": "C02 Freeze a quoted price",
+        "description": "KHACH_HANG owner only. Revalidates the quote and promotion in one transaction, then changes the order to CHO_THANH_TOAN. Holds remain DANG_GIU; no ticket is created.",
+        "security": [{"cookieAuth": []}],
+        "parameters": [{"$ref": "#/components/parameters/CsrfToken"}, {"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FreezePriceRequest"}, "example": {"maBaoGia": "BG01"}}}},
+        "responses": {
+          "200": {"description": "Price frozen and order moved to CHO_THANH_TOAN.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FreezePriceResponse"}, "example": {"maBaoGia": "BG01", "maDon": "DDV01", "trangThaiDon": "CHO_THANH_TOAN", "donViTienTe": "VND", "thoiDiemHetHan": "2026-10-13T09:45:00+07:00", "tongTienGoc": "400000", "tongTienGiam": "40000", "tongThanhToan": "360000", "chiTietGia": [{"maGhe": "G11", "giaGoc": "200000", "tienGiam": "20000", "thanhTien": "180000"}, {"maGhe": "G12", "giaGoc": "200000", "tienGiam": "20000", "thanhTien": "180000"}], "ketQuaKhuyenMai": {"hopLe": true, "duocGiam": "40000"}}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {"$ref": "#/components/responses/QuoteConflict"}
+        }
+      }
+    },
+    "/api/booking/{maDon}": {
+      "parameters": [{"$ref": "#/components/parameters/MaDon"}],
+      "get": {
+        "tags": ["T17 Pricing"],
+        "operationId": "getBookingPriceSnapshot",
+        "summary": "B05 Get an order and frozen price",
+        "description": "The existing T16 GET returns giaDaChot null before freeze. A live frozen order returns only the persisted money summary and price lines; the response has no quote version or quote timestamp.",
+        "security": [{"cookieAuth": []}],
+        "responses": {
+          "200": {"description": "Current order and optional frozen price.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderResponse"}}}},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {"$ref": "#/components/responses/QuoteConflict"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"cookieAuth": {"type": "apiKey", "in": "cookie", "name": "datvexe_session"}},
+    "parameters": {
+      "MaDon": {"name": "maDon", "in": "path", "required": true, "schema": {"$ref": "#/components/schemas/Id"}},
+      "CsrfToken": {"name": "X-CSRF-Token", "in": "header", "required": true, "schema": {"type": "string"}},
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 128}}
+    },
+    "responses": {
+      "BadRequest": {"description": "Invalid request body.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "Unauthorized": {"description": "Authentication required.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "Forbidden": {"description": "Wrong role or order owner.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "NotFound": {"description": "Order not found.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "QuoteConflict": {"description": "Quote expired, price changed, hold expired, or promotion quota is exhausted.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+    },
+    "schemas": {
+      "Id": {"type": "string", "minLength": 1, "maxLength": 40},
+      "Timestamp": {"type": "string", "format": "date-time"},
+      "MoneyVnd": {"type": "string", "pattern": "^(0|[1-9][0-9]*)$", "description": "Non-negative integer VND serialized as a string."},
+      "QuoteRequest": {"type": "object", "properties": {"maKhuyenMai": {"type": ["string", "null"], "minLength": 1, "maxLength": 40}}, "additionalProperties": false},
+      "FreezePriceRequest": {"type": "object", "required": ["maBaoGia"], "properties": {"maBaoGia": {"$ref": "#/components/schemas/Id"}}, "additionalProperties": false},
+      "PriceLine": {"type": "object", "required": ["maGhe", "giaGoc", "tienGiam", "thanhTien"], "properties": {"maGhe": {"$ref": "#/components/schemas/Id"}, "giaGoc": {"$ref": "#/components/schemas/MoneyVnd"}, "tienGiam": {"$ref": "#/components/schemas/MoneyVnd"}, "thanhTien": {"$ref": "#/components/schemas/MoneyVnd"}}, "additionalProperties": false},
+      "PromotionResult": {"type": ["object", "null"], "required": ["hopLe", "duocGiam"], "properties": {"hopLe": {"type": "boolean"}, "duocGiam": {"$ref": "#/components/schemas/MoneyVnd"}}, "additionalProperties": false},
+      "QuoteResponse": {"type": "object", "description": "C01 preview may retain exact decimal precision in the legacy T16 giaTamTinh; T17 C01/C02 round the total discount HALF_UP and serialize frozen money as integer VND strings.", "required": ["maBaoGia", "maDon", "donViTienTe", "thoiDiemBaoGia", "thoiDiemHetHan", "tongTienGoc", "tongTienGiam", "tongThanhToan", "chiTietGia", "ketQuaKhuyenMai"], "properties": {"maBaoGia": {"$ref": "#/components/schemas/Id"}, "maDon": {"$ref": "#/components/schemas/Id"}, "donViTienTe": {"type": "string", "const": "VND"}, "thoiDiemBaoGia": {"$ref": "#/components/schemas/Timestamp"}, "thoiDiemHetHan": {"$ref": "#/components/schemas/Timestamp"}, "tongTienGoc": {"$ref": "#/components/schemas/MoneyVnd"}, "tongTienGiam": {"$ref": "#/components/schemas/MoneyVnd"}, "tongThanhToan": {"$ref": "#/components/schemas/MoneyVnd"}, "chiTietGia": {"type": "array", "items": {"$ref": "#/components/schemas/PriceLine"}}, "ketQuaKhuyenMai": {"$ref": "#/components/schemas/PromotionResult"}}, "additionalProperties": false},
+      "FreezePriceResponse": {"type": "object", "required": ["maBaoGia", "maDon", "trangThaiDon", "donViTienTe", "thoiDiemHetHan", "tongTienGoc", "tongTienGiam", "tongThanhToan", "chiTietGia", "ketQuaKhuyenMai"], "properties": {"maBaoGia": {"$ref": "#/components/schemas/Id"}, "maDon": {"$ref": "#/components/schemas/Id"}, "trangThaiDon": {"type": "string", "const": "CHO_THANH_TOAN"}, "donViTienTe": {"type": "string", "const": "VND"}, "thoiDiemHetHan": {"$ref": "#/components/schemas/Timestamp"}, "tongTienGoc": {"$ref": "#/components/schemas/MoneyVnd"}, "tongTienGiam": {"$ref": "#/components/schemas/MoneyVnd"}, "tongThanhToan": {"$ref": "#/components/schemas/MoneyVnd"}, "chiTietGia": {"type": "array", "items": {"$ref": "#/components/schemas/PriceLine"}}, "ketQuaKhuyenMai": {"$ref": "#/components/schemas/PromotionResult"}}, "additionalProperties": false},
+      "FrozenPrice": {"type": "object", "description": "Persisted frozen totals and lines. It has no quote version or quote timestamp; B05 derives the current summary from the frozen lines. T17 does not add per-ticket price columns.", "required": ["donViTienTe", "tongTienGoc", "tongTienGiam", "tongThanhToan", "chiTietGia"], "properties": {"donViTienTe": {"type": "string", "const": "VND"}, "tongTienGoc": {"$ref": "#/components/schemas/MoneyVnd"}, "tongTienGiam": {"$ref": "#/components/schemas/MoneyVnd"}, "tongThanhToan": {"$ref": "#/components/schemas/MoneyVnd"}, "chiTietGia": {"type": "array", "items": {"$ref": "#/components/schemas/PriceLine"}}}, "additionalProperties": false},
+      "OrderResponse": {"type": "object", "description": "T16 OrderResponse extended with giaDaChot. danhSachVe is empty until T18 issuance.", "required": ["maDon", "trangThaiDon", "giaDaChot"], "properties": {"maDon": {"$ref": "#/components/schemas/Id"}, "trangThaiDon": {"type": "string"}, "giaDaChot": {"anyOf": [{"$ref": "#/components/schemas/FrozenPrice"}, {"type": "null"}]}}, "additionalProperties": true},
+      "ErrorResponse": {"type": "object", "required": ["code", "message", "details", "timestamp", "traceId"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "details": {"type": "object"}, "timestamp": {"$ref": "#/components/schemas/Timestamp"}, "traceId": {"type": "string"}}, "additionalProperties": false}
+    }
+  }
+}

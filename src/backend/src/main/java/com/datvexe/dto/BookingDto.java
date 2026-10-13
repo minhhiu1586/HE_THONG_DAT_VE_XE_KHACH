@@ -64,7 +64,7 @@ public final class BookingDto {
             List<TicketResponse> danhSachVe,
             PricePreview giaTamTinh,
             boolean coTheChotGia,
-            Object giaDaChot,
+            PricingDto.PriceSummary giaDaChot,
             List<String> thongBao) {}
 
     public record Result(int status, Object body) {}

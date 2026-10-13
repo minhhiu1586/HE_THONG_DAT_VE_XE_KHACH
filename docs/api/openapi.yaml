@@ -6,7 +6,8 @@ info:
     Hợp đồng mục tiêu A–F; API booking T16 đã triển khai được đánh dấu implemented.
     D04 chưa có phương thức và operation
     đang chờ nhóm thống nhất. Bản cập nhật ngày 2026-10-13 phản ánh API booking T16;
-    các phần còn lại giữ hợp đồng mục tiêu. Enum bám theo class diagram đã chốt.
+    T17 bổ sung hợp đồng C01/C02 cho báo giá và chốt giá; xem booking-pricing.md.
+    Các phần còn lại giữ hợp đồng mục tiêu. Enum bám theo class diagram đã chốt.
     Những lựa chọn chưa chốt, gồm trạng thái khả dụng ghế và quy trình hoàn tiền,
     được đánh dấu trong tài liệu. T07 bổ sung phiên cookie datvexe_session;
     xem account-auth.md và account-openapi.yaml. Quyền nghiệp vụ A–F cần tích hợp T07.1.
@@ -609,8 +610,10 @@ paths:
       description: |-
         Tính báo giá xem trước; không giữ lượt khuyến mãi. Báo giá gắn với đơn và không vượt thời hạn giữ chỗ.
         Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn; máy chủ tính giá, không nhận giá do client tự tính.
+        Mã khuyến mãi là phạm vi dùng chung; diagram chưa có trường để giới hạn theo nhà xe hoặc tuyến.
+        T16 có thể trả preview thập phân chính xác; T17 làm tròn tổng giảm HALF_UP khi chốt.
       x-api-id: C01
-      x-contract-status: proposed
+      x-contract-status: implemented
       x-roles: [KH]
       security: [{cookieAuth: []}]
       x-authentication-required: true
@@ -647,13 +650,13 @@ paths:
                     donViTienTe: VND
                     thoiDiemBaoGia: '2026-10-11T09:32:00+07:00'
                     thoiDiemHetHan: '2026-10-11T09:45:00+07:00'
-                    tongTienGoc: '500000'
-                    tongTienGiam: '50000'
-                    tongThanhToan: '450000'
+                    tongTienGoc: '400000'
+                    tongTienGiam: '40000'
+                    tongThanhToan: '360000'
                     chiTietGia:
                       - {maGhe: G11, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}
-                      - {maGhe: G12, giaGoc: '300000', tienGiam: '30000', thanhTien: '270000'}
-                    ketQuaKhuyenMai: {hopLe: true, duocGiam: '50000'}
+                      - {maGhe: G12, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}
+                    ketQuaKhuyenMai: {hopLe: true, duocGiam: '40000'}
                 noPromotion:
                   value:
                     maBaoGia: BG02
@@ -661,12 +664,12 @@ paths:
                     donViTienTe: VND
                     thoiDiemBaoGia: '2026-10-11T09:32:10+07:00'
                     thoiDiemHetHan: '2026-10-11T09:45:00+07:00'
-                    tongTienGoc: '500000'
+                    tongTienGoc: '400000'
                     tongTienGiam: '0'
-                    tongThanhToan: '500000'
+                    tongThanhToan: '400000'
                     chiTietGia:
                       - {maGhe: G11, giaGoc: '200000', tienGiam: '0', thanhTien: '200000'}
-                      - {maGhe: G12, giaGoc: '300000', tienGiam: '0', thanhTien: '300000'}
+                      - {maGhe: G12, giaGoc: '200000', tienGiam: '0', thanhTien: '200000'}
                     ketQuaKhuyenMai: null
         '400':
           description: Dữ liệu body không hợp lệ.
@@ -695,14 +698,17 @@ paths:
       operationId: chotGia
       summary: "[C02] Chốt snapshot giá đơn"
       description: |-
-        Chốt đúng báo giá đã gửi; không tự tính hoặc chốt một giá khác. Việc giữ quota khuyến mãi nguyên tử là đề xuất đang chờ xác nhận.
+        Chốt đúng báo giá đã gửi; không tự tính hoặc chốt một giá khác. C02 kiểm tra lại quota trong cùng transaction,
+        chuyển đơn sang CHO_THANH_TOAN và giữ các ghế ở DANG_GIU; không tạo vé.
+        Mã khuyến mãi không có phạm vi riêng theo nhà xe hoặc tuyến vì diagram không có trường scope.
+        Database chỉ lưu tổng gốc, tổng giảm và mã áp dụng trên đơn; dòng phân bổ được dựng lại từ dữ liệu đã chốt.
         Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn.
       x-api-id: C02
-      x-contract-status: proposed
+      x-contract-status: implemented
       x-roles: [KH]
       security: [{cookieAuth: []}]
       x-authentication-required: true
-      x-ownership: Chỉ chủ đơn; cập nhật snapshot nguyên tử theo đề xuất đang chờ xác nhận.
+      x-ownership: Chỉ chủ đơn; cập nhật snapshot nguyên tử và quota logic trong một transaction.
       parameters:
         - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaDon'}
@@ -732,14 +738,13 @@ paths:
                     maBaoGia: BG01
                     maDon: DDV01
                     donViTienTe: VND
-                    thoiDiemBaoGia: '2026-10-11T09:32:00+07:00'
+                    trangThaiDon: CHO_THANH_TOAN
                     thoiDiemHetHan: '2026-10-11T09:45:00+07:00'
-                    tongTienGoc: '500000'
-                    tongTienGiam: '50000'
-                    tongThanhToan: '450000'
-                    chiTietGia: [{maGhe: G11, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}, {maGhe: G12, giaGoc: '300000', tienGiam: '30000', thanhTien: '270000'}]
-                    ketQuaKhuyenMai: {hopLe: true, duocGiam: '50000'}
-                    phienBanGia: 1
+                    tongTienGoc: '400000'
+                    tongTienGiam: '40000'
+                    tongThanhToan: '360000'
+                    chiTietGia: [{maGhe: G11, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}, {maGhe: G12, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}]
+                    ketQuaKhuyenMai: {hopLe: true, duocGiam: '40000'}
         '400':
           description: Dữ liệu body không hợp lệ.
           headers:
@@ -813,10 +818,10 @@ paths:
             schema: {$ref: '#/components/schemas/PaymentInitRequest'}
             examples:
               init:
-                value: {maPhuongThuc: PT01, phienBanGia: 1}
+                value: {maPhuongThuc: PT01}
             x-invalid-examples:
               invalidPriceVersion:
-                value: {maPhuongThuc: PT01, phienBanGia: 0}
+                value: {maPhuongThuc: PT01, extra: 0}
       responses:
         '201':
           description: Lần thanh toán và resource khởi tạo đã tạo; chưa đồng nghĩa tiền đã thanh toán.
@@ -828,7 +833,7 @@ paths:
               schema: {$ref: '#/components/schemas/PaymentResponse'}
               examples:
                 initialized:
-                  value: {maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '450000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: 'https://pay.example/checkout/GD01', thoiDiemHetHan: '2026-10-11T09:45:00+07:00'}
+                  value: {maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '360000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: 'https://pay.example/checkout/GD01', thoiDiemHetHan: '2026-10-11T09:45:00+07:00'}
         '202':
           description: Đã ghi nhận ID nhưng kết quả khởi tạo chưa xác định; client tra cứu hoặc retry cùng key.
           headers:
@@ -839,7 +844,7 @@ paths:
               schema: {$ref: '#/components/schemas/PaymentResponse'}
               examples:
                 pending:
-                  value: {maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '450000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: null, thoiDiemHetHan: null}
+                  value: {maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '360000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: null, thoiDiemHetHan: null}
         '400':
           description: Dữ liệu body không hợp lệ.
           headers:
@@ -853,7 +858,7 @@ paths:
                     code: VALIDATION_ERROR
                     message: Request không hợp lệ.
                     details:
-                      fieldErrors: [{field: phienBanGia, code: MINIMUM, message: Phiên bản giá phải lớn hơn hoặc bằng 1.}]
+                      fieldErrors: [{field: extra, code: UNKNOWN_FIELD, message: Request không nhận trường giá do frontend gửi.}]
                     timestamp: '2026-10-11T09:30:00+07:00'
                     traceId: req-payment-validation-001
         '415': {$ref: '#/components/responses/UnsupportedMediaType'}
@@ -908,7 +913,7 @@ paths:
               examples:
                 success:
                   value:
-                    items: [{maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '450000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: null, thoiDiemHetHan: null}]
+                    items: [{maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '360000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: null, thoiDiemHetHan: null}]
                     page: 1
                     size: 20
                     totalItems: 1
@@ -943,7 +948,7 @@ paths:
               schema: {$ref: '#/components/schemas/PaymentResponse'}
               examples:
                 pending:
-                  value: {maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '450000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: null, thoiDiemHetHan: null}
+                  value: {maGiaoDich: GD01, maDon: DDV01, maPhuongThuc: PT01, soTien: '360000', donViTienTe: VND, trangThai: CHO_XU_LY, ketQuaCongDaXacDinh: false, thoiDiemTao: '2026-10-11T09:33:00+07:00', urlThanhToan: null, thoiDiemHetHan: null}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -2061,7 +2066,7 @@ components:
         the cache may be absent after a crash between database commit and session write or after session loss, in which
         case retry returns the redacted database order state. Expiry commits the hold and order as HET_HAN before returning
         409 HOLD_EXPIRED. danhSachVe always stays empty before T17/T18 issuance. T16 never creates a ticket draft or
-        HanhKhach database entity.
+        HanhKhach database entity. T18 callbacks cannot assume the session passenger snapshot remains available.
       required:
       - maDon
       - maChuyen
@@ -2128,7 +2133,10 @@ components:
           type: boolean
           description: False until the current HTTP session has a valid passenger for every held seat.
         giaDaChot:
-          type: 'null'
+          anyOf:
+          - {$ref: '#/components/schemas/FrozenPrice'}
+          - type: 'null'
+          description: T16 returns null before C02; after T17 C02 succeeds, B05 returns the current persisted money snapshot. It has no quote version or quote timestamp and is not usable for payment after the order closes.
         thongBao:
           type: array
           items:
@@ -2507,9 +2515,9 @@ components:
         coTheChotGia: {type: boolean}
         giaDaChot:
           anyOf:
-            - {$ref: '#/components/schemas/FreezePriceResponse'}
+            - {$ref: '#/components/schemas/FrozenPrice'}
             - type: 'null'
-          description: null trước khi chốt giá; sau đó chứa snapshot đầy đủ đã chốt.
+          description: null trước khi chốt hoặc sau khi đơn đóng; snapshot đọc từ B05 chỉ gồm tiền và phân bổ.
         thongBao:
           type: array
           items: {type: string}
@@ -2531,6 +2539,19 @@ components:
         tienGiam: {$ref: '#/components/schemas/MoneyVnd'}
         thanhTien: {$ref: '#/components/schemas/MoneyVnd'}
       additionalProperties: true
+    FrozenPrice:
+      type: object
+      description: Frozen order totals with reconstructed allocation lines; no durable quote version or quote timestamp. T17 does not add per-ticket price columns. Original ticket rows and order aggregates remain available for history after a partial refund.
+      required: [donViTienTe, tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia]
+      properties:
+        donViTienTe: {type: string, const: VND}
+        tongTienGoc: {$ref: '#/components/schemas/MoneyVnd'}
+        tongTienGiam: {$ref: '#/components/schemas/MoneyVnd'}
+        tongThanhToan: {$ref: '#/components/schemas/MoneyVnd'}
+        chiTietGia:
+          type: array
+          items: {$ref: '#/components/schemas/PriceLine'}
+      additionalProperties: false
     QuoteRequest:
       type: object
       properties:
@@ -2541,7 +2562,6 @@ components:
       required: [maBaoGia]
       properties:
         maBaoGia: {$ref: '#/components/schemas/Id'}
-        phienBanGia: {type: integer, minimum: 1, description: Chỉ dùng nếu quyết định bật optimistic locking; hiện tùy chọn.}
       additionalProperties: false
     QuoteResponse:
       type: object
@@ -2568,13 +2588,28 @@ components:
           additionalProperties: true
       additionalProperties: true
     FreezePriceResponse:
-      allOf:
-        - {$ref: '#/components/schemas/QuoteResponse'}
-        - type: object
-          required: [phienBanGia]
+      type: object
+      required: [maBaoGia, maDon, trangThaiDon, donViTienTe, thoiDiemHetHan, tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia, ketQuaKhuyenMai]
+      properties:
+        maBaoGia: {$ref: '#/components/schemas/Id'}
+        maDon: {$ref: '#/components/schemas/Id'}
+        trangThaiDon: {type: string, const: CHO_THANH_TOAN}
+        donViTienTe: {type: string, const: VND}
+        thoiDiemHetHan: {$ref: '#/components/schemas/OffsetDateTime'}
+        tongTienGoc: {$ref: '#/components/schemas/MoneyVnd'}
+        tongTienGiam: {$ref: '#/components/schemas/MoneyVnd'}
+        tongThanhToan: {$ref: '#/components/schemas/MoneyVnd'}
+        chiTietGia:
+          type: array
+          items: {$ref: '#/components/schemas/PriceLine'}
+        ketQuaKhuyenMai:
+          type: [object, 'null']
+          required: [hopLe, duocGiam]
           properties:
-            phienBanGia: {type: integer, minimum: 1, description: Phiên bản snapshot cần gửi khi khởi tạo thanh toán.}
-          additionalProperties: true
+            hopLe: {type: boolean}
+            duocGiam: {$ref: '#/components/schemas/MoneyVnd'}
+          additionalProperties: false
+      additionalProperties: false
     PaymentMethodDto:
       type: object
       required: [maPhuongThuc, tenPhuongThuc, moTa, trangThai]
@@ -2586,10 +2621,9 @@ components:
       additionalProperties: true
     PaymentInitRequest:
       type: object
-      required: [maPhuongThuc, phienBanGia]
+      required: [maPhuongThuc]
       properties:
         maPhuongThuc: {$ref: '#/components/schemas/Id'}
-        phienBanGia: {type: integer, minimum: 1, description: Phải khớp version snapshot giá đã chốt.}
       additionalProperties: false
     PaymentResponse:
       type: object

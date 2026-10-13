@@ -1,6 +1,7 @@
 package com.datvexe.controller;
 
 import com.datvexe.dto.BookingDto.PassengerRequest;
+import com.datvexe.dto.PricingDto;
 import com.datvexe.security.AuthFilter;
 import jakarta.servlet.SessionCookieConfig;
 import jakarta.servlet.ServletContextEvent;
@@ -18,6 +19,7 @@ import java.util.Enumeration;
 @WebListener
 public final class BookingSession implements ServletContextListener {
     private static final String ATTRIBUTE_PREFIX = "datvexe.booking.passengers.";
+    private static final String QUOTE_ATTRIBUTE_PREFIX = "datvexe.booking.quote.";
 
     @Override
     public void contextInitialized(ServletContextEvent event) {
@@ -47,12 +49,47 @@ public final class BookingSession implements ServletContextListener {
 
     public static void remove(HttpSession session, String userId, String orderId) {
         session.removeAttribute(attribute(userId, orderId));
+        clearQuote(session, userId, orderId);
         String prefix = responsePrefix(userId, orderPath(orderId));
         Enumeration<String> names = session.getAttributeNames();
         while (names.hasMoreElements()) {
             String name = names.nextElement();
             if (name.startsWith(prefix)) session.removeAttribute(name);
         }
+    }
+
+    /** Returns the latest quote for this authenticated user and order, if it is still in the session. */
+    public static PricingDto.QuoteSnapshot quote(HttpSession session, String userId, String orderId) {
+        String attribute = quoteAttribute(userId, orderId);
+        Object value = session.getAttribute(attribute);
+        if (!(value instanceof PricingDto.QuoteSnapshot snapshot)
+                || !java.util.Objects.equals(userId, snapshot.userId())
+                || !java.util.Objects.equals(orderId, snapshot.maDon())) {
+            if (value != null) session.removeAttribute(attribute);
+            return null;
+        }
+        return snapshot;
+    }
+
+    /** Saves only the latest quote for this user/order pair. */
+    public static void saveQuote(
+            HttpSession session,
+            String userId,
+            String orderId,
+            PricingDto.QuoteSnapshot snapshot) {
+        if (snapshot == null) {
+            clearQuote(session, userId, orderId);
+            return;
+        }
+        if (!java.util.Objects.equals(userId, snapshot.userId())
+                || !java.util.Objects.equals(orderId, snapshot.maDon())) {
+            throw new IllegalArgumentException("Quote does not belong to the requested booking.");
+        }
+        session.setAttribute(quoteAttribute(userId, orderId), snapshot);
+    }
+
+    public static void clearQuote(HttpSession session, String userId, String orderId) {
+        session.removeAttribute(quoteAttribute(userId, orderId));
     }
 
     public static void cachePatchResponse(
@@ -70,6 +107,10 @@ public final class BookingSession implements ServletContextListener {
 
     private static String attribute(String userId, String orderId) {
         return ATTRIBUTE_PREFIX + userId + "." + orderId;
+    }
+
+    private static String quoteAttribute(String userId, String orderId) {
+        return QUOTE_ATTRIBUTE_PREFIX + encode(userId) + "." + encode(orderId);
     }
 
     private static String responseAttribute(String userId, String path, String key) {
