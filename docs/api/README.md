@@ -18,6 +18,7 @@ Bộ tài liệu gồm:
 - **[t09-operator-management.md](t09-operator-management.md)**: API quản lý nhà xe, trạng thái và tài khoản quản lý thuộc T09.
 - **[t13-trip-search-availability.md](t13-trip-search-availability.md)**: dữ liệu Backend/database cho trang chủ, tìm chuyến và số ghế còn trống.
 - **[payment-discount.md](payment-discount.md)** và **[payment-discount-openapi.json](payment-discount-openapi.json)**: API khuyến mãi, phương thức thanh toán và báo cáo kiểm thử T14.
+- **[booking-order.md](booking-order.md)** và **[booking-order-openapi.json](booking-order-openapi.json)**: hợp đồng chi tiết cho luồng giữ chỗ và đơn đặt vé T16; tài liệu này có thẩm quyền với B01–B08 đã triển khai.
 - **README.md**: quy ước chung, cách xử lý lỗi và các điểm cần thống nhất.
 - **[api-contract.md](api-contract.md)**: danh sách API, request/response và dữ liệu mẫu ngay trong từng nhóm.
 - **[openapi.yaml](openapi.yaml)**: kiểu dữ liệu, trường bắt buộc, giá trị null và ví dụ chi tiết để xem bằng công cụ hỗ trợ OpenAPI/Swagger. https://editor.swagger.io/
@@ -43,7 +44,7 @@ Luồng chính: tìm chuyến → chọn ghế → giữ ghế và tạo đơn n
 - Trường bắt buộc, tùy chọn và nullable được ghi trong contract. Thiếu trường khác với `null`. Với PATCH, trường không gửi giữ nguyên; `null` chỉ xóa trường được phép nullable. PUT hành khách thay toàn bộ danh sách.
 - Backend phải kiểm tra cả vai trò và quyền trên đơn/vé/chuyến; không chỉ kiểm tra đã đăng nhập.
 
-Trong bản nháp, tên và số điện thoại người đặt trong `OrderResponse` vẫn là chuỗi bắt buộc, không nhận null. Cách khởi tạo hai giá trị này khi B01 tạo đơn còn chờ nhóm xác nhận: lấy thông tin hợp lệ từ hồ sơ hoặc điều chỉnh mô hình đơn nháp để cho phép thiếu. Ví dụ giả định đơn đã có liên hệ hợp lệ; đây là điểm phải thống nhất trước khi triển khai B01, không phải yêu cầu tự điền dữ liệu giả.
+Trong B01–B08 của T16, tên và số điện thoại người đặt trong `OrderResponse` là chuỗi bắt buộc, không nhận null; B01 khởi tạo từ hồ sơ người đặt. Hành khách được lưu tạm trong HTTP session; session mới vẫn tải đơn và ghế từ database nhưng trả danh sách hành khách rỗng, cần nhập lại trước khi T17 có thể chốt giá. Không tạo entity hành khách hoặc vé nháp.
 
 ## 3. Chuẩn hóa dữ liệu
 
@@ -110,7 +111,7 @@ Header chung: `Content-Type: application/json`; các API liệt kê tại mục 
 
 ## 7. Backend quyết định dữ liệu nghiệp vụ
 
-- Giữ nhiều ghế và tạo **một đơn nháp** phải thành công hoặc thất bại cùng nhau. B03/B04 cập nhật đơn đó, không tạo đơn mới.
+- B01 giữ nhiều ghế và tạo một đơn trong cùng transaction. B03/B04 cập nhật đơn đó, không tạo đơn mới. Với T16, B04 giữ danh sách hành khách trong HTTP session; không ghi hành khách nháp vào database.
 - Hạn giữ là **15 phút do backend tính**. Tải lại, gửi lại request, báo giá hoặc khởi tạo thanh toán không gia hạn. Hết hiệu lực khi thời gian server đạt hạn giữ.
 - Giá, giảm giá, tổng thu/hoàn, quyền sở hữu và trạng thái được kiểm tra ở backend; frontend gửi mã và ý định thao tác.
 - C01 xem thử giá; C02 lưu giá đã chốt. Đề xuất chỉ C02 giữ lượt khuyến mãi, thất bại phải rollback cùng snapshot. Hết hạn/hủy trả lượt đúng một lần.
@@ -120,6 +121,8 @@ Header chung: `Content-Type: application/json`; các API liệt kê tại mục 
 ## 8. Chống xử lý lặp
 
 Các API B01, B03, B07, C02, D01, E02, E03 và F02 dùng `Idempotency-Key`: cùng người gọi, method, path, key và nội dung thì trả lại kết quả; cùng key nhưng đổi nội dung trả `409 IDEMPOTENCY_KEY_REUSED`. Nếu yêu cầu cũ còn xử lý, trả `409 REQUEST_IN_PROGRESS`. Đây là lỗi chung của các API trên, ngoài các lỗi nghiệp vụ được ghi tại từng endpoint.
+
+Riêng PATCH T16, phản hồi đầy đủ chỉ replay khi cache trong HTTP session còn tồn tại. Nếu cache thiếu, server trả snapshot database với hành khách rỗng và `coTheChotGia: false`; GET đơn để kiểm tra lại. PostgreSQL không lưu hành khách tạm trong bản idempotency.
 
 Khóa này không thay cho transaction hoặc ràng buộc chống đặt trùng ghế trong DB. Callback trùng được nhận diện theo mã giao dịch/thông báo đã xác minh của cổng, tránh thu/hoàn hoặc phát hành vé hai lần. Thời gian lưu khóa cần thống nhất trước triển khai; đề xuất hiện tại là tối thiểu 24 giờ.
 
@@ -139,14 +142,14 @@ Các điểm cần nhóm xác nhận:
 | --- | --- |
 | Trạng thái | Bảng chuyển trạng thái đơn, giữ, vé, thanh toán và hoàn; cách biểu diễn đơn hết hạn. |
 | Đăng nhập và quyền | T07 đã triển khai phiên cookie và helper phạm vi; nhóm đối chiếu T01, xác nhận quyền nghiệp vụ và việc hỗ trợ khách không tài khoản. |
-| Đơn nháp | Cách khởi tạo tên/số điện thoại người đặt tại B01, như mục 2. |
+| Đơn nháp | T16 dùng liên hệ bắt buộc trong B01–B08; T17 cần đọc và xác thực danh sách hành khách hiện có trong HTTP session trước khi chốt giá. |
 | Giá và khuyến mãi | Quy tắc làm tròn, giữ/trả lượt mã; điều kiện sửa đơn hoặc chốt lại giá. |
 | Chuyến chưa gán xe | Đề xuất chi tiết cho phép null, từ chối giữ ghế; chưa có xe thì từ chối trả sơ đồ ghế. |
 | Thanh toán và hoàn | Cổng sandbox, callback muộn, chính sách/phí hoàn và thời điểm bán lại ghế. |
 
 Các điểm này cần nhóm thống nhất trước triển khai phần liên quan; không tự bổ sung enum hay thay sơ đồ lớp theo ví dụ.
 
-Khi triển khai backend, cần bổ sung cách chống tranh ghế tại DB và nơi lưu hành khách của đơn nháp, snapshot giá theo ghế, yêu cầu hoàn, thời điểm kiểm vé. Tổng các lần hoàn không được vượt số tiền thực thu của vé; đổi khóa chống lặp không được bỏ qua giới hạn này. Đây là công việc thiết kế/triển khai tiếp theo, chưa được thực hiện trong T05.
+Các nhóm tương lai cần tiếp tục hoàn thiện snapshot giá theo ghế, yêu cầu hoàn và thời điểm kiểm vé. T16 đã dùng khóa chuyến và ràng buộc DB cho tranh ghế; hành khách hiện chỉ tồn tại trong HTTP session và không được lưu thành dữ liệu nháp. Tổng các lần hoàn không được vượt số tiền thực thu của vé; đổi khóa chống lặp không được bỏ qua giới hạn này.
 
 ## 11. Thay đổi hợp đồng
 

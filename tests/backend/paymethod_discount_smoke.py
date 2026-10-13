@@ -329,12 +329,32 @@ def promotion_crud_and_validation():
               + sql_literal(ident("KM_BAD_PRECISION")) + ")", "Invalid precision promotion was persisted")
     call(ADMIN, "PUT", detail_path, changed | {"maKhuyenMai": code}, 400)
 
+    preview_order = ident("ORDER_PREVIEW")
+    db("INSERT INTO don_dat_ve (ma_don, ma_nguoi_dung, ngay_dat, tong_tien, tien_giam, "
+       "ma_khuyen_mai, khach_dat_ten, khach_dat_so_dien_thoai, kenh_dat, trang_thai) VALUES ("
+       + ", ".join((sql_literal(preview_order), sql_literal(CUSTOMER.user_id), "now()", "0", "0",
+                    sql_literal(code), sql_literal("Khách hàng T14"), sql_literal("0900000000"),
+                    sql_literal("WEB"), sql_literal("CHO_XU_LY"))) + ")")
+
+    preview_update = changed | {"tenKhuyenMai": "T14 promotion with pending preview"}
+    allowed_update = call(ADMIN, "PUT", detail_path, preview_update, 200)
+    assert allowed_update["tenKhuyenMai"] == preview_update["tenKhuyenMai"]
+    db_assert("EXISTS (SELECT 1 FROM don_dat_ve WHERE ma_don=" + sql_literal(preview_order)
+              + " AND ma_khuyen_mai=" + sql_literal(code) + " AND trang_thai='CHO_XU_LY')",
+              "Pending preview order fixture missing")
+    db("DELETE FROM don_dat_ve WHERE ma_don=" + sql_literal(preview_order))
+    db_assert("NOT EXISTS (SELECT 1 FROM don_dat_ve WHERE ma_don=" + sql_literal(preview_order) + ")",
+              "Pending preview order fixture was not removed")
+    pass_scenario("promotion update is allowed while only a pending preview order selects the code")
+
+    # Restore the baseline before verifying that committed purchase history protects the promotion.
+    call(ADMIN, "PUT", detail_path, changed, 200)
     history_order = ident("ORDER_HISTORY")
     db("INSERT INTO don_dat_ve (ma_don, ma_nguoi_dung, ngay_dat, tong_tien, tien_giam, "
        "ma_khuyen_mai, khach_dat_ten, khach_dat_so_dien_thoai, kenh_dat, trang_thai) VALUES ("
        + ", ".join((sql_literal(history_order), sql_literal(CUSTOMER.user_id), "now()", "0", "0",
                     sql_literal(code), sql_literal("Khách hàng T14"), sql_literal("0900000000"),
-                    sql_literal("WEB"), sql_literal("CHO_XU_LY"))) + ")")
+                    sql_literal("WEB"), sql_literal("DA_THANH_TOAN"))) + ")")
     call(ADMIN, "PUT", detail_path, changed, 409)
     assert call(ADMIN, "GET", detail_path)["tenKhuyenMai"] == "T14 promotion updated"
     call(ADMIN, "DELETE", detail_path, expected=409)
