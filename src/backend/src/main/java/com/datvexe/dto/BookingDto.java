@@ -33,6 +33,8 @@ public final class BookingDto {
 
     public record TicketResponse(
             String maVe,
+            String maTraCuu,
+            String qrImage,
             String maGhe,
             String hoTen,
             String soDienThoai,
@@ -55,6 +57,7 @@ public final class BookingDto {
             TrangThaiDon trangThaiDon,
             String khachDatTen,
             String khachDatSoDienThoai,
+            String khachDatEmail,
             String ghiChu,
             OffsetDateTime serverTime,
             OffsetDateTime thoiDiemBatDau,
@@ -65,7 +68,10 @@ public final class BookingDto {
             PricePreview giaTamTinh,
             boolean coTheChotGia,
             PricingDto.PriceSummary giaDaChot,
-            List<String> thongBao) {}
+            List<String> thongBao,
+            EmailStatus emailXacNhan) {}
+
+    public record EmailStatus(String trangThai, String diaChi, OffsetDateTime thoiDiemGui) {}
 
     public record Result(int status, Object body) {}
 }

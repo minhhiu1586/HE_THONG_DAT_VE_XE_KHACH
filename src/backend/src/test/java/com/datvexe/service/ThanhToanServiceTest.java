@@ -49,6 +49,7 @@ class ThanhToanServiceTest {
                 "jakarta.persistence.jdbc.password", "",
                 "hibernate.hbm2ddl.auto", "create-drop"));
         contexts = new PaymentContextStore(Clock.fixed(instant(CREATED), ZONE));
+        inTransaction(em -> em.createNativeQuery("CREATE SEQUENCE ticket_public_code_seq MINVALUE 1 MAXVALUE 33554431 NO CYCLE").executeUpdate());
         inTransaction(this::createFixture);
     }
 
@@ -61,6 +62,7 @@ class ThanhToanServiceTest {
     @Test
     void successfulPaymentIssuesAllTicketsWithFrozenAllocationAndConsumesPromotionOnce() {
         seedPromotion();
+        inTransaction(em -> em.find(DonDatVe.class, ORDER_ID).khachDatEmail = "receipt@gmail.com");
         ThanhToanService service = serviceAt(CREATED.plusMinutes(5));
         contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
 
@@ -79,6 +81,8 @@ class ThanhToanServiceTest {
                     .setParameter("id", ORDER_ID).getResultList();
             assertEquals(List.of("96666", "96667", "96667"), tickets.stream().map(v -> v.giaVe.setScale(0).toPlainString()).toList());
             assertTrue(tickets.stream().allMatch(v -> v.maQR != null && !v.maQR.isBlank()));
+            assertTrue(tickets.stream().allMatch(v -> v.maTraCuu.matches("[0-9A-HJKMNP-TV-Z]{5}")));
+            assertEquals(3L, tickets.stream().map(v -> v.maTraCuu).distinct().count());
             assertEquals(1, em.find(KhuyenMai.class, "PROMO").soLuongDaDung);
             assertEquals(3L, em.createQuery("select count(h) from GiuCho h where h.donDatVe.maDon=:id and h.trangThai=:state", Long.class)
                     .setParameter("id", ORDER_ID).setParameter("state", TrangThaiGiuCho.DA_XAC_NHAN).getSingleResult());
@@ -86,11 +90,20 @@ class ThanhToanServiceTest {
 
         ThanhToanService.ProcessingResult replay = service.receive(success());
         assertTrue(replay.duplicate());
-        inTransaction(em -> assertEquals(1, em.find(KhuyenMai.class, "PROMO").soLuongDaDung));
+        inTransaction(em -> {
+            assertEquals(1, em.find(KhuyenMai.class, "PROMO").soLuongDaDung);
+            var email = em.find(com.datvexe.domain.EmailOutbox.class, ORDER_ID);
+            assertNotNull(email);
+            assertEquals("PENDING", email.status);
+            assertEquals("receipt@gmail.com", email.recipient);
+            assertTrue(email.htmlContent.contains("96666") || email.htmlContent.contains("96.666"));
+            assertEquals(1L, em.createQuery("select count(e) from EmailOutbox e", Long.class).getSingleResult());
+        });
     }
 
     @Test
     void serverDeadlineWinsWhenProviderPaidBeforeExpiry() {
+        inTransaction(em -> em.find(DonDatVe.class, ORDER_ID).khachDatEmail = "receipt@gmail.com");
         contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
         ThanhToanService service = serviceAt(EXPIRES);
 
@@ -100,6 +113,7 @@ class ThanhToanServiceTest {
         inTransaction(em -> {
             assertEquals(TrangThaiThanhToan.THANH_CONG, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
             assertEquals(TrangThaiDon.HET_HAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
+            assertNull(em.find(com.datvexe.domain.EmailOutbox.class, ORDER_ID));
             assertEquals(0L, em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon=:id", Long.class)
                     .setParameter("id", ORDER_ID).getSingleResult());
             assertEquals(3L, em.createQuery("select count(h) from GiuCho h where h.donDatVe.maDon=:id and h.trangThai=:state", Long.class)

@@ -2348,3 +2348,42 @@ footer strong {
   .seat-steps strong { font-size: 12px; }
   .seat-selection-page .floor, .summary-card.seat-ticket-summary { padding: 16px; }
 }
+
+.account-menu-polished [role="menuitem"] { min-height: 42px; border-radius: 8px; font-weight: 600; line-height: 20px; }
+.account-menu-polished button[role="menuitem"] { border: 0; background: transparent; box-shadow: none; justify-content: flex-start; }
+.account-menu-polished [role="menuitem"]:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; background: #eff6ff; }
+.booking-checkout .summary-card, .booking-payment .summary-card { position: static; display: grid; gap: 12px; }
+.booking-checkout .page-title h1, .booking-payment .page-title h1 { font-size: clamp(24px, 3vw, 30px); }
+.checkout-form-card { min-width: 0; background: #fff; padding: 24px; border: 1px solid #dfe7f3; border-radius: 16px; }
+.checkout-form-card h2 { font-size: 20px; margin-top: 0; }
+.checkout-form-card fieldset { border: 0; padding: 0; margin: 0 0 24px; min-width: 0; }
+.checkout-form-card legend { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.checkout-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.checkout-form-card label, .booking-payment .summary-card label { display: grid; gap: 8px; font-size: 14px; margin-bottom: 12px; }
+.checkout-form-card input, .checkout-form-card textarea, .booking-payment select { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #cbd8ec; border-radius: 10px; font: inherit; }
+.checkout-form-card input, .booking-payment select { min-height: 44px; }
+.checkout-form-card textarea { min-height: 80px; resize: vertical; }
+.checkout-fields .full-width { grid-column: 1 / -1; }
+.booking-checkout .summary-card h3, .payment-info dd, .payment-reference { overflow-wrap: anywhere; }
+.booking-checkout .summary-card .primary-button, .booking-payment .summary-card .primary-button, .booking-payment .summary-card .outline-button { width: 100%; min-height: 46px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.payment-info { margin: 16px 0; }
+.payment-info > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid #edf1f7; font-size: 14px; }
+.payment-info dt { color: #64748b; }
+.payment-info dd { margin: 0; font-weight: 600; }
+.issued-ticket { border: 1px solid #dbe7f5; border-radius: 12px; padding: 16px; margin-top: 12px; background: #f8fbff; }
+.issued-ticket p { font-size: 13px; margin: 6px 0 0; }
+@media (max-width: 540px) { .checkout-fields { grid-template-columns: minmax(0, 1fr); } .checkout-form-card { padding: 18px; } }
+
+.receipt-email-status { margin: 18px 0; padding: 16px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #1e3a5f; }
+.receipt-email-status p { margin: 6px 0 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+
+.ticket-with-qr { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.ticket-with-qr > div { min-width: 0; }
+.ticket-with-qr h3 { margin: 8px 0 12px; font-size: 20px; }
+.ticket-label { color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+.ticket-code { color: #1d4ed8; font-size: 20px; letter-spacing: .1em; }
+.ticket-with-qr small { color: #64748b; line-height: 1.6; }
+.ticket-qr { flex: 0 0 160px; text-align: center; }
+.ticket-qr img { display: block; width: 160px; height: 160px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; }
+.ticket-qr a { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 600; color: #1d4ed8; }
+@media(max-width:600px) { .ticket-with-qr { flex-direction: column; align-items: flex-start; gap: 16px; } .ticket-qr { flex-basis: auto; align-self: center; } }

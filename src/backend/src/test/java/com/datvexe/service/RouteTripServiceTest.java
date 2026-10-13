@@ -66,8 +66,9 @@ class RouteTripServiceTest {
             () -> service.setTramDauCuoi("R", new Inputs.TramDauCuoi("MD", "MD"))).status());
     }
 
-    @Test void persistenceUnitMapsDomainEntitiesAndAuthSession() {
-        assertEquals(21, factory.getMetamodel().getEntities().size());
+    @Test void persistenceUnitMapsDomainEntitiesAndInfrastructure() {
+        assertEquals(22, factory.getMetamodel().getEntities().size());
+        assertNotNull(factory.getMetamodel().entity(com.datvexe.domain.EmailOutbox.class).getAttribute("maDon"));
         assertNotNull(factory.getMetamodel().entity(NguoiDung.class).getAttribute("danhSachDonDat"));
         assertNotNull(factory.getMetamodel().entity(PhanCongChuyenXe.class).getAttribute("nhanVien"));
         assertNotNull(factory.getMetamodel().entity(VeXe.class).getAttribute("chuyenXe"));

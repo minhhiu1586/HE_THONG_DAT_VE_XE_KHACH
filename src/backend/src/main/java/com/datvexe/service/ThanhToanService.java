@@ -257,7 +257,7 @@ public final class ThanhToanService {
                     .setParameter("order", ticket.donDatVe).getSingleResult();
             BigDecimal gross = ticket.donDatVe.tongTien.divide(BigDecimal.valueOf(originalCount), 0, RoundingMode.UNNECESSARY);
             BigDecimal net = ticket.giaVe == null ? BigDecimal.ZERO : ticket.giaVe;
-            return new ThanhToanDto.TicketResponse(ticket.maVe, ticket.donDatVe.maDon, ticket.chuyenXe.maChuyen,
+            return new ThanhToanDto.TicketResponse(ticket.maVe, ticket.maTraCuu, ticket.donDatVe.maDon, ticket.chuyenXe.maChuyen,
                     ticket.ghe.maGhe, ticket.hoTenKhachHang, ticket.soDienThoaiKhachHang, ticket.cccdHanhKhach,
                     money(gross), money(gross.subtract(net).max(BigDecimal.ZERO)), money(net), VND,
                     ticket.maQR, offset(ticket.ngayXuatVe), ticket.trangThai);
@@ -333,6 +333,7 @@ public final class ThanhToanService {
             PriceLine line = bySeat.get(hold.ghe.maGhe);
             VeXe ticket = new VeXe();
             ticket.maVe = "TKT-" + UUID.randomUUID();
+            ticket.maTraCuu = TicketCode.next(em);
             ticket.chuyenXe = hold.chuyenXe;
             ticket.ghe = hold.ghe;
             ticket.donDatVe = order;
@@ -349,6 +350,7 @@ public final class ThanhToanService {
         order.trangThai = TrangThaiDon.DA_THANH_TOAN;
         if (promotion != null) promotion.soLuongDaDung++;
         em.flush();
+        com.datvexe.email.ReceiptQueue.enqueue(em, order, payment);
         return new BookingDto.Result(200, toPayment(payment, context, false));
     }
 

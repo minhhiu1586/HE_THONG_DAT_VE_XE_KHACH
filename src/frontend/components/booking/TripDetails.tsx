@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { getTrip, getTripSeats, type SearchTrip, type TripSeat } from '@/lib/api';
 import styles from './TripDetails.module.css';
+import BusFront from './BusFront';
+import { getSeatLayout, getSeatPlacement } from './seat-layout';
 
 function seatStatus(seat: TripSeat) {
   if (seat.trangThaiSuDung !== 'HOAT_DONG' || seat.tinhTrangKhaDung === 'KHONG_BAN') return 'blocked';
@@ -58,6 +60,7 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
     }
   }
 
+  const layout = getSeatLayout(seats?.length ?? 0);
   const floors = seats
     ? [...new Set(seats.map((seat) => seat.tang))].sort((a, b) => a - b)
     : [];
@@ -109,7 +112,7 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
     {error && <p ref={errorRef} className="form-error" role="alert">{error}</p>}
     {seats && <section ref={seatsRef} tabIndex={-1} className={styles.seatPanel} aria-label={`Ghế của chuyến ${trip.maChuyen}`}>
       <div className={styles.seatHeader}>
-        <div><span className="eyebrow">SƠ ĐỒ GHẾ</span><h2>Ghế của chuyến {trip.maChuyen}</h2><p>Vị trí và trạng thái ghế được cập nhật theo chuyến này.</p></div>
+        <div><span className="eyebrow">SƠ ĐỒ GHẾ</span><h2>Sơ đồ ghế của chuyến</h2><p>Vị trí và trạng thái ghế được cập nhật theo chuyến này.</p></div>
         <strong className={styles.seatCount}>{trip.soGheTrong} ghế còn</strong>
       </div>
       <div className={styles.legend} aria-label="Chú giải trạng thái ghế">
@@ -120,10 +123,11 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
         const free = floorSeats.filter((seat) => seatStatus(seat) === 'available').length;
         return <div className={styles.floor} key={floor}>
           <div className={styles.floorHeader}><h3>Tầng {floor}</h3><span>{free}/{floorSeats.length} ghế trống</span></div>
-          {floor === 1 && <div className="driver-position" aria-label="Vị trí tài xế, không bán vé"><span aria-hidden="true">◉</span><div><strong>Tài xế</strong><small>Không bán vé · không chọn</small></div></div>}
-          <div className={styles.seatGrid}>{floorSeats.map((seat) => {
+          <BusFront floor={Number(floor)} />
+          <p className={styles.layoutCaption}>{layout.label} · {floorSeats.length} chỗ</p>
+          <div className={styles.seatGrid} style={{ gridTemplateColumns: layout.template }}>{floorSeats.map((seat, index) => {
             const state = seatStatus(seat);
-            return <button type="button" disabled={state !== 'available' || !trip.coTheDatVe} onClick={() => router.push(`/tim-chuyen/${trip.maChuyen}/seats`)} key={seat.maGhe} className={`${styles.seat} ${styles[state]}`} title={`${seat.viTri} · tầng ${seat.tang} · ${seatLabels[state]}`} aria-label={`Ghế ${seat.viTri}, tầng ${seat.tang}, ${seatLabels[state]}`}>
+            return <button type="button" disabled={state !== 'available' || !trip.coTheDatVe} onClick={() => router.push(`/tim-chuyen/${trip.maChuyen}/seats`)} key={seat.maGhe} style={getSeatPlacement(seats.length, index, floorSeats.length)} className={`${styles.seat} ${styles[state]}`} title={`${seat.viTri} · tầng ${seat.tang} · ${seatLabels[state]}`} aria-label={`Ghế ${seat.viTri}, tầng ${seat.tang}, ${seatLabels[state]}`}>
               <strong>{seat.viTri}</strong><small>{seatLabels[state]}</small>
             </button>;
           })}</div>

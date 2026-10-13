@@ -23,6 +23,7 @@
         <class>com.datvexe.domain.Entities$ChinhSachHoanVe</class>
         <class>com.datvexe.domain.Entities$KhuyenMai</class>
         <class>com.datvexe.domain.AuthSession</class>
+        <class>com.datvexe.domain.EmailOutbox</class>
         <properties>
             <property name="hibernate.hbm2ddl.auto" value="validate"/>
             <property name="hibernate.show_sql" value="false"/>

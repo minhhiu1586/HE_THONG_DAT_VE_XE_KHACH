@@ -56,6 +56,7 @@ public final class ThanhToanDto {
 
     public record TicketResponse(
             String maVe,
+            String maTraCuu,
             String maDon,
             String maChuyen,
             String maGhe,

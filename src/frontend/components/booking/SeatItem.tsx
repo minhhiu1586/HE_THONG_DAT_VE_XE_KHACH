@@ -4,10 +4,12 @@ export default function SeatItem({
   seat,
   selected,
   onClick,
+  disabled = false,
 }: {
   seat: Seat;
   selected: boolean;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   const unavailable =
     (seat.trangThaiSuDung ?? seat.trangThai) !== "HOAT_DONG" ||
@@ -19,7 +21,7 @@ export default function SeatItem({
       className={`seat ${selected ? "selected" : ""} ${
         unavailable ? "unavailable" : ""
       }`}
-      disabled={unavailable}
+      disabled={unavailable || disabled}
       type="button"
       aria-pressed={selected}
       aria-label={`Ghế ${typeof seat.viTri === 'string' ? seat.viTri : seat.maGhe}${unavailable ? ', không khả dụng' : ''}`}

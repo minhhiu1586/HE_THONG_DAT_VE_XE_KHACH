@@ -39,7 +39,7 @@ public class BookingController extends HttpServlet {
     private static final String USER_REQUEST_ATTRIBUTE = BookingController.class.getName() + ".userId";
     private static final Set<String> HOLD_FIELDS = Set.of("maChuyen", "danhSachMaGhe");
     private static final Set<String> PASSENGER_FIELDS = Set.of("maGhe", "hoTen", "soDienThoai", "cccd");
-    private static final Set<String> PATCH_FIELDS = Set.of("khachDatTen", "khachDatSoDienThoai", "ghiChu");
+    private static final Set<String> PATCH_FIELDS = Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail", "ghiChu");
 
     private final ObjectMapper json = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -192,8 +192,8 @@ public class BookingController extends HttpServlet {
     protected void doPatch(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Route route = route(request);
         JsonNode body = readObject(request, PATCH_FIELDS);
-        checkStrings(body, "khachDatTen", "khachDatSoDienThoai", "ghiChu");
-        for (String field : Set.of("khachDatTen", "khachDatSoDienThoai")) {
+        checkStrings(body, "khachDatTen", "khachDatSoDienThoai", "khachDatEmail", "ghiChu");
+        for (String field : Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail")) {
             if (body.has(field) && body.get(field).isNull()) {
                 throw invalid(field, "Trường này không được để trống.");
             }

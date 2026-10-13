@@ -10,7 +10,7 @@ import { Employee, Operator, roles, states } from './employee-types';
 import styles from './EmployeeManagement.module.css';
 
 const empty = { maNhanVien: '', hoTen: '', soDienThoai: '', email: '', ngaySinh: '', maNhaXe: '', loaiNhanVien: 'TAI_XE', trangThai: 'DANG_LAM_VIEC', soBangLai: '', ngayHetHanBangLai: '' };
-const pageSize = 20;
+const pageSize = 6;
 export default function EmployeeManagement() {
   const { user, loading, request } = useAuth();
   const allowed = user?.loaiTaiKhoan === 'ADMIN' || user?.loaiTaiKhoan === 'NHA_XE';
@@ -72,10 +72,18 @@ export default function EmployeeManagement() {
       <button className={styles.primary} disabled={busy || fetching} onClick={() => { setSelected(null); setForm({ ...empty, maNhaXe: operators.length === 1 ? operators[0].maNhaXe : '' }); setError(''); setSuccess(''); }}>+ Thêm nhân viên</button>
     </div>
     <div className={styles.grid}><section className={styles.panel} aria-busy={fetching}>
-      <h2>Danh sách nhân viên ({visible.length})</h2>
-      {fetching ? <p role="status">Đang tải nhân viên…</p> : visible.length === 0 ? <p>Không có nhân viên phù hợp.</p> : visible.slice((current - 1) * pageSize, current * pageSize).map(n => <button key={n.maNhanVien} className={styles.card} aria-pressed={selected?.maNhanVien === n.maNhanVien} disabled={busy} onClick={() => select(n)}>
-        <span className={styles.person}><span className={styles.avatar} aria-hidden="true">{n.hoTen.split(' ').filter(Boolean).slice(-2).map(part => part[0]).join('')}</span><span><strong>{n.hoTen}</strong><small>{roles[n.loaiNhanVien]} · {n.maNhanVien}</small></span></span><span className={n.trangThai === 'DANG_LAM_VIEC' ? styles.badge : styles.mutedBadge}>{states[n.trangThai]}</span><small>{operators.find(o => o.maNhaXe === n.maNhaXe)?.tenNhaXe ?? n.maNhaXe}</small></button>)}
-      <div className={styles.actions}><button disabled={current === 1 || busy} onClick={() => setPage(current - 1)}>Trang trước</button><span>Trang {current}/{pages}</span><button disabled={current === pages || busy} onClick={() => setPage(current + 1)}>Trang sau</button></div>
+      <div className={styles.listHeading}><h2>Danh sách nhân viên</h2><span className={styles.listCount}>{visible.length}</span></div>
+      <p className={styles.listHint}>Chọn nhân viên để xem hồ sơ và phân công chuyến.</p>
+      {fetching ? <p role="status">Đang tải nhân viên…</p> : visible.length === 0 ? <p>Không có nhân viên phù hợp.</p> : <div className={styles.employeeList}>
+        {visible.slice((current - 1) * pageSize, current * pageSize).map(n => <button type="button" key={n.maNhanVien} className={styles.employeeRow} aria-pressed={selected?.maNhanVien === n.maNhanVien} disabled={busy} onClick={() => select(n)}>
+          <span className={styles.rowAvatar} aria-hidden="true">{n.hoTen.split(' ').filter(Boolean).slice(-2).map(part => part[0]).join('')}</span>
+          <span className={styles.rowContent}><strong>{n.hoTen}</strong><small>{roles[n.loaiNhanVien]} · {n.maNhanVien}</small><span className={styles.rowMeta}><span>{operators.find(o => o.maNhaXe === n.maNhaXe)?.tenNhaXe ?? n.maNhaXe}</span><span className={n.trangThai === 'DANG_LAM_VIEC' ? styles.rowActive : styles.rowInactive}>{states[n.trangThai]}</span></span></span>
+        </button>)}
+      </div>}
+      {!fetching && visible.length > 0 && <nav className={styles.pagination} aria-label="Phân trang nhân viên">
+        <span className={styles.pageRange}>{(current - 1) * pageSize + 1}–{Math.min(current * pageSize, visible.length)} / {visible.length} nhân viên</span>
+        <div className={styles.pageControls}><button type="button" aria-label="Trang nhân viên trước" disabled={current === 1 || busy} onClick={() => setPage(current - 1)}>Trước</button><span aria-live="polite">{current} / {pages}</span><button type="button" aria-label="Trang nhân viên sau" disabled={current === pages || busy} onClick={() => setPage(current + 1)}>Sau</button></div>
+      </nav>}
     </section><div><section className={styles.panel} aria-busy={busy}>
       <h2>{selected ? 'Hồ sơ nhân viên' : 'Thêm hồ sơ nhân viên'}</h2>
       <p className={styles.hint}>{selected ? `${selected.maNhanVien} · ${roles[selected.loaiNhanVien]}` : 'Chọn nhà xe và nhập thông tin liên hệ để tạo hồ sơ.'}</p>
