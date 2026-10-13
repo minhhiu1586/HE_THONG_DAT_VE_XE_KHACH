@@ -1,17 +1,4 @@
 services:
-  backend:
-    image: tomcat:10.1-jdk21
-    ports:
-      - "8080:8080"
-    environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/datvexe
-      POSTGRES_USER: datvexe_user
-      POSTGRES_PASSWORD: datvexe_password
-    volumes:
-      - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
   postgres:
     image: postgres:16
     container_name: datvexe-postgres
@@ -22,17 +9,10 @@ services:
       POSTGRES_PASSWORD: datvexe_password
     ports:
       - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U datvexe_user -d datvexe"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docs/database/schema/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
-      - ./docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
-      - ./docs/database/seed/001_demo.sql:/docker-entrypoint-initdb.d/003_demo.sql:ro
-      - ./docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/004_fleet_demo.sql:ro
+      - ./docs/database/schema:/docker-entrypoint-initdb.d/schema:ro
+      - ./docs/database/seed:/docker-entrypoint-initdb.d/seed:ro
 
 volumes:
   postgres_data:
