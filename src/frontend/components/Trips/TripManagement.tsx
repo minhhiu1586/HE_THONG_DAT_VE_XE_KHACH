@@ -75,7 +75,7 @@ export default function TripManagement(){
     },editing?'Đã cập nhật chuyến nháp.':'Đã tạo chuyến nháp. Chuyến chưa được mở bán.');
   }
   return <div className={styles.page} onClickCapture={interaction} onFocusCapture={interaction} onInputCapture={interaction} onChangeCapture={interaction}>
-    <h1>Quản lý chuyến xe và mở bán</h1><p>Tạo lịch chạy, hoàn tất phân công và kiểm tra điều kiện trước khi mở bán.</p>
+    <header className={styles.heading}><p className={styles.eyebrow}>QUẢN TRỊ VẬN HÀNH</p><h1>Quản lý chuyến xe và mở bán</h1><p>Tạo lịch chạy, hoàn tất phân công và kiểm tra điều kiện trước khi mở bán.</p></header>
     {waiting&&<p role="status">{initialLoading?'Đang tải dữ liệu…':'Đang xử lý…'}</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}{success&&<p role="status" className={styles.success}>{success}</p>}
     <section ref={formTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editing?'Sửa chuyến nháp':'Tạo chuyến nháp'}</h2>
       <form className={styles.form} onSubmit={submit} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation}>

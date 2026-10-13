@@ -1,0 +1,45 @@
+.availability {
+  scroll-margin-top: 24px;
+  max-width: 380px;
+  padding: 20px 24px;
+  background: #eaf6f2;
+  border: 1px solid #c8e7de;
+  border-radius: 14px;
+}
+.availability:focus, .seatPanel:focus { outline: 2px solid var(--teal); outline-offset: 3px; }
+.availabilityLabel { display: block; color: #496765; font-size: 14px; font-weight: 600; }
+.availability strong { display: block; margin-top: 7px; color: #087d77; font-size: 36px; line-height: 1.2; }
+.availability strong span { font-size: 18px; font-weight: 500; }
+.availability p { margin: 8px 0 0; color: #526b69; font-size: 14px; }
+.seatPanel {
+  scroll-margin-top: 24px;
+  margin-top: 28px;
+  padding: clamp(20px, 4vw, 36px);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgba(23, 43, 43, .05);
+}
+.seatHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+.seatHeader h2 { margin: 8px 0; font-size: clamp(22px, 3vw, 30px); }
+.seatHeader p { margin: 0; color: var(--muted); }
+.seatCount { padding: 10px 16px; border-radius: 30px; background: #eaf6f2; color: #087d77; white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 26px 0; padding: 16px 0; border-block: 1px solid var(--line); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #526b69; }
+.legend i { width: 16px; height: 16px; border: 1px solid; border-radius: 5px; }
+.floor + .floor { margin-top: 30px; }
+.floorHeader { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
+.floorHeader h3 { margin: 0; font-size: 18px; }
+.floorHeader span { color: var(--muted); font-size: 14px; }
+.seatGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px; max-width: 720px; }
+.seat { min-height: 70px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; border: 1px solid; border-radius: 10px; text-align: center; }
+.seat strong { font-size: 17px; line-height: 1.1; }
+.seat small { font-size: 12px; line-height: 1.2; }
+.available { background: #eaf6f2; border-color: #bde3d8; color: #087d77; }
+.held { background: #fff5e9; border-color: #f4d4a8; color: #a45b0b; }
+.sold { background: #f1f2f5; border-color: #d9dce2; color: #66717c; }
+.blocked { background: #f9eeee; border-color: #edcdcd; color: #9d5555; }
+@media (max-width: 520px) {
+  .seatGrid { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+  .seat { min-height: 64px; }
+}

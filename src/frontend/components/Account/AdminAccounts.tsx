@@ -39,8 +39,7 @@ export default function AdminAccounts() {
   }
   if (loading || !user) return <div className={styles.page}>Đang kiểm tra quyền…</div>;
   if (user.loaiTaiKhoan !== 'ADMIN') return <div className={styles.page}><p className={styles.error} role="alert">Bạn không có quyền quản lý tài khoản.</p></div>;
-  return <div className={styles.admin}><section className={styles.card}><h1>Quản lý tài khoản</h1>
-    <p><Link href="/quan-tri/nha-xe">Quản lý nhà xe và tài khoản quản lý →</Link></p>
+  return <div className={styles.admin}><header className={styles.adminHeading}><p className={styles.eyebrow}>QUẢN TRỊ HỆ THỐNG</p><h1>Quản lý tài khoản</h1><p>Kiểm tra trạng thái và quyền truy cập của người dùng.</p></header><section className={styles.card}><div className={styles.sectionTitle}><h2>Danh sách tài khoản</h2><Link href="/quan-tri/nha-xe">Quản lý nhà xe →</Link></div>
     <p className={styles.muted}>Khóa tài khoản sẽ thu hồi tất cả phiên đăng nhập. Không thể tự khóa tài khoản quản trị hiện tại.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}{success && <p className={styles.success} role="status">{success}</p>}
     <div className={styles.scroll}><table className={styles.table}><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
