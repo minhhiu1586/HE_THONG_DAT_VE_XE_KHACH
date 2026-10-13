@@ -4,7 +4,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datvexe}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datvexe_project}
       POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -22,7 +22,7 @@ services:
     container_name: datvexe-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-datvexe}
+      POSTGRES_DB: ${POSTGRES_DB:-datvexe_project}
       POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
     ports:
@@ -37,17 +37,15 @@ services:
       - ./docs/database/schema/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
       - ./docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
       - ./docs/database/schema/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
-      - ./docs/database/seed/001_demo.sql:/docker-entrypoint-initdb.d/004_demo.sql:ro
-      - ./docs/database/seed/002_fleet_demo.sql:/docker-entrypoint-initdb.d/005_fleet_demo.sql:ro
-      - ./docs/database/seed/003_t06_transport.sql:/docker-entrypoint-initdb.d/006_transport.sql:ro
-      - ./docs/database/seed/005_t06_display_alignment.sql:/docker-entrypoint-initdb.d/007_display_alignment.sql:ro
-      - ./docs/database/seed/006_t11_staff.sql:/docker-entrypoint-initdb.d/008_staff.sql:ro
+      - ./docs/database/seed/001_catalog.sql:/docker-entrypoint-initdb.d/004_catalog.sql:ro
+      - ./docs/database/seed/002_accounts_staff_fleet.sql:/docker-entrypoint-initdb.d/005_accounts_staff_fleet.sql:ro
+      - ./docs/database/seed/003_routes_trips.sql:/docker-entrypoint-initdb.d/006_routes_trips.sql:ro
 
   migrate:
     image: postgres:16
     profiles: [ops]
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-datvexe}
+      POSTGRES_DB: ${POSTGRES_DB:-datvexe_project}
       POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
     volumes:

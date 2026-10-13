@@ -17,7 +17,7 @@ class AdminFixture:
         self.user_id = None
     def sql(self, statement):
         subprocess.run(['docker', 'exec', '-i', os.environ.get('DB_CONTAINER', 'datvexe-postgres'),
-            'psql', '-U', 'datvexe_user', '-d', os.environ.get('DB_NAME', 'datvexe'), '-v', 'ON_ERROR_STOP=1', '-c', statement],
+            'psql', '-U', 'datvexe_user', '-d', os.environ.get('DB_NAME', 'datvexe_project'), '-v', 'ON_ERROR_STOP=1', '-c', statement],
             check=True, stdout=subprocess.DEVNULL)
     def send(self, method, path, body=None):
         req = urllib.request.Request(self.base + path, method=method,

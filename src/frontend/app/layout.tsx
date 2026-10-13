@@ -1,11 +1,14 @@
 import "./globals.css";
 
 import Link from "next/link";
+import { AuthProvider } from "@/components/Account/AuthProvider";
+import AccountActions from "@/components/Account/AccountActions";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
       <body>
+        <AuthProvider>
         <header className="topbar">
           <Link className="brand" href="/home">
             <span className="brand-mark">V</span>
@@ -18,7 +21,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/trips">Tìm chuyến</Link>
             <a href="#support">Hỗ trợ</a>
           </nav>
-          <button className="ghost-button">Đăng nhập</button>
+          <AccountActions />
         </header>
         {children}
         <footer id="support">
@@ -35,6 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <p className="hotline">1900 6067</p>
           </div>
         </footer>
+        </AuthProvider>
       </body>
     </html>
   );

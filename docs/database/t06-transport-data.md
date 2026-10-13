@@ -56,7 +56,7 @@ Giữ riêng theo trách nhiệm: 003 tạo dữ liệu vận tải; 004 tạo t
 
 Khi cập nhật: giữ nguyên ID đang được vé/đơn tham chiếu; sửa assertion khi thay đổi số lượng hoặc quy ước dữ liệu; chạy script nạp và API test trước khi commit. Không thay đổi schema, mã tham chiếu hoặc logic backend/frontend.
 
-- Dữ liệu: `docs/database/seed/003_t06_transport.sql`, `004_t06_scenarios.sql`, `005_t06_display_alignment.sql`.
+- Dữ liệu: `tests/backend/fixtures/sql/003_transport.sql`, `004_t06_scenarios.sql`, `005_t06_display_alignment.sql`.
 - Hướng dẫn: file này.
 - Nạp/kiểm tra: `tests/backend/load_t06_transport.ps1`, `t06_transport_assertions.sql`, `t06_scenario_assertions.sql`, `t06_transport_api.ps1`.
 - Kiểm tra chín ca vận tải còn lại: `python tests/backend/t06_remaining_api.py`; tạo mã test riêng và tự dọn. Database trống đã được kiểm tra schema/seed trong container hiện có; xem kết quả ở ma trận.

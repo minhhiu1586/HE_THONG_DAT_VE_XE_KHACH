@@ -55,8 +55,8 @@ docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP
 Dừng và xử lý lỗi nếu bất kỳ migration nào thất bại. Không xóa volume để nâng cấp database cũ. Database phát triển chưa có demo có thể nạp:
 
 ```bash
-docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/seed/001_demo.sql
-docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/seed/002_fleet_demo.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < tests/backend/fixtures/sql/001_base.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < tests/backend/fixtures/sql/002_fleet.sql
 ```
 
 Seed là dữ liệu kiểm thử, có thể điều chỉnh bản ghi demo cũ; chỉ nạp trên database phát triển.
@@ -278,8 +278,8 @@ for file in \
   docs/database/schema/001_route_trip.sql \
   docs/database/schema/002_vehicle_alignment.sql \
   docs/database/schema/003_account_auth.sql \
-  docs/database/seed/001_demo.sql \
-  docs/database/seed/002_fleet_demo.sql
+  tests/backend/fixtures/sql/001_base.sql \
+  tests/backend/fixtures/sql/002_fleet.sql
 do
   docker exec -i datvexe-postgres psql \
     -U datvexe_user -d t07_test -v ON_ERROR_STOP=1 < "$file" || break

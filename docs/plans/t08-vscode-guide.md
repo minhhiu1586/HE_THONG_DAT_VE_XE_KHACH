@@ -253,8 +253,8 @@ docker exec datvexe-postgres createdb -U datvexe_user t08_test
 docker exec -i datvexe-postgres psql -U datvexe_user -d t08_test -v ON_ERROR_STOP=1 < docs/database/schema/001_route_trip.sql
 docker exec -i datvexe-postgres psql -U datvexe_user -d t08_test -v ON_ERROR_STOP=1 < docs/database/schema/002_vehicle_alignment.sql
 docker exec -i datvexe-postgres psql -U datvexe_user -d t08_test -v ON_ERROR_STOP=1 < docs/database/schema/003_account_auth.sql
-docker exec -i datvexe-postgres psql -U datvexe_user -d t08_test -v ON_ERROR_STOP=1 < docs/database/seed/001_demo.sql
-docker exec -i datvexe-postgres psql -U datvexe_user -d t08_test -v ON_ERROR_STOP=1 < docs/database/seed/002_fleet_demo.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d t08_test -v ON_ERROR_STOP=1 < tests/backend/fixtures/sql/001_base.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d t08_test -v ON_ERROR_STOP=1 < tests/backend/fixtures/sql/002_fleet.sql
 mvn -f src/backend/pom.xml -B -Duser.timezone=Asia/Ho_Chi_Minh -Dvehicle.pg.url=jdbc:postgresql://localhost:5432/t08_test -Dvehicle.pg.user=datvexe_user -Dvehicle.pg.password=datvexe_password verify
 ```
 

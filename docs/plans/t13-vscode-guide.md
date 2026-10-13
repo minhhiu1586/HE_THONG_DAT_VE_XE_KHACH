@@ -154,18 +154,30 @@ Các bản ghi `NHAP` hoặc `CHUA_KHOI_HANH` không tự xuất hiện như chu
 
 Nếu database đã có chuyến `DANG_MO_BAN` ở ngày tương lai và đủ điều kiện, dùng chuyến đó. Seed T11 cũng cung cấp sẵn một bộ chuyến đi-về để thử mở bán; `CX_6_1` được cấu hình làm chuyến TP. Hồ Chí Minh → Đà Lạt, xe `XE_006` và nhân viên cùng nhà xe. Chuyến này có một tài xế chính, một tài xế phụ, một phụ xe và tuyến về `CX_6_2` nối đúng bến. Trong database được seed mới, đây là dữ liệu kiểm thử có thể đủ điều kiện mở bán sau khi backend kiểm tra.
 
-### Nạp seed T11 vào database đã tồn tại
+### Dữ liệu chạy dự án hiện tại
+
+Database chính là `datvexe_project`. Dùng ba seed khởi tạo và API T12 mở bán:
+
+```powershell
+docker compose up -d postgres
+python scripts/load_project_data.py --activate
+python tests/backend/project_data_check.py --check-reload
+```
+
+Xem [dữ liệu và tài khoản](../database/seed/README.md). Mã chuyến hiện tại có dạng `CX_FUTA_1_YYYYMMDD_1`, ngày trong 14 ngày tới. Không dùng các mã CX_6_1/DEMO trong phần hồi quy dưới đây để kiểm tra database dự án mới.
+
+### Seed hồi quy cũ — chỉ dùng database kiểm thử
 
 Docker chỉ tự chạy các file seed khi khởi tạo volume PostgreSQL lần đầu. Vì vậy pull code hoặc khởi động lại container không tự tạo `CX_6_1`. Các seed có phụ thuộc; không chạy riêng `006_t11_staff.sql` trước seed vận tải T06.
 
 Tại thư mục gốc repository, nếu các seed nền chưa có, nạp theo thứ tự:
 
 ```bash
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/001_demo.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/002_fleet_demo.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/003_t06_transport.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/005_t06_display_alignment.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < docs/database/seed/006_t11_staff.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/001_base.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/002_fleet.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/003_transport.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/005_alignment.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/006_staff.sql
 ```
 
 Nếu đã xác nhận `001_demo.sql`, `002_fleet_demo.sql` và `005_t06_display_alignment.sql` có đủ dữ liệu, có thể chỉ cần chạy `003_t06_transport.sql` rồi `006_t11_staff.sql`. Ví dụ đang ở terminal `src/frontend`, đường dẫn file lần lượt bắt đầu bằng `../../docs/...`.

@@ -1,20 +1,22 @@
 .page { max-width: 680px; margin: 40px auto; padding: 0 16px; }
-.card { background: var(--surface); border-radius: 16px; padding: 28px; box-shadow: var(--shadow-md); margin-bottom: 24px; }
+.card { background: var(--surface, #fff); border: 1px solid var(--border, #dce8e4); border-radius: 16px; padding: 28px; box-shadow: var(--shadow-md, 0 8px 28px #172b2b0a); margin-bottom: 24px; }
 .card h1, .card h2 { margin-bottom: 12px; }
 .form { display: grid; gap: 16px; margin-top: 20px; }
 .form label { display: grid; gap: 6px; font-weight: 500; }
-.form input, .form select { min-width: 0; }
+.form input, .form select { min-width: 0; width: 100%; padding: 12px; border: 1px solid var(--border, #c8d9d4); border-radius: 8px; background: #fff; color: #172b2b; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .primary, .secondary { padding: 12px 20px; border-radius: 8px; font-weight: 600; }
-.primary { background: var(--primary); color: white; }
-.secondary { background: var(--primary-light); color: var(--primary-dark); }
+.primary { background: var(--primary, #0e8c85); color: white; border: 1px solid var(--primary, #0e8c85); min-height: 44px; }
+.primary:not(:disabled):hover { background: var(--primary-dark, #08756f); }
+.primary:focus-visible, .secondary:focus-visible, .form input:focus-visible, .form select:focus-visible { outline: 3px solid #83cfc8; outline-offset: 3px; }
+.secondary { background: var(--primary-light, #dff3ed); color: var(--primary-dark, #086b65); }
 .primary:disabled, .secondary:disabled { opacity: .6; cursor: wait; }
-.error { background: var(--error-light); color: #962e26; padding: 12px; border-radius: 8px; }
-.success { background: var(--success-light); color: #196b38; padding: 12px; border-radius: 8px; }
-.muted { color: var(--text-secondary); }
+.error { background: var(--error-light, #fef2f2); color: #962e26; padding: 12px; border-radius: 8px; }
+.success { background: var(--success-light, #f0fdf4); color: #196b38; padding: 12px; border-radius: 8px; }
+.muted { color: var(--text-secondary, #64748b); }
 .links { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; }
 .admin { max-width: 1100px; margin: 40px auto; padding: 0 16px; }
 .table { width: 100%; border-collapse: collapse; }
-.table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border, #dce8e4); }
 .scroll { overflow-x: auto; }
 @media (max-width: 600px) { .row { grid-template-columns: 1fr; } .card { padding: 20px; } }

@@ -2,7 +2,7 @@ param([string]$Container='datvexe-postgres',[string]$Database='datvexe',[string]
 $ErrorActionPreference='Stop'
 $OutputEncoding=[System.Text.UTF8Encoding]::new($false)
 $root=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$seed=Get-Content -Raw -Encoding UTF8 (Join-Path $root 'docs/database/seed/006_t11_staff.sql')
+$seed=Get-Content -Raw -Encoding UTF8 (Join-Path $root 'tests/backend/fixtures/sql/006_staff.sql')
 $body=$seed -replace '(?m)^BEGIN;\s*$', '' -replace '(?m)^COMMIT;\s*$', ''
 function Run-Sql([string]$Sql) {
     $Sql | docker exec -i $Container psql -U $User -d $Database -v ON_ERROR_STOP=1

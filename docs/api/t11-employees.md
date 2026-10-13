@@ -7,9 +7,9 @@ Nguồn task: [DATVEXE-19](https://app.plane.so/he_thong_dat_ve_xe_khach/browse/
 - Nhân viên, xe và tuyến cùng nhà xe; admin vẫn phải tuân thủ điều kiện nghiệp vụ. Nhân viên chỉ đọc hồ sơ/lịch được giao cho mình.
 - Một nhân viên một phân công trên một chuyến; tối đa một tài xế chính. Tài xế phải đang làm việc, đúng vai trò, có số/hạn bằng bao phủ đến cuối chuyến.
 - Lịch xe tách khỏi lịch nhân viên. Cả hai không trùng thời gian; chuyến liền trước/sau phải nối đúng bến. Khác bến trả lỗi yêu cầu điều phối di chuyển hoặc đổi xe/người; chưa tính đường đi giữa bến.
-- Bỏ đệm nghỉ 60 phút cho nhân viên; không áp mốc 2/8 giờ. Xe có thời gian chuẩn bị cấu hình `VEHICLE_TURNAROUND_MINUTES`, mặc định kỹ thuật 30 phút để review/điều chỉnh. Đúng ranh giới được phép. Thời gian chuẩn bị xe không chứng minh tài xế nghỉ đủ.
+- Xe có thời gian chuẩn bị cấu hình `VEHICLE_TURNAROUND_MINUTES`, mặc định 30 phút. Lịch nhân viên kiểm tra riêng theo thời gian chuyến và bến nối chuyến. Người điều phối xác nhận kế hoạch lái/nghỉ cho chuyến dài.
 - Nhân sự tối thiểu: một tài xế chính, ít nhất một phụ xe; chuyến trên 4 giờ thêm tài xế phụ. Chuyến dài phải có người điều phối xác nhận kế hoạch lái/nghỉ trước khi lưu phân công. Hệ thống chưa lưu từng ca lái nên không tự xác nhận tuân thủ giờ lái/nghỉ.
-- Body phân công thêm `xacNhanKeHoachLaiNghi: true` cho chuyến dài. Backend ghi người xác nhận/thời điểm/lịch/xe vào đầu `ghiChu` hiện có; không thêm cột. Sửa giờ/xe làm dấu xác nhận cũ không còn phù hợp; phải xác nhận lại trước mở bán. Dấu SEED chỉ dành cho kịch bản dữ liệu mẫu.
+- Body phân công dùng `xacNhanKeHoachLaiNghi: true` cho chuyến dài. Backend ghi người xác nhận/thời điểm/lịch/xe vào đầu `ghiChu`. Khi đổi giờ/xe, điều phối xác nhận lại kế hoạch trước mở bán.
 - Không sửa/thu hồi phân công chuyến đang chạy/hoàn tất. Chuyến đã có vé/giữ chỗ phải còn đủ nhân sự sau thay đổi; thiếu thì rollback. Giữ lịch sử chuyến hủy, không tính vào trùng lịch.
 - Không chuyển nhà xe hồ sơ; chặn đổi vai trò/trạng thái làm mất điều kiện phân công hoạt động. Chỉ xóa hồ sơ chưa có phân công/tài khoản liên kết.
 
@@ -26,31 +26,36 @@ Nguồn task: [DATVEXE-19](https://app.plane.so/he_thong_dat_ve_xe_khach/browse/
 
 Body hồ sơ: `maNhanVien`, `hoTen`, `soDienThoai`, `email`, `ngaySinh`, `maNhaXe`, `loaiNhanVien`, `trangThai`, `soBangLai`, `ngayHetHanBangLai`. PUT thay toàn bộ trường; giữ enum TAI_XE/PHU_XE/DIEU_HANH và DANG_LAM_VIEC/TAM_NGHI/DA_NGHI_VIEC. Dùng cookie/CSRF T07.1, lỗi theo `ApiErrors` T05.
 
-Nhánh này chỉ cung cấp backend, dữ liệu và test T11. Thành viên frontend xây giao diện theo API trên; dùng cookie/CSRF hiện có và hiển thị lỗi backend. Không bổ sung hoặc sửa frontend trong PR này.
+Frontend bổ sung trên `feature/t11-employee-ui`, từ commit backend T11 `b04f120`: quản lý tại `/quan-tri/nhan-vien`, lịch riêng tại `/nhan-vien`. Dùng cookie/CSRF và proxy `/api` hiện có; không dùng mock. Thêm mục điều hướng quản lý và liên kết lịch riêng cho tài khoản nhân viên.
+
+Quản lý: tìm/lọc/phân trang, thêm/sửa hồ sơ, trạng thái và số/hạn bằng; chọn nhân viên để xem lịch. Nhập mã chuyến rồi tải thông tin để xem nhân sự, kiểm tra điều kiện, thêm/sửa/thu hồi phân công. Backend vẫn quyết định quyền và điều kiện lưu. Không thêm hạng bằng theo thống nhất mới nhất của nhóm, dù mô tả Plane còn nhắc trường này.
+
+Hướng dẫn dữ liệu, tài khoản và ca test giao diện: [t11-ui-test.md](t11-ui-test.md).
 
 ## Dữ liệu và chạy kiểm tra
 
-`006_t11_staff.sql`: 18 nhân viên, 6 xe 22/29/40 chỗ, 182 ghế, 12 tuyến/chuyến đi-về và 36 phân công. Lịch lấy ngày nạp đầu; nạp lại không dời lịch hoặc ghi đè hồ sơ mới. Chuẩn hóa tên tạo tự động còn hậu tố TX/PX của bộ T06; giữ ID và lịch sử. Tên hiển thị không có chữ demo; mã nền DEMO vẫn tồn tại để tương thích FK/test đã có, không hiển thị thành tên nhà xe.
+Bộ dữ liệu dự án đã chốt: 5 nhà xe, 35 nhân viên, 47 tài khoản, 10 xe 22/29/40 chỗ, 320 ghế, 20 tuyến và lịch 14 ngày. Ba seed trong `docs/database/seed` dùng mã rõ ràng; xem [danh sách tài khoản/cách nạp](../database/seed/README.md). Seed cũ chuyển sang `tests/backend/fixtures/sql` để giữ test hồi quy, không nạp vào database dự án.
 
-Tham khảo thương hiệu/địa danh từ [FUTA](https://futabus.vn/) và [Thành Bưởi](https://thanhbuoi.com.vn/Lien-He). Nhân viên, điện thoại, biển số, lịch, giá và kế hoạch điều phối là dữ liệu mẫu phục vụ đồ án; không phải thông tin nhân viên/lịch vận hành của hãng. Email dùng miền `example.test`.
+Thương hiệu/địa danh tham khảo [FUTA](https://futabus.vn/) và [Thành Bưởi](https://thanhbuoi.com.vn/Lien-He), thông tin nhà xe/ảnh từ nhóm cung cấp. Hồ sơ nhân sự, lịch, giá và kế hoạch điều phối là dữ liệu nội bộ của đồ án. Tài khoản đăng nhập dùng miền `datvexe.test`.
 
-Docker mới nạp seed 006 sau seed 005. Database có volume sẵn cần schema xác thực 003 của T07 và dữ liệu vận tải nền; không xóa volume để nạp lại.
+Database dự án là `datvexe_project`, dùng container PostgreSQL hiện có; database cũ giữ nguyên. Docker tạo schema rồi ba seed, loader gọi API T12 để kiểm tra/mở bán; không đổi hàng loạt enum bằng SQL. Layout mới bọc lại AuthProvider và gắn AccountActions để tài khoản T11 đăng nhập được.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tests/backend/load_t11_staff.ps1
-python tests/backend/employee_assignment_smoke.py
+python scripts/load_project_data.py --activate
+python tests/backend/project_data_check.py --check-reload
 ```
 
 ## Ảnh hưởng dùng chung / bàn giao T12
 
 - Guard T07.1 bổ sung quyền/path nhân viên, phân biệt ID tạo mới với ID tài nguyên cũ; giữ kiểm tra nhà xe theo tài khoản thật.
-- `VehicleService` dùng `AssignmentRules`; `RouteTripService` gọi lại kiểm tra khi đổi xe/giờ. Ba fixture test xe/chuyến đổi sang lịch về đúng bến, không bỏ kiểm tra hồi quy cũ.
+- `VehicleService` dùng `AssignmentRules`; `RouteTripService` gọi lại kiểm tra khi đổi xe/giờ. Fixture test xe/chuyến dùng lịch về đúng bến.
 - T12 gọi `AssignmentRules.validateTrip(em, trip)` khi cập nhật, `readyForOperation(em, trip)` trước mở bán trong transaction của T12. Kiểm tra xe dùng `validateVehicleSchedule`; không tạo bộ quy tắc thứ hai.
-- Chưa thêm trạng thái chuyến nháp hoặc thực hiện luồng mở bán thay T12. Nghiệm thu tích hợp cuối cùng và review Thanh Hiền vẫn cần thực hiện khi T12 sẵn sàng.
+- Không triển khai lại T12: bộ dữ liệu gọi API mở bán T12 hiện có. Không triển khai giữ ghế/tạo đơn thay task khác; checkout hiện gọi API chưa có nên seed không thể làm phát sinh vé thật.
 
-## Kết quả kiểm tra — 12/10/2026
+## Kiểm tra và hướng dẫn sử dụng
 
-- Backend: 73 test đạt, 11 test PostgreSQL tùy chọn bỏ qua; không có test lỗi. Chạy lại 6 test hồ sơ/lịch sau sửa cuối: đạt.
-- API với PostgreSQL thật: 42 kiểm tra đạt, gồm cookie/CSRF, phạm vi nhà xe, lịch nối chuyến và hai tài khoản phân công đồng thời.
-- Seed 006: nạp và nạp lại đạt; số lượng/quan hệ/lịch đi-về đúng, lần nạp lại không thay đổi dữ liệu.
-- Chưa nghiệm thu luồng mở bán T12 hoặc kiểm chứng giờ lái/nghỉ thực tế; không tính các phần này là đã hoàn tất.
+- 52 kiểm tra HTTP T11 đạt: hồ sơ, lịch, quyền, cookie/CSRF và phân công đồng thời.
+- Bộ dữ liệu được kiểm tra số lượng, quan hệ, lịch và nạp lại. 47 tài khoản đăng nhập đúng quyền; API tìm chuyến và sơ đồ ghế đã kiểm qua proxy frontend.
+- Giao diện T11 có tìm/lọc, thẻ nhân viên, trạng thái, form hồ sơ, lịch chia trang và nhân sự chuyến. Ngày giờ hiển thị theo lịch địa phương từ backend.
+- Cách chạy, tài khoản và thao tác kiểm tra: [t11-ui-test.md](t11-ui-test.md).
+- Phạm vi dữ liệu và số lượng từng nhóm: [seed/README.md](../database/seed/README.md).
