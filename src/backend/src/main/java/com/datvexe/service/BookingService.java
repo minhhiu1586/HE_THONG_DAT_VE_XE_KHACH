@@ -1,7 +1,10 @@
 package com.datvexe.service;
 
 import com.datvexe.config.Jpa;
-import com.datvexe.domain.GiuCho;
+import com.datvexe.domain.Entities.GiuCho;
+import com.datvexe.domain.Entities.ChuyenXe;
+import com.datvexe.domain.Entities.Ghe;
+import com.datvexe.domain.States.TrangThaiGiuCho;
 import com.datvexe.dto.HoldSeatRequest;
 import com.datvexe.dto.HoldSeatResponse;
 import com.datvexe.repository.GiuChoRepository;
@@ -30,17 +33,25 @@ public class BookingService {
                 throw new RuntimeException("Ghế đang được giữ bởi người khác: " + String.join(", ", gheDangBiGiu));
             }
 
+            ChuyenXe chuyenXe = em.find(ChuyenXe.class, request.getMaChuyen());
+            if (chuyenXe == null) {
+                throw new IllegalArgumentException("Chuyến xe không tồn tại");
+            }
+
             // 2. Lưu xuống Database
             for (String maGhe : request.getDanhSachMaGhe()) {
+                Ghe ghe = em.find(Ghe.class, maGhe);
+                if (ghe == null || chuyenXe.xe == null || !chuyenXe.xe.maXe.equals(ghe.xe.maXe)) {
+                    throw new IllegalArgumentException("Ghế không thuộc xe của chuyến: " + maGhe);
+                }
                 GiuCho giuCho = new GiuCho();
-                giuCho.setMaGiuCho(UUID.randomUUID().toString());
-                giuCho.setMaChuyen(request.getMaChuyen());
-                giuCho.setMaGhe(maGhe);
-                giuCho.setMaDon(holdSessionId);
-                giuCho.setNgayDat(now);
-                giuCho.setThoiDiemBatDau(now);
-                giuCho.setThoiDiemHetHan(expiredAt);
-                giuCho.setTrangThai("DANG_GIU");
+                giuCho.maGiuCho = UUID.randomUUID().toString();
+                giuCho.chuyenXe = chuyenXe;
+                giuCho.ghe = ghe;
+                giuCho.ngayDat = now;
+                giuCho.thoiDiemBatDau = now;
+                giuCho.thoiDiemHetHan = expiredAt;
+                giuCho.trangThai = TrangThaiGiuCho.DANG_GIU;
 
                 giuChoRepository.save(em, giuCho);
             }
