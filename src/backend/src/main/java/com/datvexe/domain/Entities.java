@@ -257,6 +257,7 @@ public final class Entities {
         @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "ma_chinh_sach_hoan_ve") public ChinhSachHoanVe chinhSachHoanVe;
         @Column(name = "khach_dat_ten", nullable = false, length = 160) public String khachDatTen;
         @Column(name = "khach_dat_so_dien_thoai", nullable = false, length = 30) public String khachDatSoDienThoai;
+        @Column(name = "khach_dat_email", length = 254) public String khachDatEmail;
         @Column(name = "ghi_chu", length = 1000) public String ghiChu;
         @Enumerated(EnumType.STRING) @Column(name = "kenh_dat", nullable = false, length = 30)
         public KenhDat kenhDat = KenhDat.WEB;
@@ -272,6 +273,7 @@ public final class Entities {
         indexes = @Index(name = "ix_ve_xe_don", columnList = "ma_don"))
     public static class VeXe {
         @Id @Column(name = "ma_ve", length = 40) public String maVe;
+        @Column(name = "ma_tra_cuu", length = 5, unique = true) public String maTraCuu;
         @ManyToOne(optional = false, fetch = FetchType.EAGER) @JoinColumn(name = "ma_chuyen", nullable = false)
         public ChuyenXe chuyenXe;
         @ManyToOne(optional = false, fetch = FetchType.EAGER) @JoinColumn(name = "ma_ghe", nullable = false)

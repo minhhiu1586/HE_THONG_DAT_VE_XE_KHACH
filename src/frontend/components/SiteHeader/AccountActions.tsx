@@ -148,7 +148,7 @@ export default function AccountActions() {
             aria-hidden="true"
           />
           <div
-            className="account-menu"
+            className="account-menu account-menu-polished"
             role="menu"
             aria-label="Menu tài khoản"
             style={{
@@ -157,10 +157,10 @@ export default function AccountActions() {
               top: 'calc(100% + 8px)',
               zIndex: 100,
               background: '#fff',
-              border: '1.5px solid var(--border-2)',
+              border: '1px solid #e2e8f0',
               borderRadius: 'var(--radius-lg)',
               boxShadow: 'var(--shadow-lg)',
-              maxWidth: 'calc(100vw - 32px)',
+              width: '280px', maxWidth: 'calc(100vw - 32px)',
               overflow: 'hidden',
               animation: 'dropIn .18s ease',
             }}
@@ -171,28 +171,28 @@ export default function AccountActions() {
             <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--border-2)' }}>
               <div style={{ fontWeight: 700, fontSize: '15px' }}>{user.hoTen}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
-                {user.loaiTaiKhoan === 'ADMIN' ? '⚙ Quản trị viên'
-                  : user.loaiTaiKhoan === 'NHA_XE' ? '🏢 Quản lý nhà xe'
-                  : user.loaiTaiKhoan === 'NHAN_VIEN' ? '👷 Nhân viên'
-                  : '👤 Hành khách'}
+                {user.loaiTaiKhoan === 'ADMIN' ? 'Quản trị viên'
+                  : user.loaiTaiKhoan === 'NHA_XE' ? 'Quản lý nhà xe'
+                  : user.loaiTaiKhoan === 'NHAN_VIEN' ? 'Nhân viên'
+                  : 'Hành khách'}
               </div>
             </div>
 
             {/* Menu items */}
-            <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: '8px' }}>
               <Link
                 href="/tai-khoan"
                 role="menuitem"
                 onClick={() => setOpen(false)}
                 style={{
                   display: 'flex', gap: '10px', alignItems: 'center',
-                  padding: '11px 18px', fontSize: '14px', color: 'var(--text-primary)',
+                  padding: '11px 12px', fontSize: '14px', color: 'var(--text-primary)',
                   transition: 'background var(--transition)',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = ''; }}
               >
-                <span aria-hidden="true">👤</span> Hồ sơ cá nhân
+                Hồ sơ cá nhân
               </Link>
 
               {canManage(user.loaiTaiKhoan) && (
@@ -202,13 +202,12 @@ export default function AccountActions() {
                   onClick={() => setOpen(false)}
                   style={{
                     display: 'flex', gap: '10px', alignItems: 'center',
-                    padding: '11px 18px', fontSize: '14px', color: 'var(--text-primary)',
+                    padding: '11px 12px', fontSize: '14px', color: 'var(--text-primary)',
                     transition: 'background var(--transition)',
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = ''; }}
                 >
-                  <span aria-hidden="true">⚙</span>
                   {user.loaiTaiKhoan === 'ADMIN' ? 'Quản trị hệ thống' : 'Quản lý nhà xe'}
                 </Link>
               )}
@@ -220,13 +219,13 @@ export default function AccountActions() {
                   onClick={() => setOpen(false)}
                   style={{
                     display: 'flex', gap: '10px', alignItems: 'center',
-                    padding: '11px 18px', fontSize: '14px', color: 'var(--text-primary)',
+                    padding: '11px 12px', fontSize: '14px', color: 'var(--text-primary)',
                     transition: 'background var(--transition)',
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = ''; }}
                 >
-                  <span aria-hidden="true">📋</span> Lịch chuyến của tôi
+                  Lịch chuyến của tôi
                 </Link>
               )}
 
@@ -238,7 +237,7 @@ export default function AccountActions() {
                 onClick={() => void logout()}
                 style={{
                   display: 'flex', gap: '10px', alignItems: 'center',
-                  padding: '11px 18px', fontSize: '14px',
+                  padding: '11px 12px', fontSize: '14px',
                   color: busy ? 'var(--text-muted)' : '#e11d48',
                   width: '100%', textAlign: 'left',
                   transition: 'background var(--transition)',
@@ -247,7 +246,6 @@ export default function AccountActions() {
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#fff1f2'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = ''; }}
               >
-                <span aria-hidden="true">🚪</span>
                 {busy ? 'Đang đăng xuất…' : 'Đăng xuất'}
               </button>
             </div>

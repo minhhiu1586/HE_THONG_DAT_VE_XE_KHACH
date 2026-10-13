@@ -2057,6 +2057,10 @@ components:
           type: string
           minLength: 1
           maxLength: 20
+        khachDatEmail:
+          type: string
+          format: email
+          maxLength: 254
         ghiChu:
           type:
           - string
@@ -2251,6 +2255,16 @@ components:
           type: string
           minLength: 1
           maxLength: 20
+        khachDatEmail:
+          type: [string, 'null']
+          format: email
+          maxLength: 254
+        emailXacNhan:
+          type: [object, 'null']
+          properties:
+            trangThai: {type: string, enum: [PENDING, SENDING, SENT, FAILED, UNKNOWN]}
+            diaChi: {type: string, format: email}
+            thoiDiemGui: {type: [string, 'null'], format: date-time}
         ghiChu:
           type:
           - string
@@ -2850,6 +2864,7 @@ components:
       required: [maVe, maDon, maChuyen, maGhe, hoTenHanhKhach, trangThai, giaGoc, tienGiam, thanhTien, donViTienTe, qrToken, thoiDiemPhatHanh]
       properties:
         maVe: {$ref: '#/components/schemas/Id'}
+        maTraCuu: {type: string, minLength: 5, maxLength: 5, description: Public ticket reference for customer display}
         maDon: {$ref: '#/components/schemas/Id'}
         maChuyen: {$ref: '#/components/schemas/Id'}
         maGhe: {$ref: '#/components/schemas/Id'}

@@ -52,8 +52,9 @@ public final class BookingService {
             List<Ghe> seats = seatIds.stream().sorted().map(id -> availableSeat(em, trip, id, checkedAt)).toList();
             NguoiDung buyer = em.find(NguoiDung.class, identity().maNguoiDung());
             DonDatVe order = new DonDatVe();
-            order.maDon = id();
+            order.maDon = OrderCode.next();
             order.nguoiDat = buyer;
+            order.khachDatEmail = buyer.email;
             order.khachDatTen = text(buyer.hoTen, "khachDatTen", 120);
             order.khachDatSoDienThoai = text(buyer.soDienThoai, "khachDatSoDienThoai", 20);
             // The window starts after all locks and sale checks have completed.
@@ -144,7 +145,7 @@ public final class BookingService {
             OrderContext context = lockOrder(em, maDon, passengers);
             editable(em, context);
             if (body == null || !body.isObject() || body.isEmpty()) throw invalid("body", "Cần ít nhất một trường liên hệ.");
-            Set<String> fields = Set.of("khachDatTen", "khachDatSoDienThoai", "ghiChu");
+            Set<String> fields = Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail", "ghiChu");
             body.fieldNames().forEachRemaining(field -> {
                 if (!fields.contains(field)) throw invalid(field, "Trường không được hỗ trợ.");
                 JsonNode value = body.get(field);
@@ -153,6 +154,12 @@ public final class BookingService {
             });
             if (body.has("khachDatTen")) context.order.khachDatTen = text(body.get("khachDatTen").asText(), "khachDatTen", 120);
             if (body.has("khachDatSoDienThoai")) context.order.khachDatSoDienThoai = text(body.get("khachDatSoDienThoai").asText(), "khachDatSoDienThoai", 20);
+            if (body.has("khachDatEmail")) {
+                String email = text(body.get("khachDatEmail").asText(), "khachDatEmail", 254);
+                if (!email.matches("^[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+$"))
+                    throw invalid("khachDatEmail", "Địa chỉ email nhận vé không hợp lệ.");
+                context.order.khachDatEmail = email;
+            }
             if (body.has("ghiChu")) context.order.ghiChu = optional(body.get("ghiChu").isNull() ? null : body.get("ghiChu").asText(), "ghiChu", 500);
             return updated(em, context);
         });
@@ -443,7 +450,7 @@ public final class BookingService {
         LocalDateTime now = now();
         List<TicketResponse> tickets = context.tickets.stream()
                 .sorted(Comparator.comparing((VeXe v) -> v.ghe.maGhe).thenComparing(v -> v.maVe))
-                .map(v -> new TicketResponse(v.maVe, v.ghe.maGhe, v.hoTenKhachHang, v.soDienThoaiKhachHang,
+                .map(v -> new TicketResponse(v.maVe, v.maTraCuu, (v.trangThai == TrangThaiVe.DA_XUAT_VE || v.trangThai == TrangThaiVe.DA_LEN_XE) ? com.datvexe.ticket.TicketQr.dataUri(v.maQR) : null, v.ghe.maGhe, v.hoTenKhachHang, v.soDienThoaiKhachHang,
                         v.cccdHanhKhach, amount(v.giaVe), v.trangThai, offset(v.ngayXuatVe))).toList();
         Set<String> heldSeats = new HashSet<>();
         active(context).forEach(h -> heldSeats.add(h.ghe.maGhe));
@@ -456,9 +463,14 @@ public final class BookingService {
         boolean ready = context.order.trangThai == TrangThaiDon.CHO_XU_LY && now.isBefore(deadline(context))
                 && !heldSeats.isEmpty() && heldSeats.equals(passengerSeats) && passengers.size() == heldSeats.size();
         return new Result(200, new OrderResponse(context.order.maDon, context.trip.maChuyen, context.order.trangThai,
-                context.order.khachDatTen, context.order.khachDatSoDienThoai, context.order.ghiChu, offset(now),
+                context.order.khachDatTen, context.order.khachDatSoDienThoai, context.order.khachDatEmail, context.order.ghiChu, offset(now),
                 offset(start(context)), offset(deadline(context)), holdResponses(context), passengers, tickets,
-                preview(em, context, now), ready, frozenPrice(context), notices));
+                preview(em, context, now), ready, frozenPrice(context), notices, emailStatus(em, context.order)));
+    }
+
+    private BookingDto.EmailStatus emailStatus(EntityManager em, DonDatVe order) {
+        com.datvexe.domain.EmailOutbox notification = em.find(com.datvexe.domain.EmailOutbox.class, order.maDon);
+        return notification == null ? null : new BookingDto.EmailStatus(notification.status, notification.recipient, offset(notification.sentAt));
     }
 
     private PricePreview preview(EntityManager em, OrderContext context, LocalDateTime now) {
@@ -563,7 +575,7 @@ public final class BookingService {
                 .put("giaCoBan", amount(baseFare(context.trip)))
                 .put("khachDatTen", context.order.khachDatTen)
                 .put("khachDatSoDienThoai", context.order.khachDatSoDienThoai)
-                .put("ghiChu", context.order.ghiChu).put("expiresAt", deadline(context).toString());
+                .put("ghiChu", context.order.ghiChu).put("email", context.order.khachDatEmail).put("expiresAt", deadline(context).toString());
         input.set("seats", JSON.valueToTree(active(context).stream().map(h -> h.ghe.maGhe).sorted().toList()));
         input.set("passengers", JSON.valueToTree(context.passengers.stream()
                 .sorted(Comparator.comparing(PassengerRequest::maGhe)).toList()));

@@ -1,0 +1,15 @@
+.front { margin: 0 0 18px; overflow: hidden; border: 1px solid #cbd8e9; border-radius: 36px 36px 12px 12px; background: #f8fafc; }
+.windshield { position: relative; display: flex; justify-content: center; align-items: center; height: 68px; margin: 10px 12px 0; overflow: hidden; border: 1px solid #bfdaef; border-radius: 28px 28px 8px 8px; background: linear-gradient(125deg, #dceffd, #f0f9ff 48%, #d6eafa); }
+.windshield::before { content: ''; position: absolute; width: 30%; height: 130%; top: -15%; left: 12%; transform: skewX(-22deg); background: rgba(255,255,255,.45); }
+.direction { position: relative; display: inline-flex; gap: 6px; align-items: center; padding: 5px 10px; color: #315a7e; font-size: 11px; font-weight: 600; }
+.direction svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.wiperLeft, .wiperRight { position: absolute; bottom: 6px; width: 22%; height: 2px; border-radius: 2px; background: #8aa9bf; }
+.wiperLeft { left: 12%; transform: rotate(-8deg); }.wiperRight { right: 12%; transform: rotate(8deg); }
+.cockpit { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 22px; }
+.driver { display: flex; align-items: center; gap: 12px; color: #334155; }
+.wheel { width: 40px; height: 40px; flex-shrink: 0; fill: none; stroke: #475569; stroke-width: 3; stroke-linecap: round; }
+.driver strong { display: block; font-size: 13px; }.driver small { display: block; margin-top: 3px; color: #64748b; font-size: 11px; }
+.entry { display: flex; gap: 8px; align-items: center; font-size: 11px; color: #64748b; }
+.entry svg { width: 25px; height: 32px; fill: #e7f0fa; stroke: #819bb8; stroke-width: 1.5; }
+.upper { padding: 12px; font-size: 12px; text-align: center; color: #64748b; }
+@media (max-width: 480px) { .cockpit { padding: 14px; gap: 12px; }.driver { gap: 8px; }.wheel { width: 32px; height: 32px; }.windshield { height: 56px; } }

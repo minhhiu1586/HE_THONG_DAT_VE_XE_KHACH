@@ -206,9 +206,9 @@
 
 .seatGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 12px;
-  max-width: 720px;
+  width: 100%;
+  max-width: 560px;
 }
 
 .seat {
@@ -259,7 +259,6 @@
 
 @media (max-width: 520px) {
   .seatGrid {
-    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
     gap: 8px;
   }
 
@@ -351,3 +350,16 @@
 .bookingControls .bookingAction a:hover, .bookingControls .panelActions button:hover { transform: none; }
 .bookingControls .panelActions button:hover:not(:disabled) { background: #eff5ff; border-color: #9dbbec; color: #1d4ed8; }
 .bookingControls .bookingAction a:focus-visible, .bookingControls .panelActions button:focus-visible { outline: 3px solid #93b4ed; outline-offset: 3px; }
+
+.layoutCaption { margin: 14px 0; color: #64748b; font-size: 13px; }
+.floor { max-width: 560px; margin-inline: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background: #f8fafc; }
+.floor :global(.driver-position) { width: auto; padding: 10px 12px; gap: 10px; margin-bottom: 16px; background: #fff; border-color: #e2e8f0; color: #475569; }
+.floor :global(.driver-position) > span { font-size: 20px; }
+.floor :global(.driver-position) strong { font-size: 13px; }
+.floor :global(.driver-position) small { font-size: 11px; }
+.seat { min-width: 0; padding: 8px 4px; width: 100%; }
+@media (max-width: 520px) {
+  .floor { padding: 12px; }
+  .seat strong { font-size: 14px; }
+  .seat small { font-size: 10px; }
+}

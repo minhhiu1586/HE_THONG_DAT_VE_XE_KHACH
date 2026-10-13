@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { getTrip, getTripSeats, type SearchTrip, type HoldSeatResponse } from "@/lib/api";
+import { ApiError } from '@/lib/account-api';
 import { useAuth } from '@/components/Account/AuthProvider';
 import { bookingStore, useBookingStore } from "@/store/useBookingStore";
 import SeatLayout from "@/components/booking/SeatLayout";
@@ -12,7 +13,7 @@ import type { SeatMap } from "@/types";
 
 export default function SeatsPage() {
   const { maChuyen: tripId } = useParams<{ maChuyen: string }>();
-  const { user, request } = useAuth();
+  const { user, loading: authLoading, request } = useAuth();
   const router = useRouter();
   const booking = useBookingStore();
   const [trip, setTrip] = useState<SearchTrip>();
@@ -22,6 +23,8 @@ export default function SeatsPage() {
 
   // State mới để khóa nút bấm khi đang gọi API giữ ghế
   const [isHolding, setIsHolding] = useState(false);
+  const [holdError, setHoldError] = useState("");
+  const holdErrorRef = useRef<HTMLParagraphElement>(null);
   const holdAttempt = useRef<{ body: string; key: string } | null>(null);
 
  useEffect(() => {
@@ -48,9 +51,16 @@ export default function SeatsPage() {
 
   // Hàm xử lý giữ ghế trước khi sang trang Checkout
   const handleContinue = async () => {
-    if (booking.selectedSeats.length === 0) return;
+    if (isHolding || authLoading) return;
+    setHoldError("");
+    if (booking.selectedSeats.length === 0) { setHoldError("Chọn ít nhất một ghế trống để tiếp tục."); return; }
     if (!user) { router.push(`/dang-nhap?next=${encodeURIComponent(`/tim-chuyen/${tripId}/seats`)}`); return; }
 
+    if (user.loaiTaiKhoan !== 'KHACH_HANG') {
+      setHoldError('Tài khoản hiện tại là tài khoản quản lý. Vui lòng đăng nhập bằng tài khoản khách hàng để đặt vé.');
+      requestAnimationFrame(() => holdErrorRef.current?.focus());
+      return;
+    }
     setIsHolding(true);
     try {
       // Gọi trực tiếp hàm holdSeats
@@ -66,11 +76,19 @@ export default function SeatsPage() {
       bookingStore.setHoldSession(response.maDon, response.thoiDiemHetHan);
 
       // Chuyển sang trang Checkout
-      router.push(`/tim-chuyen/${tripId}/checkout`);
+      router.push(`/tim-chuyen/${tripId}/checkout?order=${encodeURIComponent(response.maDon)}`);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Ghế đã bị người khác chọn. Vui lòng chọn ghế khác!");
-      if (map?.maXe) {
-        getTripSeats(tripId).then(res => { setMap({ ...map, danhSachGhe: res.danhSachGhe }); bookingStore.set({ selectedSeats: [] }); }).catch(() => setError('Không thể cập nhật ghế. Vui lòng tải lại trang.'));
+      setHoldError(e instanceof Error ? e.message : 'Không thể giữ ghế. Vui lòng thử lại.');
+      requestAnimationFrame(() => holdErrorRef.current?.focus());
+      if (e instanceof ApiError && e.code === 'SEAT_UNAVAILABLE' && map) {
+        try {
+          const latest = await getTripSeats(tripId);
+          setMap({ ...map, danhSachGhe: latest.danhSachGhe });
+          const available = new Set(latest.danhSachGhe.filter(seat => seat.trangThaiSuDung === 'HOAT_DONG' && seat.tinhTrangKhaDung === 'TRONG').map(seat => seat.maGhe));
+          bookingStore.set({ selectedSeats: bookingStore.get().selectedSeats.filter(id => available.has(id)) });
+        } catch {
+          setHoldError('Không thể cập nhật trạng thái ghế. Ghế đã chọn vẫn được giữ trên giao diện; vui lòng thử lại.');
+        }
       }
     } finally {
       setIsHolding(false);
@@ -127,7 +145,8 @@ export default function SeatsPage() {
             <SeatLayout
               seats={map.danhSachGhe}
               selected={booking.selectedSeats}
-              onToggle={id => { if (trip.coTheDatVe && !isHolding) bookingStore.toggleSeat(id); }}
+              disabled={!trip.coTheDatVe || isHolding}
+              onToggle={id => { if (trip.coTheDatVe && !isHolding) { setHoldError(''); bookingStore.toggleSeat(id); } }}
             />
           </section>
           <aside className="summary-card seat-ticket-summary" aria-label="Vé của bạn">
@@ -141,9 +160,11 @@ export default function SeatsPage() {
             </div>
             <div className="ticket-price-row"><span>Giá mỗi ghế</span><strong>{Number(trip.giaVeDuKien ?? 0).toLocaleString('vi-VN')}đ</strong></div>
             <div className="ticket-total"><p>Tổng tham khảo</p><strong className="total">{(booking.selectedSeats.length * Number(trip.giaVeDuKien ?? 0)).toLocaleString('vi-VN')}đ</strong></div>
-            <button className="primary-button full" type="button" disabled={!booking.selectedSeats.length || isHolding || !trip.coTheDatVe} onClick={handleContinue}>
-              {isHolding ? 'Đang giữ ghế…' : 'Giữ ghế và tiếp tục'}
+            <button className="primary-button full" type="button" disabled={!booking.selectedSeats.length || isHolding || authLoading || !trip.coTheDatVe} onClick={handleContinue}>
+              {authLoading ? 'Đang kiểm tra tài khoản…' : isHolding ? 'Đang giữ ghế…' : 'Giữ ghế và tiếp tục'}
             </button>
+            {holdError && <p ref={holdErrorRef} tabIndex={-1} className="form-error" role="alert">{holdError}</p>}
+            {!holdError && user && user.loaiTaiKhoan !== 'KHACH_HANG' && <p className="form-error">Bạn đang dùng tài khoản quản lý. Đặt vé cần tài khoản khách hàng.</p>}
             <small>{!trip.coTheDatVe ? 'Chuyến không còn nhận đặt vé.' : !booking.selectedSeats.length ? 'Chọn ít nhất một ghế để tiếp tục.' : 'Giá cuối cùng được xác nhận theo đơn đặt vé.'}</small>
           </aside>
         </div>
