@@ -33,18 +33,19 @@ export default function ProfilePanel() {
     finally { sending.current = false; setBusy(false); }
   }
   if (loading || !user) return <div className={styles.page}><p role="status">Đang kiểm tra phiên đăng nhập…</p></div>;
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${styles.profile}`}>
+    <header className={styles.profileHeading}><p className={styles.eyebrow}>TÀI KHOẢN CỦA BẠN</p><h1>Hồ sơ cá nhân</h1><p>Quản lý thông tin và bảo mật tài khoản.</p></header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {success && <p className={styles.success} role="status">{success}</p>}
-    <section className={styles.card}><h1>Hồ sơ cá nhân</h1><p className={styles.muted}>Vai trò: {roles[user.loaiTaiKhoan]}</p>
+    <section className={styles.card}><h2>Thông tin cá nhân</h2><p className={styles.muted}>Vai trò: {roles[user.loaiTaiKhoan]}</p>
       <form onInvalid={vietnameseValidation} onInput={clearValidation} className={styles.form} onSubmit={event => submit(event)} key={user.maNguoiDung + user.email + user.soDienThoai}>
         <label>Họ tên<input name="hoTen" defaultValue={user.hoTen} autoComplete="name" maxLength={160} required /></label>
         <label>Email<input name="email" type="email" defaultValue={user.email} autoComplete="email" maxLength={254} required /></label>
         <label>Số điện thoại<input name="soDienThoai" type="tel" defaultValue={user.soDienThoai} autoComplete="tel"
           pattern="(0[35789][0-9]{8}|\+84[35789][0-9]{8})" title="Số Việt Nam 10 chữ số hoặc dạng +84" required /></label>
-        <div className={styles.row}><label>Giới tính<select name="gioiTinh" defaultValue={user.gioiTinh ?? ''}>
+        <label>Giới tính<select name="gioiTinh" defaultValue={user.gioiTinh ?? ''}>
           <option value="">Chưa cung cấp</option><option value="NAM">Nam</option><option value="NU">Nữ</option><option value="KHAC">Khác</option>
-        </select></label><label>Ngày sinh<input name="ngaySinh" type="date" defaultValue={user.ngaySinh ?? ''} min="1900-01-01" /></label></div>
+        </select></label><label>Ngày sinh<input name="ngaySinh" type="date" defaultValue={user.ngaySinh ?? ''} min="1900-01-01" /></label>
         <label>CCCD / Hộ chiếu (không bắt buộc)<input name="cccd" defaultValue={user.cccd ?? ''} maxLength={20} /></label>
         <button className={styles.primary} disabled={busy}>{busy ? 'Đang xử lý…' : 'Lưu hồ sơ'}</button>
       </form>
