@@ -1,26 +1,40 @@
-import type { Metadata } from "next";
 import "./globals.css";
-import Header from "../components/Header/Header";
-import Footer from "../components/Footer/Footer";
 
-export const metadata: Metadata = {
-  title: "VeXe - Hệ thống đặt vé xe khách trực tuyến",
-  description: "Hệ thống đặt vé xe khách trực tuyến hàng đầu Việt Nam. Hàng ngàn tuyến đường, chắc chắn có chỗ, đa dạng thanh toán.",
-};
+import Link from "next/link";
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
       <body>
-        <Header />
-        <main style={{ minHeight: "calc(100vh - 300px)" }}>
-          {children}
-        </main>
-        <Footer />
+        <header className="topbar">
+          <Link className="brand" href="/home">
+            <span className="brand-mark">V</span>
+            <span>
+              Vexere<span className="brand-dot">.</span>
+            </span>
+          </Link>
+          <nav>
+            <Link href="/home">Trang chủ</Link>
+            <Link href="/trips">Tìm chuyến</Link>
+            <a href="#support">Hỗ trợ</a>
+          </nav>
+          <button className="ghost-button">Đăng nhập</button>
+        </header>
+        {children}
+        <footer id="support">
+          <div>
+            <strong>Vexere.</strong>
+            <p>Đặt vé nhanh chóng, an tâm trên mọi hành trình.</p>
+          </div>
+          <div>
+            <strong>Hỗ trợ</strong>
+            <p>Trung tâm trợ giúp · Chính sách hoàn vé</p>
+          </div>
+          <div>
+            <strong>Hotline</strong>
+            <p className="hotline">1900 6067</p>
+          </div>
+        </footer>
       </body>
     </html>
   );
