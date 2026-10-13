@@ -1,8 +1,9 @@
 import Image from 'next/image';
+import siteLogo from '@/public/images/site-logo.jpg';
 
 export default function SiteLogo() {
   return <>
-    <Image className="site-logo" src="/images/site-logo.jpg" alt="" width={48} height={48} />
-    <span>Vexere<span className="brand-dot">.</span></span>
+    <Image className="site-logo" src={siteLogo} alt="" width={48} height={48} sizes="48px" />
+    <span>Vexexin<span className="brand-dot">.</span></span>
   </>;
 }
