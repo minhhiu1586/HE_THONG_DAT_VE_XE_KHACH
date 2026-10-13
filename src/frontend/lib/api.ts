@@ -1,3 +1,5 @@
+import { groupSearchOptions } from './search-locations';
+
 export interface CityRecord {
   maTinhThanh: string;
   tenTinhThanh: string;
@@ -16,6 +18,9 @@ export interface SearchOption {
   value: string;
   label: string;
   kind: 'CITY' | 'STATION';
+  aliases?: string[];
+  detail?: string;
+  cityValue?: string;
 }
 
 export interface PopularRoute {
@@ -170,22 +175,22 @@ export async function getSearchOptions(): Promise<SearchOption[]> {
     apiGet<CityRecord[]>('/tinh-thanh'),
     apiGet<StationRecord[]>('/ben-xe?trangThai=HOAT_DONG'),
   ]);
-  return [
-    ...cities.map(city => ({ value: `CITY:${city.maTinhThanh}`, label: city.tenTinhThanh, kind: 'CITY' as const })),
-    ...stations.map(station => {
-      const city = cities.find(item => item.maTinhThanh === station.maTinhThanh);
-      return {
-        value: `STATION:${station.maBenXe}`,
-        label: `${station.tenBenXe}${city ? ` · ${city.tenTinhThanh}` : ''}`,
-        kind: 'STATION' as const,
-      };
-    }),
-  ];
+  return groupSearchOptions(cities, stations);
 }
 
 export async function searchTrips(from: string, to: string, date: string): Promise<SearchTrip[]> {
-  const query = new URLSearchParams({ from, to, date });
-  return apiGet<SearchTrip[]>(`/chuyen-xe?${query.toString()}`);
+  const options = await getSearchOptions();
+  const aliasesFor = (value: string) => options.find(option => option.value === value || option.aliases?.includes(value))?.aliases ?? [value];
+  const requests = aliasesFor(from).flatMap(origin => aliasesFor(to).map(destination => ({ origin, destination })));
+  const trips = new Map<string, SearchTrip>();
+  for (let offset = 0; offset < requests.length; offset += 4) {
+    const results = await Promise.all(requests.slice(offset, offset + 4).map(({ origin, destination }) => {
+      const query = new URLSearchParams({ from: origin, to: destination, date });
+      return apiGet<SearchTrip[]>(`/chuyen-xe?${query.toString()}`);
+    }));
+    for (const result of results) for (const trip of result) trips.set(trip.maChuyen, trip);
+  }
+  return [...trips.values()].sort((a, b) => a.gioKhoiHanh.localeCompare(b.gioKhoiHanh) || a.maChuyen.localeCompare(b.maChuyen));
 }
 
 export async function getTrip(tripId: string): Promise<SearchTrip> {
