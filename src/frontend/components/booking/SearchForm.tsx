@@ -21,36 +21,13 @@ export default function SearchForm({
   );
   const [stations, setStations] = useState<Station[]>([]);
 
-useEffect(() => {
-    if (
-      initial &&
-      (initial.from !== values.from ||
-        initial.to !== values.to ||
-        initial.date !== values.date)
-    ) {
-      setValues(initial);
-    }
-  }, [initial, values.from, values.to, values.date]);
-
   useEffect(() => {
     api.stations()
       .then(setStations)
       .catch(() => setStations([]));
   }, []);
 
-  useEffect(() => {
-    if (!initial || !stations.length) return;
-    const label = (value: string) =>
-      stations.find(
-        (station) =>
-          station.maBenXe === value || station.tenBenXe === value,
-      )?.tenBenXe ?? value;
-    setValues((current) => ({
-      ...current,
-      from: label(initial.from),
-      to: label(initial.to),
-    }));
-  }, [initial?.from, initial?.to, stations]);
+
 
   const resolve = (value: string) =>
     stations.find(
