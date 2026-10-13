@@ -66,6 +66,9 @@ nav a:first-child{
     font-weight:700
 }
 .ghost-button,.outline-button{
+    display:inline-flex;
+    align-items:center;
+    text-decoration:none;
     background:#fff;
     border:1px solid var(--line);
     border-radius:8px;
