@@ -21,7 +21,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
     <>
       {/* ── Zone 1 & 2: Sticky Public Header ── */}
       <header className="topbar">
-        <Link className="brand" href="/home" aria-label="Trang chủ Vexere">
+        <Link className="brand" href="/home" aria-label="Trang chủ Vexexin">
           <SiteLogo />
         </Link>
 
@@ -50,7 +50,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
       {/* ── Zone 1: Footer ── */}
       <footer id="support" role="contentinfo">
         <div>
-          <Link className="brand footer-brand" href="/home" aria-label="Trang chủ Vexere"><SiteLogo /></Link>
+          <Link className="brand footer-brand" href="/home" aria-label="Trang chủ Vexexin"><SiteLogo /></Link>
           <p className="footer-tagline">Đặt vé nhanh chóng, an tâm trên mọi hành trình.</p>
         </div>
         <div>
@@ -67,7 +67,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
           </p>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} Vexere. Bảo lưu mọi quyền.</span>
+          <span>© {new Date().getFullYear()} Vexexin. Bảo lưu mọi quyền.</span>
           <span>Đặt vé xe khách trực tuyến · An toàn · Tiện lợi</span>
         </div>
       </footer>

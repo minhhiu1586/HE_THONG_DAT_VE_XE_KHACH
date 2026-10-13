@@ -11,9 +11,9 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: 'VeXeRe – Đặt vé xe khách trực tuyến',
+  title: 'Vexexin – Đặt vé xe khách trực tuyến',
   description: 'Tìm kiếm và đặt vé xe khách dễ dàng, an toàn với hàng nghìn chuyến xe mỗi ngày.',
-  keywords: 'đặt vé xe, xe khách, vé xe online, vexere',
+  keywords: 'đặt vé xe, xe khách, vé xe online, vexexin',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

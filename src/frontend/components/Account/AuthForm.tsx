@@ -37,7 +37,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
     finally { sending.current = false; setBusy(false); }
   }
   return <main className={styles.page}><section className={styles.card}>
-    <p className={styles.eyebrow}>TÀI KHOẢN VEXERE</p>
+    <p className={styles.eyebrow}>TÀI KHOẢN VEXEXIN</p>
     <h1>{register ? 'Tạo tài khoản' : 'Đăng nhập'}</h1>
     <p className={styles.muted}>{register ? 'Đăng ký tài khoản khách hàng để sử dụng VeXe.' : 'Đăng nhập để quản lý hồ sơ và sử dụng các chức năng của bạn.'}</p>
     {notice && <p className={styles.error} role="status">{notice}</p>}

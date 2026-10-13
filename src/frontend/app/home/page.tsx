@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import homeBanner from "@/public/images/home-banner.jpg";
 
 import SearchForm from "../../components/booking/SearchForm";
 import PopularRoutes from "../../components/ui/PopularRoutes";
@@ -15,8 +16,8 @@ export default function Home() {
 
   return (
     <main>
-      <section className="hero-banner" aria-label="Banner giới thiệu Vexere">
-        <Image src="/images/home-banner.jpg" alt="Vexere – banner giới thiệu dịch vụ di chuyển" width={1800} height={790} priority unoptimized sizes="100vw" />
+      <section className="hero-banner" aria-label="Banner giới thiệu Vexexin">
+        <Image src={homeBanner} alt="Vexexin – banner giới thiệu dịch vụ di chuyển" priority unoptimized sizes="100vw" />
       </section>
       <section className="search-wrap">
         <div className="section-heading">
