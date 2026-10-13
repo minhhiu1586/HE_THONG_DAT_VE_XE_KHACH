@@ -5,7 +5,9 @@ import com.datvexe.domain.Entities.*;
 import com.datvexe.domain.States.*;
 import com.datvexe.dto.BookingDto.OrderResponse;
 import com.datvexe.dto.BookingDto.PassengerRequest;
+import com.datvexe.dto.BookingDto.PassengersRequest;
 import com.datvexe.dto.BookingDto.TicketResponse;
+import com.datvexe.dto.PricingDto.PriceSummary;
 import com.datvexe.security.AccountException;
 import com.datvexe.security.CurrentUser;
 import com.datvexe.security.RequestIdentity;
@@ -27,11 +29,18 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BookingServiceExpiryTest {
     private static final ZoneId ZONE = TripSaleRules.ZONE;
@@ -167,6 +176,175 @@ class BookingServiceExpiryTest {
             assertEquals(1L, em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon = :id", Long.class)
                     .setParameter("id", ORDER_ID).getSingleResult());
             assertEquals(TrangThaiVe.DA_XUAT_VE, em.find(VeXe.class, "ISSUED_WITHOUT_HOLD").trangThai);
+        });
+    }
+
+    @Test
+    void frozenOrderGetUsesPersistedPriceAndKeepsPassengersWhenRouteFareChanges() {
+        seedFrozenOrderWithPromotion("HIST");
+        inTransaction(em -> em.find(TuyenXe.class, "ROUTE").giaCoBan = BigDecimal.valueOf(125000));
+
+        setRequest("GET", "/api/booking/" + ORDER_ID);
+        OrderResponse order = (OrderResponse) service(expiresAt.minusMinutes(1))
+                .getOrder(ORDER_ID, List.of(passenger())).body();
+
+        assertEquals(TrangThaiDon.CHO_THANH_TOAN, order.trangThaiDon());
+        assertEquals(List.of(passenger()), order.hanhKhach());
+        PriceSummary frozen = order.giaDaChot();
+        assertNotNull(frozen);
+        assertEquals("100000", frozen.tongTienGoc());
+        assertEquals("10000", frozen.tongTienGiam());
+        assertEquals("90000", frozen.tongThanhToan());
+        assertEquals("90000", frozen.chiTietGia().getFirst().thanhTien());
+    }
+
+    @Test
+    void exactDeadlineExpiresFrozenOrderButPreservesFrozenAggregates() {
+        seedFrozenOrderWithPromotion("HIST");
+
+        setRequest("GET", "/api/booking/" + ORDER_ID);
+        AccountException expired = assertThrows(AccountException.class,
+                () -> service(expiresAt).getOrder(ORDER_ID, List.of(passenger())));
+        assertEquals(409, expired.status());
+
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.HET_HAN, order.trangThai);
+            assertEquals(0, order.tongTien.compareTo(BigDecimal.valueOf(100000)));
+            assertEquals(0, order.tienGiam.compareTo(BigDecimal.valueOf(10000)));
+            assertEquals("HIST", order.maKhuyenMaiDaApDung);
+            assertEquals(TrangThaiGiuCho.HET_HAN, em.find(GiuCho.class, HOLD_ID).trangThai);
+        });
+    }
+
+    @Test
+    void schedulerExpiresFrozenOrderWithoutClearingItsPriceHistory() {
+        seedFrozenOrderWithPromotion("HIST");
+
+        service(expiresAt).releaseExpiredHolds();
+
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.HET_HAN, order.trangThai);
+            assertEquals(0, order.tongTien.compareTo(BigDecimal.valueOf(100000)));
+            assertEquals(0, order.tienGiam.compareTo(BigDecimal.valueOf(10000)));
+            assertEquals("HIST", order.maKhuyenMaiDaApDung);
+            assertEquals(TrangThaiGiuCho.HET_HAN, em.find(GiuCho.class, HOLD_ID).trangThai);
+        });
+    }
+
+    @Test
+    void invalidPassengerUpdateOnFrozenOrderRollsBackWithoutChangingPrice() {
+        seedFrozenOrderWithPromotion("HIST");
+        setRequest("PUT", "/api/booking/" + ORDER_ID + "/hanh-khach");
+
+        AccountException invalid = assertThrows(AccountException.class,
+                () -> service(expiresAt.minusMinutes(1)).savePassengers(
+                        ORDER_ID, new PassengersRequest(List.of(
+                                new PassengerRequest("OTHER", "Wrong", "0911111111", null)))));
+        assertEquals(400, invalid.status());
+
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.CHO_THANH_TOAN, order.trangThai);
+            assertEquals(0, order.tongTien.compareTo(BigDecimal.valueOf(100000)));
+            assertEquals(0, order.tienGiam.compareTo(BigDecimal.valueOf(10000)));
+            assertEquals("HIST", order.maKhuyenMaiDaApDung);
+            assertEquals(TrangThaiGiuCho.DANG_GIU, em.find(GiuCho.class, HOLD_ID).trangThai);
+        });
+    }
+
+    @Test
+    void validPassengerUpdateThawsFrozenOrderAndKeepsOriginalDeadline() {
+        seedFrozenOrderWithPromotion("HIST");
+
+        setRequest("PUT", "/api/booking/" + ORDER_ID + "/hanh-khach");
+        OrderResponse updated = (OrderResponse) service(expiresAt.minusMinutes(1))
+                .savePassengers(ORDER_ID, new PassengersRequest(List.of(passenger()))).body();
+
+        assertEquals(TrangThaiDon.CHO_XU_LY, updated.trangThaiDon());
+        assertEquals("10000", updated.giaTamTinh().tienGiam());
+        assertNull(updated.giaDaChot());
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.CHO_XU_LY, order.trangThai);
+            assertEquals(0, order.tienGiam.compareTo(BigDecimal.ZERO));
+            assertEquals("HIST", order.maKhuyenMaiDaApDung);
+            assertEquals(expiresAt, em.find(GiuCho.class, HOLD_ID).thoiDiemHetHan);
+        });
+    }
+
+    @Test
+    void schedulerAndGetAtExactDeadlineConvergeOnOneExpiredFrozenOrder() throws Exception {
+        seedFrozenOrderWithPromotion("HIST");
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CyclicBarrier start = new CyclicBarrier(2);
+        try {
+            Future<?> scheduler = executor.submit(() -> {
+                start.await();
+                service(expiresAt).releaseExpiredHolds();
+                return null;
+            });
+            Future<Integer> get = executor.submit(() -> {
+                start.await();
+                setRequest("GET", "/api/booking/" + ORDER_ID);
+                try {
+                    service(expiresAt).getOrder(ORDER_ID, List.of(passenger()));
+                    return 200;
+                } catch (AccountException error) {
+                    assertEquals("HOLD_EXPIRED", error.code());
+                    return error.status();
+                } finally {
+                    RequestIdentity.clear();
+                }
+            });
+            assertEquals(409, get.get(10, TimeUnit.SECONDS));
+            scheduler.get(10, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        }
+
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.HET_HAN, order.trangThai);
+            assertEquals(0, order.tongTien.compareTo(BigDecimal.valueOf(100000)));
+            assertEquals(0, order.tienGiam.compareTo(BigDecimal.valueOf(10000)));
+            assertEquals("HIST", order.maKhuyenMaiDaApDung);
+            assertEquals(TrangThaiGiuCho.HET_HAN, em.find(GiuCho.class, HOLD_ID).trangThai);
+        });
+    }
+
+    private PassengerRequest passenger() {
+        return new PassengerRequest("SEAT", "Passenger", "0912345678", null);
+    }
+
+    private void seedFrozenOrderWithPromotion(String promotionId) {
+        createPromotion(promotionId);
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            order.trangThai = TrangThaiDon.CHO_THANH_TOAN;
+            order.tongTien = BigDecimal.valueOf(100000);
+            order.tienGiam = BigDecimal.valueOf(10000);
+            order.maKhuyenMaiDaApDung = promotionId;
+            em.find(GiuCho.class, HOLD_ID).trangThai = TrangThaiGiuCho.DANG_GIU;
+        });
+    }
+
+    private void createPromotion(String id) {
+        inTransaction(em -> {
+            KhuyenMai promotion = new KhuyenMai();
+            promotion.maKhuyenMai = id;
+            promotion.tenKhuyenMai = "Historical discount";
+            promotion.loaiGiam = LoaiGiam.SO_TIEN_CO_DINH;
+            promotion.giaTriGiam = BigDecimal.valueOf(10000);
+            promotion.donToiThieu = BigDecimal.ZERO;
+            promotion.soLuong = 10;
+            promotion.soLuongDaDung = 0;
+            promotion.ngayBatDau = expiresAt.minusHours(1);
+            promotion.ngayKetThuc = expiresAt.plusHours(1);
+            promotion.trangThai = TrangThaiKhuyenMai.HOAT_DONG;
+            em.persist(promotion);
         });
     }
 
