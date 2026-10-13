@@ -43,9 +43,9 @@ export default function ProfilePanel() {
         <label>Email<input name="email" type="email" defaultValue={user.email} autoComplete="email" maxLength={254} required /></label>
         <label>Số điện thoại<input name="soDienThoai" type="tel" defaultValue={user.soDienThoai} autoComplete="tel"
           pattern="(0[35789][0-9]{8}|\+84[35789][0-9]{8})" title="Số Việt Nam 10 chữ số hoặc dạng +84" required /></label>
-        <div className={styles.row}><label>Giới tính<select name="gioiTinh" defaultValue={user.gioiTinh ?? ''}>
+        <label>Giới tính<select name="gioiTinh" defaultValue={user.gioiTinh ?? ''}>
           <option value="">Chưa cung cấp</option><option value="NAM">Nam</option><option value="NU">Nữ</option><option value="KHAC">Khác</option>
-        </select></label><label>Ngày sinh<input name="ngaySinh" type="date" defaultValue={user.ngaySinh ?? ''} min="1900-01-01" /></label></div>
+        </select></label><label>Ngày sinh<input name="ngaySinh" type="date" defaultValue={user.ngaySinh ?? ''} min="1900-01-01" /></label>
         <label>CCCD / Hộ chiếu (không bắt buộc)<input name="cccd" defaultValue={user.cccd ?? ''} maxLength={20} /></label>
         <button className={styles.primary} disabled={busy}>{busy ? 'Đang xử lý…' : 'Lưu hồ sơ'}</button>
       </form>

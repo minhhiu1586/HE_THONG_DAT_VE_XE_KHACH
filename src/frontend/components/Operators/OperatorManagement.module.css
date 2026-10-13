@@ -13,9 +13,12 @@
 .heading > button, .form button[type=submit], .filters button[type=submit] { background: #2563eb; color: #fff; }
 .page button:disabled { opacity: .5; cursor: not-allowed; }
 .list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.list button { background: #f5f8fd; color: #17243a; text-align: left; display: grid; gap: 4px; border: 1px solid #e2e8f0; }
-.list button.selected { outline: 2px solid #2563eb; }
-.list small, .manager small { display: block; color: var(--text-secondary); }
+.list button { background: #f8faff; color: #17243a; text-align: left; display: grid; align-content: center; gap: 4px; min-height: 78px; border: 1px solid #e2e8f0; font-family: inherit; font-size: 15px; font-weight: 400; line-height: 1.4; }
+.list button:hover:not(:disabled) { border-color: #93b4f8; background: #f1f6ff; }
+.list button.selected { outline: 2px solid #2563eb; background: #edf4ff; }
+.list button strong { display: block; font-family: inherit; font-size: 16px; font-weight: 700; line-height: 1.35; letter-spacing: normal; overflow-wrap: anywhere; }
+.list button small { display: block; color: #64748b; font-size: 13px; font-weight: 400; line-height: 1.4; overflow-wrap: anywhere; }
+.manager small { display: block; color: #64748b; }
 .pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; }
 .form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .form label { display: grid; gap: 6px; font-weight: 600; }
