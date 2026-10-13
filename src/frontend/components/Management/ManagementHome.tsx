@@ -12,7 +12,7 @@ export default function ManagementHome() {
     <p>Xin chào {user.hoTen}. {user.loaiTaiKhoan === 'ADMIN' ? 'Theo dõi và quản lý dữ liệu trong toàn hệ thống.' : 'Quản lý nhân sự và vận hành trong phạm vi nhà xe của bạn.'}</p>
     <p><Link href="/tai-khoan">Hồ sơ cá nhân và bảo mật tài khoản →</Link></p>
     <div className={styles.cards}>{navigationFor(user.loaiTaiKhoan).map(item => <Link key={item.href} href={item.href} className={styles.card}>
-      <span className={styles.icon} aria-hidden="true">{item.icon}</span><h2>{item.label}</h2><p>{item.description}</p><span className={styles.open} aria-hidden="true">Mở quản lý →</span>
+      <h2>{item.label}</h2><p>{item.description}</p><span className={styles.open} aria-hidden="true">Mở quản lý →</span>
     </Link>)}</div>
   </section>;
 }

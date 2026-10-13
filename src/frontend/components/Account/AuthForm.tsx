@@ -49,7 +49,7 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
       <label>Email<input name="email" type="email" autoComplete="username" maxLength={254} required /></label>
       <label>Mật khẩu<input name="matKhau" type="password" autoComplete={register ? 'new-password' : 'current-password'}
         minLength={register ? 10 : undefined} maxLength={128} required /></label>
-      {register && <><p className={styles.muted}>Mật khẩu cần 10–128 ký tự, có chữ và số.</p>
+      {register && <><p className={styles.muted}>Dùng ít nhất 10 ký tự, kết hợp chữ và số.</p>
         <label>Xác nhận mật khẩu<input name="xacNhan" type="password" autoComplete="new-password" maxLength={128} required /></label></>}
       <button className={styles.primary} disabled={busy}>{busy ? 'Đang xử lý…' : register ? 'Đăng ký' : 'Đăng nhập'}</button>
     </form>

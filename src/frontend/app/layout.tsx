@@ -1,43 +1,29 @@
-import "./globals.css";
-
-import Link from "next/link";
+import './globals.css';
+import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/components/Account/AuthProvider';
-import AccountActions from '@/components/SiteHeader/AccountActions';
+import ZoneShell from '@/components/ZoneShell';
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+const inter = Inter({
+  subsets: ['latin', 'vietnamese'],
+  variable: '--font-inter',
+  display: 'swap',
+  weight: ['400', '500', '600', '700', '800', '900'],
+});
+
+export const metadata = {
+  title: 'VeXeRe – Đặt vé xe khách trực tuyến',
+  description: 'Tìm kiếm và đặt vé xe khách dễ dàng, an toàn với hàng nghìn chuyến xe mỗi ngày.',
+  keywords: 'đặt vé xe, xe khách, vé xe online, vexere',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi">
-      <body>
+    <html lang="vi" className={inter.variable}>
+      <body className={inter.className}>
         <AuthProvider>
-        <header className="topbar">
-          <Link className="brand" href="/home">
-            <span className="brand-mark">V</span>
-            <span>
-              Vexere<span className="brand-dot">.</span>
-            </span>
-          </Link>
-          <nav>
-            <Link href="/home">Trang chủ</Link>
-            <Link href="/trips">Tìm chuyến</Link>
-            <a href="#support">Hỗ trợ</a>
-          </nav>
-          <AccountActions />
-        </header>
-        {children}
-        <footer id="support">
-          <div>
-            <strong>Vexere.</strong>
-            <p>Đặt vé nhanh chóng, an tâm trên mọi hành trình.</p>
-          </div>
-          <div>
-            <strong>Hỗ trợ</strong>
-            <p>Trung tâm trợ giúp · Chính sách hoàn vé</p>
-          </div>
-          <div>
-            <strong>Hotline</strong>
-            <p className="hotline">1900 6067</p>
-          </div>
-        </footer>
+          <ZoneShell>
+            {children}
+          </ZoneShell>
         </AuthProvider>
       </body>
     </html>

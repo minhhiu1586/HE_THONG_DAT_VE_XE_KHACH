@@ -7,6 +7,9 @@ import { useAuth } from './AuthProvider';
 import { errorMessage, Profile } from '@/lib/account-api';
 import styles from './Account.module.css';
 
+const roleLabels = { ADMIN: 'Quản trị viên', NHA_XE: 'Quản lý nhà xe', NHAN_VIEN: 'Nhân viên', KHACH_HANG: 'Khách hàng' };
+const stateLabels = { HOAT_DONG: 'Hoạt động', KHOA: 'Đã khóa', CHO_XAC_THUC: 'Chờ xác thực' };
+
 type Page = { items: Profile[]; totalPages: number };
 export default function AdminAccounts() {
   const { user, loading, request } = useAuth(); const router = useRouter();
@@ -43,7 +46,7 @@ export default function AdminAccounts() {
     <p className={styles.muted}>Khóa tài khoản sẽ thu hồi tất cả phiên đăng nhập. Không thể tự khóa tài khoản quản trị hiện tại.</p>
     {error && <p className={styles.error} role="alert">{error}</p>}{success && <p className={styles.success} role="status">{success}</p>}
     <div className={styles.scroll}><table className={styles.table}><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
-      <tbody>{data.items.map(account => <tr key={account.maNguoiDung}><td>{account.hoTen}</td><td>{account.email}</td><td>{account.loaiTaiKhoan}</td><td>{account.trangThai}</td>
+      <tbody>{data.items.map(account => <tr key={account.maNguoiDung}><td>{account.hoTen}</td><td>{account.email}</td><td>{roleLabels[account.loaiTaiKhoan]}</td><td>{stateLabels[account.trangThai]}</td>
         <td><button className={styles.secondary} disabled={busy || account.maNguoiDung === user.maNguoiDung} onClick={() => toggle(account)}>{account.trangThai === 'KHOA' ? 'Mở khóa' : 'Khóa'}</button></td></tr>)}</tbody></table></div>
     <div className={styles.links}><button disabled={busy || page === 1} onClick={() => setPage(page - 1)}>Trang trước</button><span>Trang {page}</span>
       <button disabled={busy || page >= data.totalPages} onClick={() => setPage(page + 1)}>Trang sau</button></div>
