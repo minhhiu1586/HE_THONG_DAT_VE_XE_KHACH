@@ -4,7 +4,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datvexe_project}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datvexe}
       POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -13,6 +13,7 @@ services:
       TRIP_BOOKING_CUTOFF_MINUTES: ${TRIP_BOOKING_CUTOFF_MINUTES:-60}
     volumes:
       - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
+      - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT/WEB-INF/lib/postgresql-42.7.5.jar:/usr/local/tomcat/lib/postgresql-42.7.5.jar:ro
     depends_on:
       postgres:
         condition: service_healthy

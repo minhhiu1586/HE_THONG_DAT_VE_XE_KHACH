@@ -7,6 +7,11 @@ import java.util.function.Function;
 public final class Jpa {
     private Jpa() {}
 
+    static {
+        try { Class.forName("org.postgresql.Driver"); }
+        catch (ClassNotFoundException e) { throw new ExceptionInInitializerError(e); }
+    }
+
     private static final EntityManagerFactory FACTORY = Persistence.createEntityManagerFactory("datvexe", Map.of(
         "jakarta.persistence.jdbc.driver", System.getProperty("db.driver", "org.postgresql.Driver"),
         "jakarta.persistence.jdbc.url", System.getProperty("db.url", System.getenv().getOrDefault("DATABASE_URL", "jdbc:postgresql://localhost:5432/datvexe_project")),
