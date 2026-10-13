@@ -15,8 +15,8 @@ export class ApiError extends Error {
     public fieldErrors: { field: string; message: string }[] = []) { super(message); }
 }
 /** All modules use the same cookie session and structured error contract. No token in localStorage. */
-export async function accountRequest<T>(path: string, method = 'GET', body?: unknown, csrfToken?: string): Promise<T> {
-  const headers: Record<string, string> = { 'X-Requested-With': 'datvexe' };
+export async function accountRequest<T>(path: string, method = 'GET', body?: unknown, csrfToken?: string, extraHeaders?: Record<string, string>): Promise<T> {
+  const headers: Record<string, string> = { ...extraHeaders, 'X-Requested-With': 'datvexe' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
   let response: Response;

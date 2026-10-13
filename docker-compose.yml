@@ -23,7 +23,7 @@ services:
     container_name: datvexe-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-datvexe_project}
+      POSTGRES_DB: ${POSTGRES_DB:-datvexe}
       POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
     ports:
@@ -48,7 +48,7 @@ services:
     image: postgres:16
     profiles: [ops]
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-datvexe_project}
+      POSTGRES_DB: ${POSTGRES_DB:-datvexe}
       POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
     volumes:

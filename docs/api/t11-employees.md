@@ -13,6 +13,12 @@ Nguồn task: [DATVEXE-19](https://app.plane.so/he_thong_dat_ve_xe_khach/browse/
 - Không sửa/thu hồi phân công chuyến đang chạy/hoàn tất. Chuyến đã có vé/giữ chỗ phải còn đủ nhân sự sau thay đổi; thiếu thì rollback. Giữ lịch sử chuyến hủy, không tính vào trùng lịch.
 - Không chuyển nhà xe hồ sơ; chặn đổi vai trò/trạng thái làm mất điều kiện phân công hoạt động. Chỉ xóa hồ sơ chưa có phân công/tài khoản liên kết.
 
+## Khu vực cá nhân theo vai trò
+
+Phần bổ sung `feature/t11-role-workspaces`: đăng nhập đưa admin tới tổng quan quản trị, quản lý tới nhân viên/phân công, nhân viên tới không gian cá nhân. Tài xế/phụ xe có tổng quan, hồ sơ nghiệp vụ và lịch riêng; tài xế thấy số/hạn bằng. Trang `/tai-khoan` T07.1 quản lý thông tin tài khoản và mật khẩu. Quyền cập nhật hồ sơ nghiệp vụ giữ tại admin/quản lý nhà xe theo T11 mục 2.9; nhân viên không tự đổi vai trò/trạng thái/phân công.
+
+Mỗi người dùng chung cấu trúc giao diện theo vai trò và nhận dữ liệu riêng từ phiên đăng nhập. Hướng dẫn kiểm tra: [t11-ui-test.md](t11-ui-test.md).
+
 ## API bàn giao frontend
 
 | API | Nội dung |
@@ -38,7 +44,7 @@ Bộ dữ liệu dự án đã chốt: 5 nhà xe, 35 nhân viên, 47 tài khoả
 
 Thương hiệu/địa danh tham khảo [FUTA](https://futabus.vn/) và [Thành Bưởi](https://thanhbuoi.com.vn/Lien-He), thông tin nhà xe/ảnh từ nhóm cung cấp. Hồ sơ nhân sự, lịch, giá và kế hoạch điều phối là dữ liệu nội bộ của đồ án. Tài khoản đăng nhập dùng miền `datvexe.test`.
 
-Database dự án là `datvexe_project`, dùng container PostgreSQL hiện có; database cũ giữ nguyên. Docker tạo schema rồi ba seed, loader gọi API T12 để kiểm tra/mở bán; không đổi hàng loạt enum bằng SQL. Layout mới bọc lại AuthProvider và gắn AccountActions để tài khoản T11 đăng nhập được.
+Database dự án là `datvexe`, dùng container PostgreSQL hiện có; database cũ giữ nguyên. Docker tạo schema rồi ba seed, loader gọi API T12 để kiểm tra/mở bán; không đổi hàng loạt enum bằng SQL. Layout mới bọc lại AuthProvider và gắn AccountActions để tài khoản T11 đăng nhập được.
 
 ```powershell
 python scripts/load_project_data.py --activate
@@ -50,7 +56,7 @@ python tests/backend/project_data_check.py --check-reload
 - Guard T07.1 bổ sung quyền/path nhân viên, phân biệt ID tạo mới với ID tài nguyên cũ; giữ kiểm tra nhà xe theo tài khoản thật.
 - `VehicleService` dùng `AssignmentRules`; `RouteTripService` gọi lại kiểm tra khi đổi xe/giờ. Fixture test xe/chuyến dùng lịch về đúng bến.
 - T12 gọi `AssignmentRules.validateTrip(em, trip)` khi cập nhật, `readyForOperation(em, trip)` trước mở bán trong transaction của T12. Kiểm tra xe dùng `validateVehicleSchedule`; không tạo bộ quy tắc thứ hai.
-- Không triển khai lại T12: bộ dữ liệu gọi API mở bán T12 hiện có. Không triển khai giữ ghế/tạo đơn thay task khác; checkout hiện gọi API chưa có nên seed không thể làm phát sinh vé thật.
+- Bộ dữ liệu gọi API mở bán T12 hiện có. API giữ ghế/đơn nháp sau merge thuộc T16; checkout cần dùng hợp đồng `/api/booking/...` trong `booking-order.md`.
 
 ## Kiểm tra và hướng dẫn sử dụng
 

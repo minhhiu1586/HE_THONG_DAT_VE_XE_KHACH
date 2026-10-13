@@ -1,6 +1,6 @@
 # Database và JPA mapping
 
-Database mặc định chạy dự án là `datvexe_project`. Dữ liệu, tài khoản và cách nạp: [seed/README.md](seed/README.md). Seed cũ nằm trong `tests/backend/fixtures/sql`, chỉ phục vụ test hồi quy. Không xóa database cũ hoặc volume để nạp bộ mới.
+Database mặc định chạy dự án là `datvexe`. Dữ liệu, tài khoản và cách nạp: [seed/README.md](seed/README.md). Seed cũ nằm trong `tests/backend/fixtures/sql`, chỉ phục vụ test hồi quy. Không xóa database cũ hoặc volume để nạp bộ mới.
 
 Class diagram đã chốt có 20 entity. JPA mapping nằm trong `src/backend/src/main/java/com/datvexe/domain/Entities.java`; persistence unit đăng ký tường minh trong `src/backend/src/main/resources/META-INF/persistence.xml`. Các enum được định nghĩa trong `States.java` và lưu dưới dạng chuỗi (`EnumType.STRING`).
 

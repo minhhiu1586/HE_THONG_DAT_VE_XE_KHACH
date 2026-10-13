@@ -6,7 +6,9 @@
 | `002_accounts_staff_fleet.sql` | 35 nhân viên, 47 tài khoản, 10 xe và 320 ghế |
 | `003_routes_trips.sql` | 20 tuyến, 40 điểm đón/trả, lịch 14 ngày và 490 phân công |
 
-Database chạy dự án: **datvexe_project**. Database cũ không bị xóa. Seed cũ chuyển sang `tests/backend/fixtures/sql` để giữ hợp đồng test; Docker không nạp chúng vào database dự án.
+Database chạy dự án: **datvexe**. Database cũ không bị xóa. Seed cũ chuyển sang `tests/backend/fixtures/sql` để giữ hợp đồng test; Docker không nạp chúng vào database dự án.
+
+Thống nhất `POSTGRES_DB=datvexe` và URL JDBC kết thúc bằng `/datvexe`. Trên máy đã chuyển bộ dữ liệu mới về tên này, dữ liệu cũ được giữ trong database lưu trữ; bản sao lưu nằm tại `src/backend/target/database-backups/` và không đưa lên Git. Thành viên khác dùng loader để nạp vào `datvexe` của mình, không cần đổi tên hoặc xóa database/volume.
 
 ```powershell
 docker compose up -d postgres
@@ -38,7 +40,7 @@ Mỗi nhà xe có 1 xe tuyến ngắn đi-về trong ngày (1 tài xế + 1 ph�
 
 Chỉ mở bán sau kiểm tra nhà xe, bến, xe/ghế, đăng kiểm, lịch và nhân sự. Dấu kế hoạch của dữ liệu khởi tạo không chứng nhận giờ lái thực tế; điều phối cần rà soát trước vận hành.
 
-Code hiện có hỗ trợ tìm chuyến, mở bán và đọc ghế trống. Chưa có API giữ ghế/tạo đơn mà checkout đang gọi; không tạo đơn/vé/thanh toán giả để thay thế phần này. Chỉ có danh mục VNPAY, không ghi sẵn giao dịch VNPAY thành công.
+Code sau merge có API giữ ghế và đơn nháp tại `/api/booking/...`, xem `docs/api/booking-order.md`. Checkout cần dùng đúng hợp đồng này. Danh mục VNPAY đã có; giao dịch và vé phát sinh từ nghiệp vụ, không khởi tạo sẵn thanh toán thành công.
 
 ## Ghi chú riêng database: đã có và còn thiếu
 

@@ -6,7 +6,7 @@ import { accountRequest, ApiError, Profile, Session } from '@/lib/account-api';
 type Auth = {
   user: Profile | null; loading: boolean; notice: string;
   accept: (session: Session) => void; refresh: () => Promise<void>; clear: (notice?: string) => void;
-  request: <T>(path: string, method?: string, body?: unknown) => Promise<T>;
+  request: <T>(path: string, method?: string, body?: unknown, headers?: Record<string, string>) => Promise<T>;
 };
 const Context = createContext<Auth | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener('visibilitychange', update);
     return () => document.removeEventListener('visibilitychange', update);
   }, [refresh]);
-  const request = useCallback(async <T,>(path: string, method = 'GET', body?: unknown): Promise<T> => {
-    try { return await accountRequest<T>(path, method, body, csrf.current); }
+  const request = useCallback(async <T,>(path: string, method = 'GET', body?: unknown, headers?: Record<string, string>): Promise<T> => {
+    try { return await accountRequest<T>(path, method, body, csrf.current, headers); }
     catch (error) {
       if (error instanceof ApiError && error.status === 401) clear('Phiên đăng nhập đã hết hạn hoặc bị thu hồi. Vui lòng đăng nhập lại.');
       throw error;

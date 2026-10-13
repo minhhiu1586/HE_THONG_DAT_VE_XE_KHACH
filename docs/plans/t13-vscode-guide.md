@@ -156,7 +156,7 @@ Nếu database đã có chuyến `DANG_MO_BAN` ở ngày tương lai và đủ �
 
 ### Dữ liệu chạy dự án hiện tại
 
-Database chính là `datvexe_project`. Dùng ba seed khởi tạo và API T12 mở bán:
+Database chính là `datvexe`. Dùng ba seed khởi tạo và API T12 mở bán:
 
 ```powershell
 docker compose up -d postgres

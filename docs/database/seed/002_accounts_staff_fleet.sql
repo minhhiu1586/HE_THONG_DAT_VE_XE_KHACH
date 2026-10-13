@@ -39,9 +39,15 @@ ON CONFLICT(ma_nguoi_dung) DO NOTHING;
 
 INSERT INTO nguoi_dung(ma_nguoi_dung,ho_ten,so_dien_thoai,email,mat_khau,loai_tai_khoan,trang_thai)
 SELECT id,name,phone,email,p.hash,'ADMIN','HOAT_DONG'
-FROM (VALUES ('USR_ADMIN_01','Quản trị hệ thống 1','0901000001','admin1@datvexe.test'),
-('USR_ADMIN_02','Quản trị hệ thống 2','0901000002','admin2@datvexe.test')) a(id,name,phone,email)
+FROM (VALUES ('USR_ADMIN_01','Nguyễn Minh Khang','0901000001','admin1@datvexe.test'),
+('USR_ADMIN_02','Trần Ngọc Linh','0901000002','admin2@datvexe.test')) a(id,name,phone,email)
 CROSS JOIN project_password p ON CONFLICT(ma_nguoi_dung) DO NOTHING;
+
+-- Chuẩn hóa tên khởi tạo cũ; giữ tên người dùng đã tự cập nhật.
+UPDATE nguoi_dung SET ho_ten='Nguyễn Minh Khang'
+WHERE ma_nguoi_dung='USR_ADMIN_01' AND email='admin1@datvexe.test' AND ho_ten='Quản trị hệ thống 1';
+UPDATE nguoi_dung SET ho_ten='Trần Ngọc Linh'
+WHERE ma_nguoi_dung='USR_ADMIN_02' AND email='admin2@datvexe.test' AND ho_ten='Quản trị hệ thống 2';
 
 INSERT INTO nguoi_dung(ma_nguoi_dung,ho_ten,so_dien_thoai,email,mat_khau,loai_tai_khoan,trang_thai)
 SELECT 'USR_KH_'||lpad(r::text,2,'0'),

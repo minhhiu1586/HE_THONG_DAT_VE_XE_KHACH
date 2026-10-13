@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { getTrip, getTripSeats, type SearchTrip, type TripSeat } from '@/lib/api';
 import styles from './TripDetails.module.css';
@@ -20,6 +21,7 @@ const seatLabels = {
 };
 
 export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
+  const router = useRouter();
   const [trip, setTrip] = useState(initial);
   const [seats, setSeats] = useState<TripSeat[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +69,7 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
     <article className="trip-card"><div><strong>Điểm đi</strong><p>{trip.tenBenDi} · {trip.tenTinhDi}</p><p>{trip.diaChiBenDi}</p></div>
       <div><strong>Điểm đến</strong><p>{trip.tenBenDen} · {trip.tenTinhDen}</p><p>{trip.diaChiBenDen}</p></div>
       <div><strong>Thông tin chuyến</strong><p>Đến dự kiến: {trip.gioDenDuKien.replace('T', ' ')}</p><p>{trip.tenLoaiXe ?? 'Xe chưa cập nhật'} · {trip.soGheTrong}/{trip.tongSoGhe} ghế còn</p><p>{Number(trip.giaVeDuKien).toLocaleString('vi-VN')}đ</p></div></article>
-    <section className="state"><strong>Điểm dừng trung gian</strong>{trip.diemDung.length ? <ol>{trip.diemDung.map(stop => <li key={stop.maDiemDung}>{stop.tenDiemDung} · {stop.diaChi} ({stop.thoiGianDung} phút)</li>)}</ol> : <p>Không có điểm dừng trung gian.</p>}</section>
+    <section className={styles.stops}><h2>Điểm đón, trả và dừng</h2>{trip.diemDung.length ? <ul>{trip.diemDung.map(stop => <li key={stop.maDiemDung}><div><strong>{stop.tenDiemDung}</strong><p>{stop.diaChi}</p></div><span>{stop.thoiGianDung} phút</span></li>)}</ul> : <p>Không có điểm dừng trung gian.</p>}</section>
     <div className="detail-actions"><button className="outline-button" disabled={busy} onClick={() => void refresh(false)}>{busy ? 'Đang cập nhật...' : 'Cập nhật chỗ còn'}</button>
       <button className="primary-button" disabled={busy || !trip.coTheDatVe} onClick={() => void refresh(true)}>{busy ? 'Đang tải...' : 'Xem ghế của chuyến'}</button></div>
     <div ref={availabilityRef} tabIndex={-1} className={styles.availability} role="status" aria-live="polite">
@@ -75,7 +77,7 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
       <strong>{trip.soGheTrong}<span> / {trip.tongSoGhe} ghế</span></strong>
       <p>{updatedAt ? `Đã cập nhật lúc ${updatedAt} (giờ Việt Nam).` : 'Nhấn “Cập nhật chỗ còn” để xem số ghế mới nhất.'}</p>
     </div>
-    {!trip.coTheDatVe && <p>Chuyến không còn nhận đặt vé.</p>}
+    <div className={styles.bookingAction}>{trip.coTheDatVe ? <Link className="primary-button" href={`/tim-chuyen/${trip.maChuyen}/seats`}>Chọn ghế và đặt vé →</Link> : <p>Chuyến không còn nhận đặt vé.</p>}</div>
     {error && <p ref={errorRef} className="form-error" role="alert">{error}</p>}
     {seats && <section ref={seatsRef} tabIndex={-1} className={styles.seatPanel} aria-label={`Ghế của chuyến ${trip.maChuyen}`}>
       <div className={styles.seatHeader}>
@@ -90,11 +92,12 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
         const free = floorSeats.filter((seat) => seatStatus(seat) === 'available').length;
         return <div className={styles.floor} key={floor}>
           <div className={styles.floorHeader}><h3>Tầng {floor}</h3><span>{free}/{floorSeats.length} ghế trống</span></div>
+          {floor === 1 && <div className="driver-position" aria-label="Vị trí tài xế, không bán vé"><span aria-hidden="true">◉</span><div><strong>Tài xế</strong><small>Không bán vé · không chọn</small></div></div>}
           <div className={styles.seatGrid}>{floorSeats.map((seat) => {
             const state = seatStatus(seat);
-            return <div key={seat.maGhe} className={`${styles.seat} ${styles[state]}`} title={`${seat.viTri} · tầng ${seat.tang} · ${seatLabels[state]}`} aria-label={`Ghế ${seat.viTri}, tầng ${seat.tang}, ${seatLabels[state]}`}>
+            return <button type="button" disabled={state !== 'available' || !trip.coTheDatVe} onClick={() => router.push(`/tim-chuyen/${trip.maChuyen}/seats`)} key={seat.maGhe} className={`${styles.seat} ${styles[state]}`} title={`${seat.viTri} · tầng ${seat.tang} · ${seatLabels[state]}`} aria-label={`Ghế ${seat.viTri}, tầng ${seat.tang}, ${seatLabels[state]}`}>
               <strong>{seat.viTri}</strong><small>{seatLabels[state]}</small>
-            </div>;
+            </button>;
           })}</div>
         </div>;
       })}

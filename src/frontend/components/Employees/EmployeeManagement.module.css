@@ -43,6 +43,14 @@
 .schedule { border: 1px solid #e2e8f0; border-left: 3px solid #60a5fa; border-radius: 8px; padding: 14px; margin: 12px 0; }
 .schedule p { margin: 8px 0; font-size: .9rem; color: #475569; }
 .schedule strong { display: block; overflow-wrap: anywhere; }
+.workspaceNav { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.workspaceNav button[aria-current=page] { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.page .workspaceNav button[aria-current=page]:not(:disabled):hover { background: #1e40af; color: #fff; border-color: #1e40af; }
+.details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.details div { padding: 16px 0; border-bottom: 1px solid #e2e8f0; }
+.details dt { color: #64748b; font-size: .8rem; margin-bottom: 6px; }
+.details dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .details { grid-template-columns: 1fr; } .workspaceNav button { flex: 1 1 130px; } }
 .schedule .actions { margin-bottom: 0; }
 .schedule .actions button { font-size: .8rem; }
 .page textarea { min-height: 88px; resize: vertical; }
