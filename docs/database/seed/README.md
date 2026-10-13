@@ -18,6 +18,20 @@ python tests/backend/project_data_check.py --check-reload
 
 Loader nạp trong transaction, giữ bản ghi đã có, cấu hình `.env` và mở bán bằng API T12. Docker mới tạo chuyến nháp; vẫn cần chạy loader để kiểm tra/mở bán. Chạy lại bổ sung lịch 14 ngày tiếp theo theo mã ngày, không dời chuyến hoặc ghi đè mật khẩu/hồ sơ.
 
+## Thay bộ dữ liệu cũ bằng bộ chuẩn
+
+Máy còn dữ liệu cũ (ví dụ 160 nhân viên) chạy tại thư mục gốc:
+
+```powershell
+docker compose up -d postgres
+python scripts/load_project_data.py --reset --activate
+python tests/backend/project_data_check.py --check-reload
+```
+
+`--reset` thay toàn bộ schema `public` và dữ liệu trong database đã chọn, gồm tài khoản, nhân viên, chuyến, đơn/vé và giao dịch; sau nạp có 35 nhân viên, 47 tài khoản và mật khẩu khởi tạo trong `accounts.md`. Script sao lưu đầy đủ database và kiểm tra bản sao trước khi thay. Backup nằm trong `src/backend/target/database-backups/*.dump`, không đưa lên Git. Nếu lỗi SQL, transaction giữ nguyên schema/dữ liệu cũ. Dùng chế độ này để thống nhất bộ khởi tạo, không chạy mỗi lần pull code.
+
+Không có `--reset` thì loader vẫn giữ dữ liệu nhóm đã tạo. Không cần xóa Docker volume hoặc đổi tên database.
+
 ## Tài khoản đăng nhập
 
 Danh sách đầy đủ tên, email và mật khẩu khởi tạo của 47 tài khoản: [accounts.md](accounts.md).
