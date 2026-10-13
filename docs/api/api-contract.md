@@ -7,6 +7,7 @@ Tài liệu mô tả hợp đồng mục tiêu cho 29 API A01–F03. Bản mô t
 - Trường bắt buộc, tùy chọn và nullable được ghi riêng theo API; thiếu trường khác với `null`. JSON thành công là object/array trực tiếp, không bọc thêm `data`.
 - Quyền: `P` công khai; `KH` khách đã đăng nhập và là chủ tài nguyên; `NV` nhân viên có quyền/được phân công; `NX` nhà xe trong phạm vi của mình; `AD` quản trị có quyền; `CG` cổng thanh toán đã được xác minh. Backend phải kiểm tra chủ tài nguyên và phạm vi; T07 dùng phiên cookie/CSRF và T07.1 cung cấp helper phạm vi theo [account-auth.md](account-auth.md) và [hướng dẫn tích hợp](../tasks/T07.1-integration.md). Vai trò cho từng hành động nghiệp vụ vẫn phải đối chiếu T01.
 - Quy ước chung về kiểu dữ liệu, phân trang, lỗi và idempotency nằm trong [README](README.md). Các API cần `Idempotency-Key`: **B01, B03, B07, C02, D01, E02, E03, F02**; các mã lỗi 409 dùng chung được mô tả tại [mục 8](README.md#8-chống-xử-lý-lặp). Bảng dưới đây chỉ liệt kê lỗi nghiệp vụ chính.
+- Hợp đồng chi tiết của T17 nằm trong [booking-pricing.md](booking-pricing.md) và [booking-pricing-openapi.json](booking-pricing-openapi.json); C01/C02 ở dưới chỉ là chỉ mục ngắn.
 
 ## A — Tìm chuyến và xem ghế
 
@@ -278,7 +279,7 @@ Tên người đặt và hành khách dài 1–120 ký tự; số điện thoạ
 
 #### B05 — Đơn và snapshot giá
 
-Ví dụ mục tiêu sau T17/T18; backend T16 hiện trả `giaDaChot: null`.
+`giaDaChot` là `null` trước khi chốt, sau khi C02 thành công thì chứa snapshot tiền đã chốt. Hợp đồng chi tiết nằm trong [booking-pricing.md](booking-pricing.md); snapshot không có `phienBanGia`, `maBaoGia` hoặc `thoiDiemBaoGia` khi đọc lại đơn.
 
 ```json
 {
@@ -316,14 +317,10 @@ Ví dụ mục tiêu sau T17/T18; backend T16 hiện trả `giaDaChot: null`.
   ],
   "danhSachVe": [],
   "giaDaChot": {
-    "maBaoGia": "BG01",
-    "maDon": "DDV01",
     "donViTienTe": "VND",
-    "thoiDiemBaoGia": "2026-10-11T09:32:00+07:00",
-    "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
-    "tongTienGoc": "500000",
-    "tongTienGiam": "50000",
-    "tongThanhToan": "450000",
+    "tongTienGoc": "400000",
+    "tongTienGiam": "40000",
+    "tongThanhToan": "360000",
     "chiTietGia": [
       {
         "maGhe": "G11",
@@ -333,21 +330,16 @@ Ví dụ mục tiêu sau T17/T18; backend T16 hiện trả `giaDaChot: null`.
       },
       {
         "maGhe": "G12",
-        "giaGoc": "300000",
-        "tienGiam": "30000",
-        "thanhTien": "270000"
+        "giaGoc": "200000",
+        "tienGiam": "20000",
+        "thanhTien": "180000"
       }
-    ],
-    "ketQuaKhuyenMai": {
-      "hopLe": true,
-      "duocGiam": "50000"
-    },
-    "phienBanGia": 1
+    ]
   }
 }
 ```
 
-Trước khi chốt, `giaDaChot` là `null`; sau khi chốt, đây là snapshot bất biến có `phienBanGia`. Frontend tải lại đơn qua B05 và gửi phiên bản đó khi gọi D01.
+Trước khi chốt, `giaDaChot` là `null`; sau khi chốt, đây là snapshot bất biến gồm đơn vị tiền, ba tổng tiền và phân bổ theo ghế. Frontend tải lại đơn qua B05 rồi dùng số tiền do backend trả khi bắt đầu thanh toán ở D01.
 
 #### B07 — Hủy đơn
 
@@ -391,11 +383,11 @@ Trước khi chốt, `giaDaChot` là `null`; sau khi chốt, đây là snapshot 
 
 | ID | Phương thức + đường dẫn | Quyền | Tham số / yêu cầu | Phản hồi thành công | Lỗi nghiệp vụ chính |
 | --- | --- | --- | --- | --- | --- |
-| C01 | POST `/api/booking/{maDon}/bao-gia` | KH | Path `maDon`; body JSON bắt buộc. `maKhuyenMai` tùy chọn, là chuỗi (1–40 ký tự) hoặc `null`; gửi `{}` nếu không áp mã. | 200 `QuoteResponse` ([ví dụ](#c01--báo-giá)) | 409 `PROMOTION_NOT_APPLICABLE` |
-| C02 | POST `/api/booking/{maDon}/chot-gia` | KH | Path `maDon`; body cần `maBaoGia`; `phienBanGia` tùy chọn, số nguyên từ 1. Việc dùng khóa lạc quan còn chờ quyết định. | 200 `FreezePriceResponse` ([ví dụ](#c02--chốt-giá)) | 409 `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PROMOTION_EXHAUSTED` |
+| C01 | POST `/api/booking/{maDon}/bao-gia` | KH | Path `maDon`; body `{}` hoặc `maKhuyenMai` là chuỗi (1–40 ký tự) hoặc `null`; không nhận giá từ frontend. | 200 `QuoteResponse` ([ví dụ](#c01--báo-giá)) | 409 `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PROMOTION_NOT_APPLICABLE` |
+| C02 | POST `/api/booking/{maDon}/chot-gia` | KH | Path `maDon`; body bắt buộc `maBaoGia`; header `Idempotency-Key` bắt buộc. | 200 `FreezePriceResponse` ([ví dụ](#c02--chốt-giá)) | 409 `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PROMOTION_EXHAUSTED`, `HOLD_EXPIRED` |
 | C03 | GET `/api/phuong-thuc-thanh-toan` | P | Không có | 200, `array<PaymentMethodDto>` ([ví dụ](#c03--phương-thức-thanh-toán)) | — |
 
-C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 chốt đúng báo giá đã gửi; cách giữ lượt khuyến mãi nguyên tử, thay mã/chốt lại và giải phóng lượt còn chờ quyết định. Nếu báo giá hết hạn hoặc giá thay đổi, ứng dụng cần lấy báo giá mới.
+C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 chốt đúng báo giá đã gửi, tính lượt giữ từ các đơn `CHO_THANH_TOAN` còn hạn và chuyển đơn sang `CHO_THANH_TOAN`; `giu_cho` vẫn `DANG_GIU`. Nếu báo giá hết hạn hoặc giá thay đổi, ứng dụng cần lấy báo giá mới. T16 preview có thể còn số thập phân chính xác; T17 làm tròn tổng giảm bằng `HALF_UP` khi chốt và trả VND nguyên. Mã khuyến mãi là mã dùng chung vì diagram chưa có trường phạm vi theo nhà xe hoặc tuyến; T17 cũng không thêm cột giá riêng cho từng vé. Hành khách chỉ nằm trong HTTP session nên callback T18 không được giả định session còn tồn tại. Các dòng vé gốc và tổng đơn phải được giữ để tra cứu sau hoàn một phần. Xem chi tiết công thức và rollback tại [booking-pricing.md](booking-pricing.md).
 
 ### Request body
 
@@ -426,9 +418,9 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
   "donViTienTe": "VND",
   "thoiDiemBaoGia": "2026-10-11T09:32:00+07:00",
   "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
-  "tongTienGoc": "500000",
-  "tongTienGiam": "50000",
-  "tongThanhToan": "450000",
+  "tongTienGoc": "400000",
+  "tongTienGiam": "40000",
+  "tongThanhToan": "360000",
   "chiTietGia": [
     {
       "maGhe": "G11",
@@ -438,14 +430,14 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
     },
     {
       "maGhe": "G12",
-      "giaGoc": "300000",
-      "tienGiam": "30000",
-      "thanhTien": "270000"
+      "giaGoc": "200000",
+      "tienGiam": "20000",
+      "thanhTien": "180000"
     }
   ],
   "ketQuaKhuyenMai": {
     "hopLe": true,
-    "duocGiam": "50000"
+    "duocGiam": "40000"
   }
 }
 ```
@@ -459,11 +451,11 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
   "maBaoGia": "BG01",
   "maDon": "DDV01",
   "donViTienTe": "VND",
-  "thoiDiemBaoGia": "2026-10-11T09:32:00+07:00",
+  "trangThaiDon": "CHO_THANH_TOAN",
   "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
-  "tongTienGoc": "500000",
-  "tongTienGiam": "50000",
-  "tongThanhToan": "450000",
+  "tongTienGoc": "400000",
+  "tongTienGiam": "40000",
+  "tongThanhToan": "360000",
   "chiTietGia": [
     {
       "maGhe": "G11",
@@ -473,16 +465,15 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
     },
     {
       "maGhe": "G12",
-      "giaGoc": "300000",
-      "tienGiam": "30000",
-      "thanhTien": "270000"
+      "giaGoc": "200000",
+      "tienGiam": "20000",
+      "thanhTien": "180000"
     }
   ],
   "ketQuaKhuyenMai": {
     "hopLe": true,
-    "duocGiam": "50000"
-  },
-  "phienBanGia": 1
+    "duocGiam": "40000"
+  }
 }
 ```
 
@@ -503,7 +494,7 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
 
 | ID | Phương thức + đường dẫn | Quyền | Tham số / yêu cầu | Phản hồi thành công | Lỗi nghiệp vụ chính |
 | --- | --- | --- | --- | --- | --- |
-| D01 | POST `/api/booking/{maDon}/thanh-toan` | KH | Path `maDon`; body cần `maPhuongThuc`, `phienBanGia` từ snapshot B05. | 201 khi khởi tạo; 202 khi đang chờ. `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 409 `PAYMENT_PROCESSING` |
+| D01 | POST `/api/booking/{maDon}/thanh-toan` | KH | Path `maDon`; body cần `maPhuongThuc`. Số tiền và snapshot đọc từ backend; không gửi `phienBanGia`. | 201 khi khởi tạo; 202 khi đang chờ. `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 409 `PAYMENT_PROCESSING` |
 | D02 | GET `/api/thanh-toan/{maGiaoDich}` | KH; NX/AD theo quyền | Path `maGiaoDich` | 200 cùng `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 404 `RESOURCE_NOT_FOUND` |
 | D03 | GET `/api/booking/{maDon}/thanh-toan` | KH; NX/AD theo quyền | Path `maDon`; query `page`, `size`, `trangThai`, `sort` (`thoiDiemTao,asc\|desc`). | 200 `Page<PaymentResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 404 `RESOURCE_NOT_FOUND` |
 | D04 | Method chưa chốt — `/api/thanh-toan/callback/{congThanhToan}` | CG | Path dự kiến có `congThanhToan`; body, chữ ký, response/ACK phụ thuộc cổng. | Chưa định nghĩa | Chờ đặc tả provider |
@@ -513,12 +504,11 @@ D01 tạo giao dịch từ giá đã chốt; 201/202 không chứng minh đã th
 
 ### Request body
 
-#### D01 — Tạo lần thanh toán theo phiên bản giá đã chốt
+#### D01 — Tạo lần thanh toán theo giá đã chốt
 
 ```json
 {
-  "maPhuongThuc": "PT01",
-  "phienBanGia": 1
+  "maPhuongThuc": "PT01"
 }
 ```
 
@@ -531,7 +521,7 @@ D01 tạo giao dịch từ giá đã chốt; 201/202 không chứng minh đã th
   "maGiaoDich": "GD01",
   "maDon": "DDV01",
   "maPhuongThuc": "PT01",
-  "soTien": "450000",
+  "soTien": "360000",
   "donViTienTe": "VND",
   "trangThai": "CHO_XU_LY",
   "ketQuaCongDaXacDinh": false,

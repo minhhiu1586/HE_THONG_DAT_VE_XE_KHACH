@@ -19,6 +19,7 @@ Bộ tài liệu gồm:
 - **[t13-trip-search-availability.md](t13-trip-search-availability.md)**: dữ liệu Backend/database cho trang chủ, tìm chuyến và số ghế còn trống.
 - **[payment-discount.md](payment-discount.md)** và **[payment-discount-openapi.json](payment-discount-openapi.json)**: API khuyến mãi, phương thức thanh toán và báo cáo kiểm thử T14.
 - **[booking-order.md](booking-order.md)** và **[booking-order-openapi.json](booking-order-openapi.json)**: hợp đồng chi tiết cho luồng giữ chỗ và đơn đặt vé T16; tài liệu này có thẩm quyền với B01–B08 đã triển khai.
+- **[booking-pricing.md](booking-pricing.md)** và **[booking-pricing-openapi.json](booking-pricing-openapi.json)**: hợp đồng T17 cho báo giá, chốt giá và phân bổ giảm giá; C01/C02 dùng chung đơn T16.
 - **README.md**: quy ước chung, cách xử lý lỗi và các điểm cần thống nhất.
 - **[api-contract.md](api-contract.md)**: danh sách API, request/response và dữ liệu mẫu ngay trong từng nhóm.
 - **[openapi.yaml](openapi.yaml)**: kiểu dữ liệu, trường bắt buộc, giá trị null và ví dụ chi tiết để xem bằng công cụ hỗ trợ OpenAPI/Swagger. https://editor.swagger.io/
@@ -52,7 +53,7 @@ Trong B01–B08 của T16, tên và số điện thoại người đặt trong `
 | --- | --- |
 | ID | Chuỗi, ví dụ `"DDV01"`; phân biệt mã đơn, vé, giao dịch nội bộ và tham chiếu cổng. Không suy đoán nghiệp vụ từ ID. |
 | Tiền | Chuỗi số nguyên VND không âm, ví dụ `"250000"`; backend tính bằng `BigDecimal`, không dùng `float`/`double`. |
-| Làm tròn | Đề xuất `HALF_UP` đến 1 VND khi chốt; phân bổ phần dư ổn định để tổng từng vé bằng tổng đơn. Cần nhóm duyệt. |
+| Làm tròn | T17 dùng `HALF_UP` đến 1 VND cho tổng giảm; phân bổ phần dư theo phần lẻ lớn nhất, hòa thì mã ghế tăng dần. |
 | Ngày / giờ lịch | `YYYY-MM-DD` / `HH:mm:ss`. |
 | Thời điểm | RFC3339 có offset, ví dụ `2026-10-11T09:30:00+07:00`; múi giờ nghiệp vụ `Asia/Ho_Chi_Minh`. |
 | Trạng thái | Theo quy tắc được nhóm thống nhất. Giá trị trong ví dụ chưa thay thế bảng chuyển trạng thái chính thức. |
@@ -114,8 +115,8 @@ Header chung: `Content-Type: application/json`; các API liệt kê tại mục 
 - B01 giữ nhiều ghế và tạo một đơn trong cùng transaction. B03/B04 cập nhật đơn đó, không tạo đơn mới. Với T16, B04 giữ danh sách hành khách trong HTTP session; không ghi hành khách nháp vào database.
 - Hạn giữ là **15 phút do backend tính**. Tải lại, gửi lại request, báo giá hoặc khởi tạo thanh toán không gia hạn. Hết hiệu lực khi thời gian server đạt hạn giữ.
 - Giá, giảm giá, tổng thu/hoàn, quyền sở hữu và trạng thái được kiểm tra ở backend; frontend gửi mã và ý định thao tác.
-- C01 xem thử giá; C02 lưu giá đã chốt. Đề xuất chỉ C02 giữ lượt khuyến mãi, thất bại phải rollback cùng snapshot. Hết hạn/hủy trả lượt đúng một lần.
-- B05 trả `giaDaChot: null` trước khi chốt, snapshot có `phienBanGia` sau khi chốt. D01 dùng phiên bản này và số tiền từ backend; GET đơn không tự chốt lại.
+- C01 xem thử giá; C02 lưu giá đã chốt. C02 tính lượt đang giữ từ các đơn `CHO_THANH_TOAN` còn hạn, không tăng `soLuongDaDung`; thất bại rollback cùng snapshot.
+- B05 trả `giaDaChot: null` trước khi chốt hoặc sau khi đơn đóng; snapshot đang hiệu lực chỉ gồm đơn vị tiền, ba tổng tiền và phân bổ theo ghế. Không dùng `phienBanGia`.
 - Tổng tiền phân bổ theo vé phải khớp đơn. Hoàn một vé không làm mất hiệu lực các vé khác.
 
 ## 8. Chống xử lý lặp
@@ -143,7 +144,7 @@ Các điểm cần nhóm xác nhận:
 | Trạng thái | Bảng chuyển trạng thái đơn, giữ, vé, thanh toán và hoàn; cách biểu diễn đơn hết hạn. |
 | Đăng nhập và quyền | T07 đã triển khai phiên cookie và helper phạm vi; nhóm đối chiếu T01, xác nhận quyền nghiệp vụ và việc hỗ trợ khách không tài khoản. |
 | Đơn nháp | T16 dùng liên hệ bắt buộc trong B01–B08; T17 cần đọc và xác thực danh sách hành khách hiện có trong HTTP session trước khi chốt giá. |
-| Giá và khuyến mãi | Quy tắc làm tròn, giữ/trả lượt mã; điều kiện sửa đơn hoặc chốt lại giá. |
+| Giá và khuyến mãi | T17 đã chốt làm tròn, giữ/trả lượt và sửa/chốt lại trong [booking-pricing.md](booking-pricing.md). Phạm vi mã theo nhà xe/tuyến chưa được mô hình hỗ trợ. |
 | Chuyến chưa gán xe | Đề xuất chi tiết cho phép null, từ chối giữ ghế; chưa có xe thì từ chối trả sơ đồ ghế. |
 | Thanh toán và hoàn | Cổng sandbox, callback muộn, chính sách/phí hoàn và thời điểm bán lại ghế. |
 

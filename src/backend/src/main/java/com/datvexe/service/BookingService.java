@@ -7,6 +7,7 @@ import com.datvexe.dto.BookingDto;
 import com.datvexe.dto.BookingDto.*;
 import com.datvexe.dto.HoldSeatRequest;
 import com.datvexe.dto.HoldSeatResponse;
+import com.datvexe.dto.PricingDto.*;
 import com.datvexe.repository.*;
 import com.datvexe.security.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -80,10 +81,68 @@ public final class BookingService {
         });
     }
 
+    public QuoteSnapshot baoGia(String maDon, QuoteRequest request, List<PassengerRequest> passengers) {
+        Result result = execute(null, em -> {
+            OrderContext context = lockOrder(em, maDon, passengers);
+            pricingReady(em, context);
+            if (request == null) throw invalid("body", "Thiếu yêu cầu báo giá.");
+            String promotionId = request.maKhuyenMai() == null ? null : code(request.maKhuyenMai(), "maKhuyenMai");
+            KhuyenMai promotion = promotionForPricing(em, context, promotionId, false);
+            LocalDateTime checkedAt = now();
+            PriceSummary price = calculate(context, promotion, checkedAt);
+            String fingerprint = priceFingerprint(context, promotion);
+            checkExpiry(context, now());
+            QuoteResponse quote = new QuoteResponse(id(), context.order.maDon, "VND", offset(checkedAt),
+                    offset(deadline(context)), price.tongTienGoc(), price.tongTienGiam(), price.tongThanhToan(),
+                    price.chiTietGia(), promotionResult(promotion, price));
+            return new Result(200, new QuoteSnapshot(identity().maNguoiDung(), context.order.maDon,
+                    promotionId, fingerprint, quote));
+        });
+        return (QuoteSnapshot) result.body();
+    }
+
+    public Result chotGia(String maDon, FreezeRequest request, String key,
+                         List<PassengerRequest> passengers, QuoteSnapshot quote) {
+        return execute(key, em -> {
+            OrderContext context = lockOrder(em, maDon, passengers);
+            checkExpiry(context, now());
+            if (request == null) throw invalid("body", "Thiếu yêu cầu chốt giá.");
+            String quoteId = code(request.maBaoGia(), "maBaoGia");
+            if (quote == null || !quote.userId().equals(identity().maNguoiDung())
+                    || !quote.maDon().equals(context.order.maDon)
+                    || !quote.response().maBaoGia().equals(quoteId)
+                    || !clock.instant().isBefore(quote.response().thoiDiemHetHan().toInstant()))
+                throw new AccountException(409, "QUOTE_EXPIRED", "Báo giá không còn trong phiên hoặc đã hết hạn.");
+            // A new key cannot consume another use for an already frozen order.
+            if (context.order.trangThai == TrangThaiDon.CHO_THANH_TOAN) {
+                PriceSummary frozen = frozenPrice(context);
+                if (!Objects.equals(context.order.maKhuyenMaiDaApDung, quote.maKhuyenMai())
+                        || !frozen.equals(summary(quote.response())))
+                    throw new AccountException(409, "PRICE_CHANGED", "Đơn đã có giá chốt khác; hãy đọc lại đơn.");
+                return new Result(200, freezeResponse(context, quoteId, frozen));
+            }
+            pricingReady(em, context);
+            KhuyenMai promotion = promotionForPricing(em, context, quote.maKhuyenMai(), true);
+            // Use a fresh clock after waiting for the promotion lock.
+            LocalDateTime checkedAt = now();
+            checkExpiry(context, checkedAt);
+            PriceSummary price = calculate(context, promotion, checkedAt);
+            if (!quote.fingerprint().equals(priceFingerprint(context, promotion))
+                    || !price.equals(summary(quote.response())))
+                throw new AccountException(409, "PRICE_CHANGED", "Dữ liệu hoặc giá đã thay đổi; vui lòng lấy báo giá mới.");
+            context.order.tongTien = new BigDecimal(price.tongTienGoc());
+            context.order.tienGiam = new BigDecimal(price.tongTienGiam());
+            context.order.maKhuyenMaiDaApDung = quote.maKhuyenMai();
+            context.order.trangThai = TrangThaiDon.CHO_THANH_TOAN;
+            checkExpiry(context, now());
+            return new Result(200, freezeResponse(context, quoteId, price));
+        });
+    }
+
     public Result updateContact(String maDon, JsonNode body, String key, List<PassengerRequest> passengers) {
         return execute(key, em -> {
             OrderContext context = lockOrder(em, maDon, passengers);
-            editable(context);
+            editable(em, context);
             if (body == null || !body.isObject() || body.isEmpty()) throw invalid("body", "Cần ít nhất một trường liên hệ.");
             Set<String> fields = Set.of("khachDatTen", "khachDatSoDienThoai", "ghiChu");
             body.fieldNames().forEachRemaining(field -> {
@@ -102,7 +161,7 @@ public final class BookingService {
     public Result savePassengers(String maDon, PassengersRequest request) {
         return execute(null, em -> {
             OrderContext context = lockOrder(em, maDon);
-            editable(context);
+            editable(em, context);
             if (request == null || request.hanhKhach() == null || request.hanhKhach().isEmpty())
                 throw invalid("hanhKhach", "Cần thông tin của toàn bộ ghế đang giữ.");
             Map<String, PassengerRequest> passengers = new LinkedHashMap<>();
@@ -126,7 +185,7 @@ public final class BookingService {
     public Result removeSeat(String maDon, String maGhe, List<PassengerRequest> passengers) {
         return execute(null, em -> {
             OrderContext context = lockOrder(em, maDon, passengers);
-            editable(context);
+            editable(em, context);
             GiuCho hold = heldSeat(context, code(maGhe, "maGhe"));
             hold.trangThai = TrangThaiGiuCho.DA_HUY;
             context.passengers.removeIf(passenger -> passenger.maGhe().equals(maGhe));
@@ -138,7 +197,7 @@ public final class BookingService {
     public Result changeSeat(String maDon, ChangeSeatRequest request, List<PassengerRequest> passengers) {
         return execute(null, em -> {
             OrderContext context = lockOrder(em, maDon, passengers);
-            editable(context);
+            editable(em, context);
             if (request == null) throw invalid("body", "Thiếu thông tin đổi ghế.");
             String oldId = code(request.maGheCu(), "maGheCu"), newId = code(request.maGheMoi(), "maGheMoi");
             GiuCho oldHold = heldSeat(context, oldId);
@@ -162,10 +221,10 @@ public final class BookingService {
     public Result applyPromotion(String maDon, PromotionRequest request, List<PassengerRequest> passengers) {
         return execute(null, em -> {
             OrderContext context = lockOrder(em, maDon, passengers);
-            editable(context);
+            editable(em, context);
             if (request == null) throw invalid("body", "Thiếu mã khuyến mãi.");
             context.order.maKhuyenMaiDaApDung = code(request.maKhuyenMai(), "maKhuyenMai");
-            PricePreview price = preview(em, context, now());
+            PricePreview price = preview(em, context, now(), true);
             if (price.lyDoKhongApDung() != null)
                 throw new AccountException(409, "PROMOTION_NOT_APPLICABLE", price.lyDoKhongApDung());
             return updated(em, context);
@@ -175,7 +234,7 @@ public final class BookingService {
     public Result removePromotion(String maDon, List<PassengerRequest> passengers) {
         return execute(null, em -> {
             OrderContext context = lockOrder(em, maDon, passengers);
-            editable(context);
+            editable(em, context);
             context.order.maKhuyenMaiDaApDung = null;
             return updated(em, context);
         });
@@ -186,9 +245,9 @@ public final class BookingService {
             OrderContext context = lockOrder(em, maDon);
             if (context.order.trangThai == TrangThaiDon.DA_HUY || context.order.trangThai == TrangThaiDon.HET_HAN)
                 return result(em, context, List.of());
-            editable(context);
+            editable(em, context);
             cancel(context);
-            return updated(em, context);
+            return result(em, context, List.of());
         });
     }
 
@@ -221,7 +280,8 @@ public final class BookingService {
                 CurrentUser current = identity();
                 var request = RequestIdentity.get();
                 boolean needsKey = request.method().equals("PATCH")
-                        || (request.method().equals("POST") && (request.path().equals("/api/booking/hold") || request.path().endsWith("/huy")));
+                        || (request.method().equals("POST") && (request.path().equals("/api/booking/hold")
+                        || request.path().endsWith("/huy") || request.path().endsWith("/chot-gia")));
                 IdempotencyRepository repository = new IdempotencyRepository(em);
                 IdempotencyRepository.Scope scope = null;
                 String hash = null;
@@ -319,10 +379,13 @@ public final class BookingService {
         em.flush();
     }
 
-    private void editable(OrderContext context) {
+    private void editable(EntityManager em, OrderContext context) {
         checkExpiry(context, now());
-        if (context.order.trangThai != TrangThaiDon.CHO_XU_LY)
-            throw conflict("Chỉ được sửa đơn nháp chưa chốt giá, chưa thanh toán.");
+        if (context.order.trangThai != TrangThaiDon.CHO_XU_LY
+                && context.order.trangThai != TrangThaiDon.CHO_THANH_TOAN)
+            throw conflict("Chỉ được sửa đơn chưa thanh toán.");
+        if (new DonDatVeRepository(em).hasBlockingPayment(context.order.maDon))
+            throw new AccountException(409, "PAYMENT_PROCESSING", "Đơn đã có giao dịch đang xử lý hoặc thành công.");
         if (active(context).isEmpty()) throw conflict("Đơn không còn ghế đang giữ.");
     }
 
@@ -339,22 +402,30 @@ public final class BookingService {
     }
 
     private void expire(OrderContext context) {
+        boolean frozen = context.order.trangThai == TrangThaiDon.CHO_THANH_TOAN;
         context.order.trangThai = TrangThaiDon.HET_HAN;
         context.holds.stream().filter(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU).forEach(h -> h.trangThai = TrangThaiGiuCho.HET_HAN);
         context.passengers.clear();
-        context.order.maKhuyenMaiDaApDung = null;
+        if (!frozen) context.order.maKhuyenMaiDaApDung = null;
     }
 
     private void cancel(OrderContext context) {
+        boolean frozen = context.order.trangThai == TrangThaiDon.CHO_THANH_TOAN;
         context.order.trangThai = TrangThaiDon.DA_HUY;
         active(context).forEach(h -> h.trangThai = TrangThaiGiuCho.DA_HUY);
         context.passengers.clear();
-        context.order.maKhuyenMaiDaApDung = null;
-        context.order.tongTien = BigDecimal.ZERO;
-        context.order.tienGiam = BigDecimal.ZERO;
+        if (!frozen) {
+            context.order.maKhuyenMaiDaApDung = null;
+            context.order.tongTien = BigDecimal.ZERO;
+            context.order.tienGiam = BigDecimal.ZERO;
+        }
     }
 
     private Result updated(EntityManager em, OrderContext context) {
+        if (context.order.trangThai == TrangThaiDon.DA_HUY) return result(em, context, List.of());
+        // Thaw only after the requested edit has passed validation; failures roll back the entire transaction.
+        if (context.order.trangThai == TrangThaiDon.CHO_THANH_TOAN)
+            context.order.trangThai = TrangThaiDon.CHO_XU_LY;
         BigDecimal fare = baseFare(context.trip);
         context.order.tongTien = fare.multiply(BigDecimal.valueOf(active(context).size()));
         validateTotal(context.order.tongTien);
@@ -376,7 +447,7 @@ public final class BookingService {
                         v.cccdHanhKhach, amount(v.giaVe), v.trangThai, offset(v.ngayXuatVe))).toList();
         Set<String> heldSeats = new HashSet<>();
         active(context).forEach(h -> heldSeats.add(h.ghe.maGhe));
-        List<PassengerRequest> passengers = context.order.trangThai == TrangThaiDon.CHO_XU_LY
+        List<PassengerRequest> passengers = Set.of(TrangThaiDon.CHO_XU_LY, TrangThaiDon.CHO_THANH_TOAN).contains(context.order.trangThai)
                 ? context.passengers.stream().filter(passenger -> heldSeats.contains(passenger.maGhe()))
                     .sorted(Comparator.comparing(PassengerRequest::maGhe)).toList()
                 : List.of();
@@ -387,23 +458,169 @@ public final class BookingService {
         return new Result(200, new OrderResponse(context.order.maDon, context.trip.maChuyen, context.order.trangThai,
                 context.order.khachDatTen, context.order.khachDatSoDienThoai, context.order.ghiChu, offset(now),
                 offset(start(context)), offset(deadline(context)), holdResponses(context), passengers, tickets,
-                preview(em, context, now), ready, null, notices));
+                preview(em, context, now), ready, frozenPrice(context), notices));
     }
 
     private PricePreview preview(EntityManager em, OrderContext context, LocalDateTime now) {
-        boolean draft = context.order.trangThai == TrangThaiDon.CHO_XU_LY;
+        return preview(em, context, now, context.order.trangThai == TrangThaiDon.CHO_XU_LY);
+    }
+
+    private PricePreview preview(EntityManager em, OrderContext context, LocalDateTime now, boolean draft) {
         BigDecimal total = draft ? baseFare(context.trip).multiply(BigDecimal.valueOf(active(context).size())) : context.order.tongTien;
         String selected = context.order.maKhuyenMaiDaApDung;
         BigDecimal discount = draft ? BigDecimal.ZERO : context.order.tienGiam;
-        String applied = null, reason = null;
+        String applied = context.order.trangThai == TrangThaiDon.CHO_THANH_TOAN
+                || context.order.trangThai == TrangThaiDon.DA_THANH_TOAN ? selected : null, reason = null;
         if (draft && selected != null) {
             KhuyenMai promotion = new KhuyenMaiRepository(em, now).find(selected);
             if (promotion == null) reason = "Mã khuyến mãi không tồn tại.";
             else if (!promotion.kiemTraHieuLuc(now)) reason = "Mã chưa có hiệu lực, đã hết hạn hoặc hết lượt.";
             else if (!promotion.kiemTraDieuKien(total, now)) reason = "Tổng tiền chưa đạt điều kiện khuyến mãi.";
+            else if (promotion.soLuong - (long) promotion.soLuongDaDung
+                    - new DonDatVeRepository(em).reservedPromotionUses(selected, context.order.maDon, now) <= 0)
+                reason = "Các lượt khuyến mãi còn lại đang được giữ bởi đơn khác.";
             else { discount = promotion.tinhTienGiam(total, now); applied = selected; }
         }
         return new PricePreview(amount(total), amount(discount), amount(total.subtract(discount)), selected, applied, reason);
+    }
+
+    private void pricingReady(EntityManager em, OrderContext context) {
+        checkExpiry(context, now());
+        if (context.order.trangThai != TrangThaiDon.CHO_XU_LY || !context.tickets.isEmpty())
+            throw conflict("Chỉ được báo và chốt giá cho đơn nháp chưa phát hành vé.");
+        if (new DonDatVeRepository(em).hasBlockingPayment(context.order.maDon))
+            throw new AccountException(409, "PAYMENT_PROCESSING", "Đơn đã có giao dịch đang xử lý hoặc thành công.");
+        TripSaleRules.ensureSellable(em, context.trip, now());
+        List<GiuCho> holds = active(context);
+        if (holds.isEmpty()) throw conflict("Đơn không còn ghế đang giữ.");
+        Set<String> seats = new HashSet<>();
+        for (GiuCho hold : holds) {
+            if (!seats.add(hold.ghe.maGhe) || context.trip.xe == null
+                    || !hold.ghe.xe.maXe.equals(context.trip.xe.maXe)
+                    || hold.ghe.trangThai != TrangThaiGhe.HOAT_DONG)
+                throw new AccountException(409, "SEAT_UNAVAILABLE", "Ghế giữ không còn hợp lệ.");
+        }
+        long sold = em.createQuery("select count(v) from VeXe v where v.chuyenXe = :trip "
+                + "and v.ghe.maGhe in :seats and v.trangThai in :states", Long.class)
+                .setParameter("trip", context.trip).setParameter("seats", seats)
+                .setParameter("states", List.of(TrangThaiVe.DA_XUAT_VE, TrangThaiVe.DA_LEN_XE)).getSingleResult();
+        long otherHolds = em.createQuery("select count(h) from GiuCho h where h.chuyenXe = :trip "
+                + "and h.ghe.maGhe in :seats and h.trangThai = :holding and h.thoiDiemHetHan > :now "
+                + "and (h.donDatVe is null or h.donDatVe.maDon <> :order)", Long.class)
+                .setParameter("trip", context.trip).setParameter("seats", seats)
+                .setParameter("holding", TrangThaiGiuCho.DANG_GIU).setParameter("now", now())
+                .setParameter("order", context.order.maDon).getSingleResult();
+        if (sold > 0 || otherHolds > 0) throw new AccountException(409, "SEAT_UNAVAILABLE", "Ghế không còn thuộc lượt giữ hợp lệ của đơn.");
+        Set<String> passengerSeats = new HashSet<>();
+        for (PassengerRequest passenger : context.passengers) {
+            if (passenger == null || !passengerSeats.add(code(passenger.maGhe(), "maGhe")))
+                throw invalid("hanhKhach", "Danh sách hành khách không hợp lệ.");
+            text(passenger.hoTen(), "hoTen", 120);
+            text(passenger.soDienThoai(), "soDienThoai", 20);
+            optional(passenger.cccd(), "cccd", 20);
+        }
+        if (!seats.equals(passengerSeats) || context.passengers.size() != holds.size())
+            throw invalid("hanhKhach", "Cần đủ hành khách cho toàn bộ ghế đang giữ trong phiên hiện tại.");
+        text(context.order.khachDatTen, "khachDatTen", 120);
+        text(context.order.khachDatSoDienThoai, "khachDatSoDienThoai", 20);
+        checkExpiry(context, now());
+    }
+
+    private KhuyenMai promotionForPricing(EntityManager em, OrderContext context, String code, boolean lock) {
+        if (code == null) return null;
+        KhuyenMaiRepository repository = new KhuyenMaiRepository(em, now());
+        KhuyenMai promotion = lock ? repository.lock(code) : repository.find(code);
+        if (promotion == null) throw new AccountException(409, "PROMOTION_NOT_APPLICABLE", "Mã khuyến mãi không tồn tại.");
+        if (lock) em.refresh(promotion, LockModeType.PESSIMISTIC_WRITE);
+        LocalDateTime checkedAt = now();
+        checkExpiry(context, checkedAt);
+        if (checkedAt.isBefore(promotion.ngayBatDau) || !checkedAt.isBefore(promotion.ngayKetThuc))
+            throw new AccountException(409, "PROMOTION_NOT_APPLICABLE", "Mã khuyến mãi chưa có hiệu lực hoặc đã hết hạn.");
+        long reserved = new DonDatVeRepository(em).reservedPromotionUses(code, context.order.maDon, checkedAt);
+        if (promotion.soLuong - (long) promotion.soLuongDaDung - reserved <= 0)
+            throw new AccountException(409, "PROMOTION_EXHAUSTED", "Mã đã hết lượt khả dụng.");
+        BigDecimal total = baseFare(context.trip).multiply(BigDecimal.valueOf(active(context).size()));
+        validateTotal(total);
+        if (!promotion.kiemTraDieuKien(total, checkedAt))
+            throw new AccountException(409, "PROMOTION_NOT_APPLICABLE", "Đơn chưa đạt điều kiện khuyến mãi.");
+        return promotion;
+    }
+
+    private PriceSummary calculate(OrderContext context, KhuyenMai promotion, LocalDateTime checkedAt) {
+        BigDecimal fare = baseFare(context.trip);
+        BigDecimal total = fare.multiply(BigDecimal.valueOf(active(context).size()));
+        validateTotal(total);
+        if (promotion != null && !promotion.kiemTraDieuKien(total, checkedAt))
+            throw new AccountException(409, "PROMOTION_NOT_APPLICABLE", "Khuyến mãi không còn đủ điều kiện.");
+        BigDecimal discount = promotion == null ? BigDecimal.ZERO : promotion.tinhTienGiam(total, checkedAt);
+        return PriceCalculator.calculate(active(context).stream()
+                .map(h -> new PriceCalculator.SeatPrice(h.ghe.maGhe, fare)).toList(), discount);
+    }
+
+    private String priceFingerprint(OrderContext context, KhuyenMai promotion) {
+        ObjectNode input = JSON.createObjectNode();
+        input.put("maDon", context.order.maDon).put("maChuyen", context.trip.maChuyen)
+                .put("giaCoBan", amount(baseFare(context.trip)))
+                .put("khachDatTen", context.order.khachDatTen)
+                .put("khachDatSoDienThoai", context.order.khachDatSoDienThoai)
+                .put("ghiChu", context.order.ghiChu).put("expiresAt", deadline(context).toString());
+        input.set("seats", JSON.valueToTree(active(context).stream().map(h -> h.ghe.maGhe).sorted().toList()));
+        input.set("passengers", JSON.valueToTree(context.passengers.stream()
+                .sorted(Comparator.comparing(PassengerRequest::maGhe)).toList()));
+        if (promotion == null) input.putNull("promotion");
+        else {
+            ObjectNode rules = input.putObject("promotion");
+            rules.put("code", promotion.maKhuyenMai).put("type", promotion.loaiGiam.name())
+                    .put("value", amount(promotion.giaTriGiam))
+                    .put("maximum", promotion.giaTriToiDa == null ? null : amount(promotion.giaTriToiDa))
+                    .put("minimum", amount(promotion.donToiThieu)).put("quantity", promotion.soLuong)
+                    .put("starts", promotion.ngayBatDau.toString()).put("ends", promotion.ngayKetThuc.toString());
+        }
+        return IdempotencyRepository.hash(stringify(canonical(input)));
+    }
+
+    private PriceSummary frozenPrice(OrderContext context) {
+        if (context.order.trangThai == TrangThaiDon.CHO_THANH_TOAN) {
+            List<GiuCho> holds = active(context);
+            if (holds.isEmpty()) throw conflict("Đơn đã chốt không còn ghế giữ.");
+            BigDecimal fare = originalFare(context.order, holds.size());
+            return PriceCalculator.calculate(holds.stream()
+                    .map(h -> new PriceCalculator.SeatPrice(h.ghe.maGhe, fare)).toList(), context.order.tienGiam);
+        }
+        if (context.order.trangThai != TrangThaiDon.DA_THANH_TOAN || context.tickets.isEmpty()) return null;
+        BigDecimal fare = originalFare(context.order, context.tickets.size());
+        List<PriceLine> lines = context.tickets.stream().sorted(Comparator.comparing(v -> v.ghe.maGhe)).map(v -> {
+            if (!TripSaleRules.validPrice(v.giaVe) || v.giaVe.compareTo(fare) > 0)
+                throw conflict("Giá vé đã phát hành không khớp giá gốc của đơn.");
+            return new PriceLine(v.ghe.maGhe, amount(fare), amount(fare.subtract(v.giaVe)), amount(v.giaVe));
+        }).toList();
+        BigDecimal net = context.tickets.stream().map(v -> v.giaVe).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (net.compareTo(context.order.tongTien.subtract(context.order.tienGiam)) != 0)
+            throw conflict("Tổng giá vé đã phát hành không khớp tổng tiền đơn.");
+        return new PriceSummary("VND", amount(context.order.tongTien), amount(context.order.tienGiam), amount(net), lines);
+    }
+
+    private BigDecimal originalFare(DonDatVe order, int count) {
+        if (!TripSaleRules.validPrice(order.tongTien) || !TripSaleRules.validPrice(order.tienGiam)
+                || order.tienGiam.compareTo(order.tongTien) > 0)
+            throw conflict("Giá chốt của đơn không hợp lệ.");
+        try { return order.tongTien.divide(BigDecimal.valueOf(count), 0, java.math.RoundingMode.UNNECESSARY); }
+        catch (ArithmeticException error) { throw conflict("Tổng gốc không khớp số ghế cùng giá."); }
+    }
+
+    private static PriceSummary summary(QuoteResponse quote) {
+        return new PriceSummary(quote.donViTienTe(), quote.tongTienGoc(), quote.tongTienGiam(),
+                quote.tongThanhToan(), quote.chiTietGia());
+    }
+
+    private static PromotionResult promotionResult(KhuyenMai promotion, PriceSummary price) {
+        return promotion == null ? null : new PromotionResult(true, price.tongTienGiam());
+    }
+
+    private FreezePriceResponse freezeResponse(OrderContext context, String quoteId, PriceSummary price) {
+        return new FreezePriceResponse(quoteId, context.order.maDon, context.order.trangThai, "VND", offset(deadline(context)),
+                price.tongTienGoc(), price.tongTienGiam(), price.tongThanhToan(), price.chiTietGia(),
+                context.order.maKhuyenMaiDaApDung == null ? null : new PromotionResult(true, price.tongTienGiam()));
     }
 
     private List<BookingDto.HoldResponse> holdResponses(OrderContext context) {
