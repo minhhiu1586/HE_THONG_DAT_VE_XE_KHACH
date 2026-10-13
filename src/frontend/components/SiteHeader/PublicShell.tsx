@@ -62,7 +62,7 @@ export default function PublicShell({ children }: { children: React.ReactNode })
         <div>
           <strong>Hotline 24/7</strong>
           <p className="hotline">1900 6067</p>
-          <p style={{ fontSize: '13px', marginTop: '8px', color: '#7aafab' }}>
+          <p style={{ fontSize: '13px', marginTop: '8px', color: '#374151' }}>
             Thứ 2 – Chủ nhật, 7:00 – 22:00
           </p>
         </div>
