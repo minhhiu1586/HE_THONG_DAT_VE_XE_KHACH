@@ -8,3 +8,4 @@ Thư mục này lưu toàn bộ tài liệu phân tích, thiết kế và kế h
 - `diagrams/`: các sơ đồ phân tích và thiết kế.
 - `database/`: thiết kế cơ sở dữ liệu, schema và dữ liệu mẫu.
 - `plans/`: kế hoạch làm việc, phân công nhiệm vụ và tiến độ.
+- [`api/`](api/README.md): hợp đồng API, quy ước trao đổi dữ liệu và dữ liệu mẫu.

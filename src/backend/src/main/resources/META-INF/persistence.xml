@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence" version="3.1">
+    <persistence-unit name="datvexe" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <class>com.datvexe.domain.Entities$TinhThanh</class>
+        <class>com.datvexe.domain.Entities$BenXe</class>
+        <class>com.datvexe.domain.Entities$NhaXe</class>
+        <class>com.datvexe.domain.Entities$NhanVien</class>
+        <class>com.datvexe.domain.Entities$LoaiXe</class>
+        <class>com.datvexe.domain.Entities$Xe</class>
+        <class>com.datvexe.domain.Entities$Ghe</class>
+        <class>com.datvexe.domain.Entities$TuyenXe</class>
+        <class>com.datvexe.domain.Entities$DiemDung</class>
+        <class>com.datvexe.domain.Entities$ChuyenXe</class>
+        <class>com.datvexe.domain.Entities$PhanCongChuyenXe</class>
+        <class>com.datvexe.domain.Entities$GiuCho</class>
+        <class>com.datvexe.domain.Entities$NguoiDung</class>
+        <class>com.datvexe.domain.Entities$DonDatVe</class>
+        <class>com.datvexe.domain.Entities$VeXe</class>
+        <class>com.datvexe.domain.Entities$DanhGia</class>
+        <class>com.datvexe.domain.Entities$ThanhToan</class>
+        <class>com.datvexe.domain.Entities$PhuongThucThanhToan</class>
+        <class>com.datvexe.domain.Entities$ChinhSachHoanVe</class>
+        <class>com.datvexe.domain.Entities$KhuyenMai</class>
+        <properties>
+            <property name="hibernate.hbm2ddl.auto" value="validate"/>
+            <property name="hibernate.show_sql" value="false"/>
+        </properties>
+    </persistence-unit>
+</persistence>
