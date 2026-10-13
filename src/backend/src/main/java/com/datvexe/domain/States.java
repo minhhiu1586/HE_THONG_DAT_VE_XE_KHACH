@@ -22,7 +22,7 @@ public final class States {
         @Deprecated TAI_XE
     }
     public enum TrangThaiDanhGia { CHO_DUYET, DA_DUYET, AN }
-    public enum TrangThaiDon { CHO_XU_LY, DA_XAC_NHAN, CHO_THANH_TOAN, DA_THANH_TOAN, DA_HUY }
+    public enum TrangThaiDon { CHO_XU_LY, DA_XAC_NHAN, CHO_THANH_TOAN, DA_THANH_TOAN, DA_HUY, HET_HAN }
     public enum KenhDat { WEB, APP, TONG_DAI, TAI_QUAY }
     public enum TrangThaiVe { DA_XUAT_VE, DA_LEN_XE, DA_HOAN, DA_HUY }
     public enum TrangThaiThanhToan { CHO_XU_LY, THANH_CONG, THAT_BAI, DA_HOAN_TIEN, HOAN_TIEN_MOT_PHAN }

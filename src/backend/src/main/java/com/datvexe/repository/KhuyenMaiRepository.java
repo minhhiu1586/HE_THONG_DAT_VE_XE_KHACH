@@ -2,6 +2,7 @@ package com.datvexe.repository;
 
 import com.datvexe.domain.Entities.KhuyenMai;
 import com.datvexe.domain.States.TrangThaiKhuyenMai;
+import com.datvexe.domain.States.TrangThaiDon;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import java.time.LocalDate;
@@ -82,9 +83,11 @@ public final class KhuyenMaiRepository extends JpaRepository<KhuyenMai> {
         }
 
         Long orders = em.createQuery(
-                        "select count(d) from DonDatVe d where d.maKhuyenMaiDaApDung = :code",
+                        "select count(d) from DonDatVe d where d.maKhuyenMaiDaApDung = :code "
+                                + "and d.trangThai <> :draft",
                         Long.class)
                 .setParameter("code", maKhuyenMai)
+                .setParameter("draft", TrangThaiDon.CHO_XU_LY)
                 .getSingleResult();
         return orders > 0;
     }

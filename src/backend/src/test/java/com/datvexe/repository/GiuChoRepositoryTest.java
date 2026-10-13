@@ -10,7 +10,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GiuChoRepositoryTest {
-    @Test void activeHoldsAreScopedToTripAndExpiredHoldsAreReleased() {
+    @Test void activeHoldsAreScopedToTripAndExcludeTheExactExpiryDeadline() {
         try (EntityManagerFactory factory = Persistence.createEntityManagerFactory("datvexe", Map.of(
                 "jakarta.persistence.jdbc.driver", "org.h2.Driver",
                 "jakarta.persistence.jdbc.url", "jdbc:h2:mem:hold_repository;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
@@ -32,19 +32,28 @@ class GiuChoRepositoryTest {
             em.persist(first); em.persist(second); em.persist(third);
             ChuyenXe outbound = trip("T1", route, vehicle), returnTrip = trip("T2", route, vehicle);
             em.persist(outbound); em.persist(returnTrip);
-            LocalDateTime now = LocalDateTime.now();
-            GiuChoRepository repository = new GiuChoRepository();
-            repository.save(em, hold("H1", outbound, first, now.plusMinutes(15), TrangThaiGiuCho.DANG_GIU));
-            repository.save(em, hold("H2", outbound, second, now.minusMinutes(1), TrangThaiGiuCho.DANG_GIU));
+            NguoiDung buyer = new NguoiDung(); buyer.maNguoiDung = "BUYER"; buyer.hoTen = "Buyer";
+            buyer.soDienThoai = "0900000000"; buyer.email = "buyer@example.test"; buyer.matKhau = "hashed";
+            em.persist(buyer);
+            DonDatVe order = new DonDatVe(); order.maDon = "ORDER"; order.nguoiDat = buyer;
+            order.ngayDat = LocalDateTime.of(2030, 1, 1, 10, 0); order.khachDatTen = "Buyer";
+            order.khachDatSoDienThoai = "0900000000"; em.persist(order);
+            LocalDateTime now = LocalDateTime.of(2030, 1, 1, 10, 0);
+            GiuChoRepository repository = new GiuChoRepository(em);
+            GiuCho active = hold("H1", outbound, first, now.plusMinutes(15), TrangThaiGiuCho.DANG_GIU);
+            active.donDatVe = order; repository.save(em, active);
+            GiuCho atDeadline = hold("H2", outbound, second, now, TrangThaiGiuCho.DANG_GIU);
+            atDeadline.donDatVe = order; repository.save(em, atDeadline);
             repository.save(em, hold("H3", returnTrip, first, now.plusMinutes(15), TrangThaiGiuCho.DANG_GIU));
-            repository.save(em, hold("H4", outbound, third, now.plusMinutes(15), TrangThaiGiuCho.DA_HUY));
+            GiuCho cancelled = hold("H4", outbound, third, now.plusMinutes(15), TrangThaiGiuCho.DA_HUY);
+            cancelled.donDatVe = order; repository.save(em, cancelled);
             em.flush();
             assertEquals(List.of("S1"), repository.timCacGheDangBiGiu(em, "T1", List.of("S1", "S2", "S3"), now));
             assertEquals(List.of("S1"), repository.timCacGheDangBiGiu(em, "T2", List.of("S1"), now));
-            assertEquals(1, repository.huyGiuChoQuaHan(em, now));
-            em.clear();
-            assertEquals(TrangThaiGiuCho.DA_HUY, em.find(GiuCho.class, "H2").trangThai);
-            assertEquals(TrangThaiGiuCho.DANG_GIU, em.find(GiuCho.class, "H1").trangThai);
+            assertEquals(List.of("H1"), repository.activeForOrder("ORDER", now).stream()
+                    .map(hold -> hold.maGiuCho).toList());
+            assertEquals(3, repository.forOrder("ORDER").size());
+            assertEquals(TrangThaiGiuCho.DANG_GIU, em.find(GiuCho.class, "H2").trangThai);
             em.getTransaction().rollback();
         }
     }

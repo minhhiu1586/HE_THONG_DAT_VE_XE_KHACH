@@ -38,6 +38,8 @@ services:
       - ./docs/database/schema/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
       - ./docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
       - ./docs/database/schema/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
+      - ./docs/database/schema/004_booking_order.sql:/docker-entrypoint-initdb.d/004_booking_order.sql:ro
+      - ./docs/database/schema/005_booking_session.sql:/docker-entrypoint-initdb.d/005_booking_session.sql:ro
       - ./docs/database/seed/001_catalog.sql:/docker-entrypoint-initdb.d/004_catalog.sql:ro
       - ./docs/database/seed/002_accounts_staff_fleet.sql:/docker-entrypoint-initdb.d/005_accounts_staff_fleet.sql:ro
       - ./docs/database/seed/003_routes_trips.sql:/docker-entrypoint-initdb.d/006_routes_trips.sql:ro

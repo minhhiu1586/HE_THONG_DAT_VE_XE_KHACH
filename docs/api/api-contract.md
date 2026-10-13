@@ -151,15 +151,14 @@ A03 hiện chuyển từ array đang có sang `Page` theo đề xuất. `maXe` v
 
 | ID | Phương thức + đường dẫn | Quyền | Tham số / yêu cầu | Phản hồi thành công | Lỗi nghiệp vụ chính |
 | --- | --- | --- | --- | --- | --- |
-| B01 | POST `/api/giu-cho` | KH | Body JSON: `maChuyen`, `danhSachMaGhe` (không rỗng, không trùng). | 201 `HoldResponse` ([ví dụ](#b01--giữ-ghế-và-tạo-đơn-nháp)) | 409 `SEAT_UNAVAILABLE`, `INVALID_STATE_TRANSITION` |
-| B02 | GET `/api/don-dat-ve/{maDon}/giu-cho` | KH | Path `maDon` | 200 cùng `HoldResponse` của [B01](#b01--giữ-ghế-và-tạo-đơn-nháp) | 403 `FORBIDDEN`; 404 `RESOURCE_NOT_FOUND` |
-| B03 | PATCH `/api/don-dat-ve/{maDon}` | KH | Path `maDon`; body cần ít nhất một trong `khachDatTen`, `khachDatSoDienThoai`, `ghiChu`. `ghiChu: null` xóa ghi chú. | 200 `OrderResponse` ([ví dụ nháp](#b03-và-b04--đơn-nháp)) | 409 `INVALID_STATE_TRANSITION` |
-| B04 | PUT `/api/don-dat-ve/{maDon}/hanh-khach` | KH | Path `maDon`; body thay toàn bộ `hanhKhach` (ít nhất 1). Mỗi phần tử cần `maGhe`, `hoTen`; `maGhe` không trùng và tập `maGhe` phải khớp toàn bộ ghế đang giữ cho đơn; `soDienThoai`, `cccd` có thể là chuỗi hoặc `null`. | 200 cùng `OrderResponse` ([ví dụ nháp](#b03-và-b04--đơn-nháp)) | 409 `HOLD_EXPIRED` |
-| B05 | GET `/api/don-dat-ve/{maDon}` | KH; NX/AD theo quyền | Path `maDon` | 200 `OrderResponse` với snapshot ([ví dụ](#b05--đơn-và-snapshot-giá)) | 403 `FORBIDDEN`; 404 `RESOURCE_NOT_FOUND` |
-| B06 | GET `/api/don-dat-ve` | KH | Query tùy chọn `page`, `size`, `trangThaiDon`, `maChuyen`, `tuNgay`, `denNgay`, `sort`; sort theo `ngayTao` hoặc `thoiDiemKhoiHanh`, chiều `asc\|desc`. | 200 `Page<OrderResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 400 `VALIDATION_ERROR` |
-| B07 | POST `/api/don-dat-ve/{maDon}/huy` | KH | Path `maDon`; không có body | 200 `CancelOrderResponse` ([ví dụ](#b07--hủy-đơn)) | 409 `INVALID_STATE_TRANSITION` |
+| B01 | POST `/api/booking/hold` | KH | Body JSON: `maChuyen`, `danhSachMaGhe` (không rỗng, không trùng). | 201 `HoldSeatResponse` ([ví dụ](#b01--giữ-ghế-và-tạo-đơn-nháp)) | 409 `SEAT_UNAVAILABLE`, `INVALID_STATE_TRANSITION` |
+| B02/B05 | GET `/api/booking/{maDon}` | KH | Path `maDon`; trả đơn, thời hạn giữ và giá tạm tính theo hợp đồng T16. | 200 `OrderResponse` ([ví dụ đơn nháp](#b03-và-b04--đơn-nháp)) | 403 `FORBIDDEN`; 404 `RESOURCE_NOT_FOUND`; 409 `HOLD_EXPIRED` |
+| B03 | PATCH `/api/booking/{maDon}` | KH | Path `maDon`; body cần ít nhất một trong `khachDatTen`, `khachDatSoDienThoai`, `ghiChu`. `ghiChu: null` xóa ghi chú. | 200 `OrderResponse` ([ví dụ nháp](#b03-và-b04--đơn-nháp)) | 409 `INVALID_STATE_TRANSITION` |
+| B04 | PUT `/api/booking/{maDon}/hanh-khach` | KH | Path `maDon`; body thay toàn bộ `hanhKhach` (ít nhất 1). Mỗi phần tử cần `maGhe`, `hoTen`, `soDienThoai`; `maGhe` không trùng và tập `maGhe` phải khớp toàn bộ ghế đang giữ cho đơn. `cccd` tùy chọn, chuỗi tối đa 20 ký tự hoặc `null`. | 200 cùng `OrderResponse` ([ví dụ nháp](#b03-và-b04--đơn-nháp)) | 409 `HOLD_EXPIRED` |
+| B06 | GET `/api/booking` | KH | Query tùy chọn `page`, `size`, `trangThaiDon`, `maChuyen`, `tuNgay`, `denNgay`, `sort`; sort theo `ngayTao` hoặc `thoiDiemKhoiHanh`, chiều `asc\|desc`. | 200 `Page<OrderResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 400 `VALIDATION_ERROR` |
+| B07 | POST `/api/booking/{maDon}/huy` | KH | Path `maDon`; body tùy chọn, nếu gửi thì `{}`. | 200 `OrderResponse` (hợp đồng T16 tại [booking-order.md](booking-order.md)) | 409 `INVALID_STATE_TRANSITION` |
 
-B01 giữ toàn bộ ghế và tạo một đơn nháp trong cùng giao dịch nguyên tử; B03 và B04 chỉ cập nhật đơn do B01 tạo. Máy chủ nên kiểm tra lại chuyến trước khi giữ. `OrderResponse` hiện yêu cầu `khachDatTen` và `khachDatSoDienThoai` có giá trị, không `null`; trước khi triển khai B01, nhóm cần quyết định cách khởi tạo thông tin liên hệ cho đơn nháp. Các ví dụ giả định đã có thông tin liên hệ hợp lệ. Chưa có luồng đổi tập ghế trên cùng đơn.
+B01 giữ toàn bộ ghế và tạo một đơn nháp trong cùng giao dịch nguyên tử; B03 và B04 chỉ cập nhật đơn do B01 tạo. Máy chủ nên kiểm tra lại chuyến trước khi giữ. Với B04, `soDienThoai` của từng hành khách là bắt buộc; danh sách hành khách được giữ tạm trong HTTP session, không tạo hàng hành khách hoặc vé nháp trong database. Cùng `JSESSIONID` đọc lại được snapshot; session mới vẫn đọc được đơn và ghế nhưng trả `hanhKhach: []` và `coTheChotGia: false`. Hợp đồng module [booking-order.md](booking-order.md) là nguồn có thẩm quyền cho chi tiết B01–B08 của T16; những mục B còn lại tại đây giữ phạm vi tương lai của T05.
 
 ### Request body
 
@@ -193,32 +192,40 @@ B01 giữ toàn bộ ghế và tạo một đơn nháp trong cùng giao dịch n
 }
 ```
 
-Tên người đặt và hành khách dài 1–120 ký tự; số điện thoại người đặt dài 1–20; `ghiChu` tối đa 500. `hoTen` bắt buộc trong mỗi hành khách; `soDienThoai` và `cccd` nhận chuỗi tối đa 20 ký tự hoặc `null`.
+Tên người đặt và hành khách dài 1–120 ký tự; số điện thoại người đặt dài 1–20; `ghiChu` tối đa 500. `hoTen` và `soDienThoai` bắt buộc trong mỗi hành khách; số điện thoại dài 1–20 ký tự. `cccd` tùy chọn, tối đa 20 ký tự hoặc `null`.
 
 ### Ví dụ response thành công
 
 <a id="b01--giữ-ghế-và-tạo-đơn-nháp"></a>
 
-#### B01 — Giữ ghế và tạo đơn nháp; B02 dùng cùng response
+#### B01 — Giữ ghế và tạo đơn nháp
 
 ```json
 {
   "maDon": "DDV01",
   "maChuyen": "CX01",
   "trangThaiDon": "CHO_XU_LY",
-  "serverTime": "2026-10-11T09:30:00+07:00",
-  "thoiDiemBatDau": "2026-10-11T09:30:00+07:00",
-  "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
+  "serverTime": "2026-10-13T09:30:00+07:00",
+  "thoiDiemBatDau": "2026-10-13T09:30:00+07:00",
+  "thoiDiemHetHan": "2026-10-13T09:45:00+07:00",
+  "danhSachGheGiu": [
+    "G11",
+    "G12"
+  ],
   "danhSachGiuCho": [
     {
       "maGiuCho": "GC01",
       "maGhe": "G11",
-      "trangThai": "DANG_GIU"
+      "trangThai": "DANG_GIU",
+      "thoiDiemBatDau": "2026-10-13T09:30:00+07:00",
+      "thoiDiemHetHan": "2026-10-13T09:45:00+07:00"
     },
     {
       "maGiuCho": "GC02",
       "maGhe": "G12",
-      "trangThai": "DANG_GIU"
+      "trangThai": "DANG_GIU",
+      "thoiDiemBatDau": "2026-10-13T09:30:00+07:00",
+      "thoiDiemHetHan": "2026-10-13T09:45:00+07:00"
     }
   ]
 }
@@ -234,16 +241,16 @@ Tên người đặt và hành khách dài 1–120 ký tự; số điện thoạ
   "khachDatTen": "Nguyen Van A",
   "khachDatSoDienThoai": "0900000001",
   "ghiChu": null,
+  "serverTime": "2026-10-13T09:32:00+07:00",
+  "thoiDiemBatDau": "2026-10-13T09:30:00+07:00",
+  "thoiDiemHetHan": "2026-10-13T09:45:00+07:00",
   "danhSachGiuCho": [
     {
       "maGiuCho": "GC01",
       "maGhe": "G11",
-      "trangThai": "DANG_GIU"
-    },
-    {
-      "maGiuCho": "GC02",
-      "maGhe": "G12",
-      "trangThai": "DANG_GIU"
+      "trangThai": "DANG_GIU",
+      "thoiDiemBatDau": "2026-10-13T09:30:00+07:00",
+      "thoiDiemHetHan": "2026-10-13T09:45:00+07:00"
     }
   ],
   "hanhKhach": [
@@ -252,20 +259,26 @@ Tên người đặt và hành khách dài 1–120 ký tự; số điện thoạ
       "hoTen": "Nguyen Van A",
       "soDienThoai": "0900000001",
       "cccd": null
-    },
-    {
-      "maGhe": "G12",
-      "hoTen": "Tran Thi B",
-      "soDienThoai": "0900000002",
-      "cccd": null
     }
   ],
   "danhSachVe": [],
-  "giaDaChot": null
+  "giaTamTinh": {
+    "tongTienGoc": "125000",
+    "tienGiam": "0",
+    "tongThanhToan": "125000",
+    "maKhuyenMaiDaChon": null,
+    "maKhuyenMaiApDung": null,
+    "lyDoKhongApDung": null
+  },
+  "coTheChotGia": true,
+  "giaDaChot": null,
+  "thongBao": []
 }
 ```
 
 #### B05 — Đơn và snapshot giá
+
+Ví dụ mục tiêu sau T17/T18; backend T16 hiện trả `giaDaChot: null`.
 
 ```json
 {
@@ -340,9 +353,37 @@ Trước khi chốt, `giaDaChot` là `null`; sau khi chốt, đây là snapshot 
 
 ```json
 {
-  "maDon": "DDV02",
+  "maDon": "DDV01",
+  "maChuyen": "CX01",
   "trangThaiDon": "DA_HUY",
-  "thoiDiemHuy": "2026-10-11T09:35:00+07:00"
+  "khachDatTen": "Nguyen Van A",
+  "khachDatSoDienThoai": "0900000001",
+  "ghiChu": null,
+  "serverTime": "2026-10-13T09:32:00+07:00",
+  "thoiDiemBatDau": "2026-10-13T09:30:00+07:00",
+  "thoiDiemHetHan": "2026-10-13T09:45:00+07:00",
+  "danhSachGiuCho": [
+    {
+      "maGiuCho": "GC01",
+      "maGhe": "G11",
+      "trangThai": "DA_HUY",
+      "thoiDiemBatDau": "2026-10-13T09:30:00+07:00",
+      "thoiDiemHetHan": "2026-10-13T09:45:00+07:00"
+    }
+  ],
+  "hanhKhach": [],
+  "danhSachVe": [],
+  "giaTamTinh": {
+    "tongTienGoc": "0",
+    "tienGiam": "0",
+    "tongThanhToan": "0",
+    "maKhuyenMaiDaChon": null,
+    "maKhuyenMaiApDung": null,
+    "lyDoKhongApDung": null
+  },
+  "coTheChotGia": false,
+  "giaDaChot": null,
+  "thongBao": []
 }
 ```
 
@@ -350,8 +391,8 @@ Trước khi chốt, `giaDaChot` là `null`; sau khi chốt, đây là snapshot 
 
 | ID | Phương thức + đường dẫn | Quyền | Tham số / yêu cầu | Phản hồi thành công | Lỗi nghiệp vụ chính |
 | --- | --- | --- | --- | --- | --- |
-| C01 | POST `/api/don-dat-ve/{maDon}/bao-gia` | KH | Path `maDon`; body JSON bắt buộc. `maKhuyenMai` tùy chọn, là chuỗi (1–40 ký tự) hoặc `null`; gửi `{}` nếu không áp mã. | 200 `QuoteResponse` ([ví dụ](#c01--báo-giá)) | 409 `PROMOTION_NOT_APPLICABLE` |
-| C02 | POST `/api/don-dat-ve/{maDon}/chot-gia` | KH | Path `maDon`; body cần `maBaoGia`; `phienBanGia` tùy chọn, số nguyên từ 1. Việc dùng khóa lạc quan còn chờ quyết định. | 200 `FreezePriceResponse` ([ví dụ](#c02--chốt-giá)) | 409 `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PROMOTION_EXHAUSTED` |
+| C01 | POST `/api/booking/{maDon}/bao-gia` | KH | Path `maDon`; body JSON bắt buộc. `maKhuyenMai` tùy chọn, là chuỗi (1–40 ký tự) hoặc `null`; gửi `{}` nếu không áp mã. | 200 `QuoteResponse` ([ví dụ](#c01--báo-giá)) | 409 `PROMOTION_NOT_APPLICABLE` |
+| C02 | POST `/api/booking/{maDon}/chot-gia` | KH | Path `maDon`; body cần `maBaoGia`; `phienBanGia` tùy chọn, số nguyên từ 1. Việc dùng khóa lạc quan còn chờ quyết định. | 200 `FreezePriceResponse` ([ví dụ](#c02--chốt-giá)) | 409 `QUOTE_EXPIRED`, `PRICE_CHANGED`, `PROMOTION_EXHAUSTED` |
 | C03 | GET `/api/phuong-thuc-thanh-toan` | P | Không có | 200, `array<PaymentMethodDto>` ([ví dụ](#c03--phương-thức-thanh-toán)) | — |
 
 C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 chốt đúng báo giá đã gửi; cách giữ lượt khuyến mãi nguyên tử, thay mã/chốt lại và giải phóng lượt còn chờ quyết định. Nếu báo giá hết hạn hoặc giá thay đổi, ứng dụng cần lấy báo giá mới.
@@ -462,9 +503,9 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
 
 | ID | Phương thức + đường dẫn | Quyền | Tham số / yêu cầu | Phản hồi thành công | Lỗi nghiệp vụ chính |
 | --- | --- | --- | --- | --- | --- |
-| D01 | POST `/api/don-dat-ve/{maDon}/thanh-toan` | KH | Path `maDon`; body cần `maPhuongThuc`, `phienBanGia` từ snapshot B05. | 201 khi khởi tạo; 202 khi đang chờ. `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 409 `PAYMENT_PROCESSING` |
+| D01 | POST `/api/booking/{maDon}/thanh-toan` | KH | Path `maDon`; body cần `maPhuongThuc`, `phienBanGia` từ snapshot B05. | 201 khi khởi tạo; 202 khi đang chờ. `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 409 `PAYMENT_PROCESSING` |
 | D02 | GET `/api/thanh-toan/{maGiaoDich}` | KH; NX/AD theo quyền | Path `maGiaoDich` | 200 cùng `PaymentResponse` ([ví dụ](#d01--tạo-lần-thanh-toán)) | 404 `RESOURCE_NOT_FOUND` |
-| D03 | GET `/api/don-dat-ve/{maDon}/thanh-toan` | KH; NX/AD theo quyền | Path `maDon`; query `page`, `size`, `trangThai`, `sort` (`thoiDiemTao,asc\|desc`). | 200 `Page<PaymentResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 404 `RESOURCE_NOT_FOUND` |
+| D03 | GET `/api/booking/{maDon}/thanh-toan` | KH; NX/AD theo quyền | Path `maDon`; query `page`, `size`, `trangThai`, `sort` (`thoiDiemTao,asc\|desc`). | 200 `Page<PaymentResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 404 `RESOURCE_NOT_FOUND` |
 | D04 | Method chưa chốt — `/api/thanh-toan/callback/{congThanhToan}` | CG | Path dự kiến có `congThanhToan`; body, chữ ký, response/ACK phụ thuộc cổng. | Chưa định nghĩa | Chờ đặc tả provider |
 | D05 | GET `/api/ve-xe/{maVe}` | KH; NV/NX/AD theo quyền | Path `maVe` | 200 `TicketResponse` ([ví dụ](#d05--vé-điện-tử)) | 404 `RESOURCE_NOT_FOUND` |
 
