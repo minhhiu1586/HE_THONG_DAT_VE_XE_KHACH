@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { getTrip, getTripSeats, type SearchTrip, type HoldSeatResponse } from "@/lib/api";
@@ -77,12 +78,13 @@ export default function SeatsPage() {
   };
 
   return (
-    <main className="page">
-      <div className="stepper">
-        <span className="active">01 Chọn ghế</span>
-        <span>02 Thông tin</span>
-        <span>03 Xác nhận</span>
-      </div>
+    <main className="page seat-selection-page">
+      <Link className="seat-back-link" href={`/tim-chuyen/${encodeURIComponent(tripId)}`}>← Chi tiết chuyến</Link>
+      <ol className="seat-steps" aria-label="Các bước đặt vé">
+        <li className="active" aria-current="step"><span>1</span><strong>Chọn ghế</strong></li>
+        <li><span>2</span><strong>Thông tin hành khách</strong></li>
+        <li><span>3</span><strong>Xác nhận</strong></li>
+      </ol>
       {loading && (
         <div className="state">Đang tải chuyến và sơ đồ ghế...</div>
       )}
@@ -104,7 +106,7 @@ export default function SeatsPage() {
                 {trip.tenBenDen}
               </h1>
               <p>
-                {trip.ngayKhoiHanh} · {trip.gioKhoiHanh.slice(0, 5)} ·{" "}
+                {trip.ngayKhoiHanh.split('-').reverse().join('/')} · {trip.gioKhoiHanh.slice(0, 5)} ·{" "}
                 {trip.tenNhaXe ?? "Nhà xe"}
               </p>
             </div>
@@ -119,7 +121,7 @@ export default function SeatsPage() {
               </span>
               <span>
                 <i className="seat-demo unavailable" />
-                Đã bán
+                Không khả dụng
               </span>
             </div>
             <SeatLayout
@@ -128,26 +130,21 @@ export default function SeatsPage() {
               onToggle={id => { if (trip.coTheDatVe && !isHolding) bookingStore.toggleSeat(id); }}
             />
           </section>
-          <aside className="summary-card">
+          <aside className="summary-card seat-ticket-summary" aria-label="Vé của bạn">
             <span className="eyebrow">VÉ CỦA BẠN</span>
-            <h2>{booking.selectedSeats.length} ghế</h2>
-            <p>Giá tham khảo</p>
-            <strong className="total">
-              {(
-                booking.selectedSeats.length * Number(trip.giaVeDuKien ?? 0)
-              ).toLocaleString("vi-VN")}
-              đ
-            </strong>
-            <button
-              className="primary-button full"
-              disabled={!booking.selectedSeats.length || isHolding || !trip.coTheDatVe}
-              onClick={handleContinue}
-            >
-              {isHolding ? "Đang giữ ghế..." : 'Tiếp tục →'}
+            <h2>{booking.selectedSeats.length ? booking.selectedSeats.length + ' ghế đã chọn' : 'Chưa chọn ghế'}</h2>
+            <div className="ticket-selected-seats" aria-label="Ghế đã chọn">
+              {booking.selectedSeats.length ? booking.selectedSeats.map(id => {
+                const seat = map.danhSachGhe.find(item => item.maGhe === id);
+                return <span key={id}>{typeof seat?.viTri === 'string' ? seat.viTri : id}</span>;
+              }) : <p>Chọn ghế trống trên sơ đồ bên cạnh.</p>}
+            </div>
+            <div className="ticket-price-row"><span>Giá mỗi ghế</span><strong>{Number(trip.giaVeDuKien ?? 0).toLocaleString('vi-VN')}đ</strong></div>
+            <div className="ticket-total"><p>Tổng tham khảo</p><strong className="total">{(booking.selectedSeats.length * Number(trip.giaVeDuKien ?? 0)).toLocaleString('vi-VN')}đ</strong></div>
+            <button className="primary-button full" type="button" disabled={!booking.selectedSeats.length || isHolding || !trip.coTheDatVe} onClick={handleContinue}>
+              {isHolding ? 'Đang giữ ghế…' : 'Giữ ghế và tiếp tục'}
             </button>
-            {!booking.selectedSeats.length && (
-              <small>Chọn ít nhất một ghế để tiếp tục</small>
-            )}
+            <small>{!trip.coTheDatVe ? 'Chuyến không còn nhận đặt vé.' : !booking.selectedSeats.length ? 'Chọn ít nhất một ghế để tiếp tục.' : 'Giá cuối cùng được xác nhận theo đơn đặt vé.'}</small>
           </aside>
         </div>
       )}

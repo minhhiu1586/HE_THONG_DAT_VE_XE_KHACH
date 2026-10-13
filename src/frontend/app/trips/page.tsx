@@ -20,7 +20,7 @@ function TripsContent() {
   const [locations, setLocations] = useState<SearchOption[]>([]);
   useEffect(() => {
     let active = true;
-    getSearchOptions().then(data => { if (active) setLocations(data); }).catch(() => {});
+    getSearchOptions().then(data => { if (active) setLocations(data); }).catch(() => { });
     return () => { active = false; };
   }, []);
   const locationName = (value: string, fallback: string) =>

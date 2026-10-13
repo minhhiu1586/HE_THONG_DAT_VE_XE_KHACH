@@ -62,22 +62,50 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
     ? [...new Set(seats.map((seat) => seat.tang))].sort((a, b) => a - b)
     : [];
 
-  return <main className="page">
-    <Link href="/trips">← Tìm chuyến khác</Link>
-    <div className="page-title"><span className="eyebrow">CHI TIẾT CHUYẾN</span><h1>{trip.tenBenDi} <span>→</span> {trip.tenBenDen}</h1>
-      <p>{trip.ngayKhoiHanh} · {trip.gioKhoiHanh.slice(0, 5)} · {trip.tenNhaXe ?? trip.tenTuyen}</p></div>
-    <article className="trip-card"><div><strong>Điểm đi</strong><p>{trip.tenBenDi} · {trip.tenTinhDi}</p><p>{trip.diaChiBenDi}</p></div>
-      <div><strong>Điểm đến</strong><p>{trip.tenBenDen} · {trip.tenTinhDen}</p><p>{trip.diaChiBenDen}</p></div>
-      <div><strong>Thông tin chuyến</strong><p>Đến dự kiến: {trip.gioDenDuKien.replace('T', ' ')}</p><p>{trip.tenLoaiXe ?? 'Xe chưa cập nhật'} · {trip.soGheTrong}/{trip.tongSoGhe} ghế còn</p><p>{Number(trip.giaVeDuKien).toLocaleString('vi-VN')}đ</p></div></article>
-    <section className={styles.stops}><h2>Điểm đón, trả và dừng</h2>{trip.diemDung.length ? <ul>{trip.diemDung.map(stop => <li key={stop.maDiemDung}><div><strong>{stop.tenDiemDung}</strong><p>{stop.diaChi}</p></div><span>{stop.thoiGianDung} phút</span></li>)}</ul> : <p>Không có điểm dừng trung gian.</p>}</section>
-    <div className="detail-actions"><button className="outline-button" disabled={busy} onClick={() => void refresh(false)}>{busy ? 'Đang cập nhật...' : 'Cập nhật chỗ còn'}</button>
-      <button className="primary-button" disabled={busy || !trip.coTheDatVe} onClick={() => void refresh(true)}>{busy ? 'Đang tải...' : 'Xem ghế của chuyến'}</button></div>
-    <div ref={availabilityRef} tabIndex={-1} className={styles.availability} role="status" aria-live="polite">
-      <span className={styles.availabilityLabel}>Chỗ còn hiện tại</span>
-      <strong>{trip.soGheTrong}<span> / {trip.tongSoGhe} ghế</span></strong>
-      <p>{updatedAt ? `Đã cập nhật lúc ${updatedAt} (giờ Việt Nam).` : 'Nhấn “Cập nhật chỗ còn” để xem số ghế mới nhất.'}</p>
+  const formatDate = (value: string) => value.slice(0, 10).split('-').reverse().join('/');
+  const minutes = Math.round(Number(trip.thoiLuongPhut));
+  const duration = Number.isFinite(minutes) && minutes > 0 ? [Math.floor(minutes / 60) ? Math.floor(minutes / 60) + ' giờ' : '', minutes % 60 ? minutes % 60 + ' phút' : ''].filter(Boolean).join(' ') : 'Đang cập nhật';
+
+  return <main className={`page ${styles.detailPage}`}>
+    <Link className={styles.backLink} href="/trips">← Tìm chuyến khác</Link>
+    <header className={styles.intro}><span className="eyebrow">CHI TIẾT CHUYẾN</span>
+      <h1>{trip.tenTinhDi} <span aria-hidden="true">→</span> {trip.tenTinhDen}</h1>
+      <p>{trip.tenNhaXe ?? trip.tenTuyen} · {trip.tenLoaiXe ?? 'Thông tin xe đang cập nhật'}</p>
+    </header>
+    <div className={styles.detailLayout}>
+      <div className={styles.detailContent}>
+        <article className={styles.journeyCard}>
+          <div className={styles.journeyHeader}><h2>Thông tin hành trình</h2><span>{formatDate(trip.ngayKhoiHanh)}</span></div>
+          <div className={styles.journeyTimes}>
+            <div><span>Khởi hành</span><strong>{trip.gioKhoiHanh.slice(0, 5)}</strong><time dateTime={trip.ngayKhoiHanh}>{formatDate(trip.ngayKhoiHanh)}</time></div>
+            <div className={styles.journeyDuration}><span>{duration}</span><div aria-hidden="true">○ ───── ○</div><small>Thời gian dự kiến</small></div>
+            <div><span>Đến dự kiến</span><strong>{trip.gioDenDuKien.slice(11, 16)}</strong><time dateTime={trip.gioDenDuKien}>{formatDate(trip.gioDenDuKien)}</time></div>
+          </div>
+          <div className={styles.stationGrid}>
+            <section><span>Điểm đi</span><h3>{trip.tenBenDi}</h3><p>{trip.diaChiBenDi}</p></section>
+            <section><span>Điểm đến</span><h3>{trip.tenBenDen}</h3><p>{trip.diaChiBenDen}</p></section>
+          </div>
+          <div className={styles.vehicleInfo}><span>{trip.tenLoaiXe ?? 'Xe đang cập nhật'}</span>{trip.bienSo && <span>Biển số: {trip.bienSo}</span>}</div>
+        </article>
+        <section className={styles.stops}><h2>Hành trình và điểm dừng</h2>
+          {trip.diemDung.length ? <ol>{[...trip.diemDung].sort((a, b) => a.thuTu - b.thuTu).map((stop, index) => <li key={stop.maDiemDung}>
+            <span className={styles.stopNumber}>{index + 1}</span><div className={styles.stopInfo}><strong>{stop.tenDiemDung}</strong><p>{stop.diaChi}</p></div>
+            <span className={styles.stopDuration}>{stop.thoiGianDung} phút dừng</span>
+          </li>)}</ol> : <p>Không có điểm dừng trung gian.</p>}
+        </section>
+      </div>
+      <aside className={styles.bookingPanel} aria-label="Giá vé và đặt chỗ">
+        <span className={styles.fareLabel}>Giá vé dự kiến</span><div className={styles.detailFare}><strong>{Number(trip.giaVeDuKien).toLocaleString('vi-VN')}đ</strong><span>/ vé</span></div>
+        <p className={styles.operatorName}>{trip.tenNhaXe ?? trip.tenTuyen}</p>
+        <div ref={availabilityRef} tabIndex={-1} className={styles.availability} role="status" aria-live="polite">
+          <span className={styles.availabilityLabel}>Chỗ còn hiện tại</span><strong>{trip.soGheTrong}<span> / {trip.tongSoGhe} ghế</span></strong>
+          <p>{updatedAt ? `Đã cập nhật lúc ${updatedAt} (giờ Việt Nam).` : 'Cập nhật chỗ còn trước khi chọn ghế.'}</p>
+        </div>
+        <div className={styles.bookingControls}><div className={styles.bookingAction}>{trip.coTheDatVe ? <Link className="primary-button" href={`/tim-chuyen/${encodeURIComponent(trip.maChuyen)}/seats`}>Chọn ghế và đặt vé</Link> : <p>Chuyến không còn nhận đặt vé.</p>}</div>
+        <div className={styles.panelActions}><button className="outline-button" disabled={busy} onClick={() => void refresh(false)}>{busy ? 'Đang cập nhật…' : 'Cập nhật chỗ còn'}</button>
+          <button className="outline-button" disabled={busy || !trip.coTheDatVe} onClick={() => void refresh(true)}>{busy ? 'Đang tải…' : 'Xem sơ đồ ghế'}</button></div></div>
+      </aside>
     </div>
-    <div className={styles.bookingAction}>{trip.coTheDatVe ? <Link className="primary-button" href={`/tim-chuyen/${trip.maChuyen}/seats`}>Chọn ghế và đặt vé →</Link> : <p>Chuyến không còn nhận đặt vé.</p>}</div>
     {error && <p ref={errorRef} className="form-error" role="alert">{error}</p>}
     {seats && <section ref={seatsRef} tabIndex={-1} className={styles.seatPanel} aria-label={`Ghế của chuyến ${trip.maChuyen}`}>
       <div className={styles.seatHeader}>
