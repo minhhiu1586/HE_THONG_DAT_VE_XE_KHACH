@@ -252,8 +252,7 @@ public final class Entities {
         @Column(name = "ngay_dat", nullable = false) public LocalDateTime ngayDat;
         @Column(name = "tong_tien", nullable = false, precision = 14, scale = 2) public BigDecimal tongTien = BigDecimal.ZERO;
         @Column(name = "tien_giam", nullable = false, precision = 14, scale = 2) public BigDecimal tienGiam = BigDecimal.ZERO;
-        @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "ma_khuyen_mai") public KhuyenMai khuyenMaiDaApDung;
-        @Column(name = "ma_khuyen_mai", insertable = false, updatable = false, length = 40)
+        @Column(name = "ma_khuyen_mai", length = 40)
         public String maKhuyenMaiDaApDung;
         @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "ma_chinh_sach_hoan_ve") public ChinhSachHoanVe chinhSachHoanVe;
         @Column(name = "khach_dat_ten", nullable = false, length = 160) public String khachDatTen;
@@ -268,10 +267,9 @@ public final class Entities {
         public DonDatVe() {}
     }
 
-    @Entity(name = "VeXe") @Table(name = "ve_xe", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_ve_xe_ma_ghe_chuyen", columnNames = {"ma_ghe", "ma_chuyen"}),
-        @UniqueConstraint(name = "uq_ve_xe_ma_ve", columnNames = "ma_ve")
-    }, indexes = @Index(name = "ix_ve_xe_don", columnList = "ma_don"))
+    @Entity(name = "VeXe") @Table(name = "ve_xe", uniqueConstraints =
+        @UniqueConstraint(name = "uq_ve_xe_ma_ve", columnNames = "ma_ve"),
+        indexes = @Index(name = "ix_ve_xe_don", columnList = "ma_don"))
     public static class VeXe {
         @Id @Column(name = "ma_ve", length = 40) public String maVe;
         @ManyToOne(optional = false, fetch = FetchType.EAGER) @JoinColumn(name = "ma_chuyen", nullable = false)
@@ -378,7 +376,6 @@ public final class Entities {
         @Column(name = "ngay_ket_thuc", nullable = false) public LocalDateTime ngayKetThuc;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
         public TrangThaiKhuyenMai trangThai = TrangThaiKhuyenMai.HOAT_DONG;
-        @OneToMany(mappedBy = "khuyenMaiDaApDung") public List<DonDatVe> danhSachDonDat = new ArrayList<>();
         public KhuyenMai() {}
 
         /** Ưu tiên hết hạn khi đồng thời hết thời hạn và hết lượt. */

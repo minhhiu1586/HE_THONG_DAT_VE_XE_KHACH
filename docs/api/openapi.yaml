@@ -3,9 +3,10 @@ info:
   title: Hệ thống đặt vé xe khách API
   version: 0.1.0-draft
   description: |-
-    Hợp đồng mục tiêu gồm 29 mục A01–F03; D04 chưa có phương thức và operation
-    đang chờ nhóm thống nhất. Đây là bản nháp cập nhật ngày 2026-10-11, chưa khẳng
-    định API đã triển khai hoặc được duyệt. Tên enum từ States.java được giữ nguyên.
+    Hợp đồng mục tiêu A–F; API booking T16 đã triển khai được đánh dấu implemented.
+    D04 chưa có phương thức và operation
+    đang chờ nhóm thống nhất. Bản cập nhật ngày 2026-10-13 phản ánh API booking T16;
+    các phần còn lại giữ hợp đồng mục tiêu. Enum bám theo class diagram đã chốt.
     Những lựa chọn chưa chốt, gồm trạng thái khả dụng ghế và quy trình hoàn tiền,
     được đánh dấu trong tài liệu. T07 bổ sung phiên cookie datvexe_session;
     xem account-auth.md và account-openapi.yaml. Quyền nghiệp vụ A–F cần tích hợp T07.1.
@@ -324,273 +325,132 @@ paths:
                       - {loaiGhe: GIUONG_NAM, gia: '250000'}
         '404': {$ref: '#/components/responses/NotFound'}
         '500': {$ref: '#/components/responses/InternalError'}
-  /api/giu-cho:
+  /api/booking/hold:
     post:
-      tags: [B — Giữ chỗ và đơn đặt vé]
-      operationId: createGiuCho
-      summary: "[B01] Giữ các ghế và tạo đơn nháp"
-      description: |-
-        Giữ toàn bộ ghế hoặc hoàn tác toàn bộ thao tác; mỗi yêu cầu tạo đúng một đơn. Chuyến cần có xe và nhà xe trước khi nhận giữ chỗ; đây là đề xuất đang chờ nhóm xác nhận.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chủ đơn lấy từ danh tính đã xác thực; không nhận maNguoiDung trong body.
-        Thông tin liên hệ ban đầu của đơn chưa được thống nhất. Trước khi triển khai, nhóm cần quyết định lấy liên hệ từ hồ sơ khách hàng hay cho phép giá trị null. Hợp đồng hiện giữ các trường bắt buộc, khác rỗng; ví dụ giả định đã có thông tin liên hệ hợp lệ.
-      x-api-id: B01
-      x-contract-status: proposed
-      x-roles: [KH]
-      security: [{cookieAuth: []}]
-      x-authentication-required: true
-      x-ownership: Chủ đơn lấy từ danh tính đã xác thực; không nhận maNguoiDung từ body.
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: holdSeatsAndCreateOrder
+      summary: B01 Hold seats and create a draft order
+      description: KHACH_HANG only. The authenticated session owns the order. Hold every requested seat atomically
+        for 15 minutes; expiry is evaluated at now >= thoiDiemHetHan.
+      x-roles:
+      - KHACH_HANG
       parameters:
-        - $ref: "#/components/parameters/CsrfToken"
-        - {$ref: '#/components/parameters/IdempotencyKey'}
+      - $ref: '#/components/parameters/BookingCsrfToken'
+      - $ref: '#/components/parameters/BookingIdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/HoldRequest'}
-            examples:
-              holdSeats:
-                value: {maChuyen: CX01, danhSachMaGhe: [G11, G12]}
-            x-invalid-examples:
-              emptySeatList:
-                value: {maChuyen: CX01, danhSachMaGhe: []}
+            schema:
+              $ref: '#/components/schemas/BookingHoldRequest'
+            example:
+              maChuyen: CX01
+              danhSachMaGhe:
+              - G11
+              - G12
       responses:
         '201':
-          description: Một đơn và các quyền giữ đã tạo; Location trỏ đến đơn.
+          description: Order and holds created atomically.
           headers:
-            Location: {$ref: '#/components/headers/OrderLocation'}
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
+            Location:
+              schema:
+                type: string
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/HoldResponse'}
-              examples:
-                success:
-                  value:
-                    maDon: DDV01
-                    maChuyen: CX01
-                    trangThaiDon: CHO_XU_LY
-                    serverTime: '2026-10-11T09:30:00+07:00'
-                    thoiDiemBatDau: '2026-10-11T09:30:00+07:00'
-                    thoiDiemHetHan: '2026-10-11T09:45:00+07:00'
-                    danhSachGiuCho:
-                      - {maGiuCho: GC01, maGhe: G11, trangThai: DANG_GIU}
-                      - {maGiuCho: GC02, maGhe: G12, trangThai: DANG_GIU}
+              schema:
+                $ref: '#/components/schemas/BookingHoldSeatResponse'
         '400':
-          description: Dữ liệu body không hợp lệ.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ErrorResponse'}
-              examples:
-                emptySeatList:
-                  value:
-                    code: VALIDATION_ERROR
-                    message: Request không hợp lệ.
-                    details:
-                      fieldErrors: [{field: danhSachMaGhe, code: MIN_ITEMS, message: Cần chọn ít nhất một ghế.}]
-                    timestamp: '2026-10-11T09:30:00+07:00'
-                    traceId: req-hold-validation-001
-        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
-        '401': {$ref: '#/components/responses/Unauthenticated'}
+          $ref: '#/components/responses/BookingBadRequest'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
         '409':
-          description: "409 nếu chuyến chưa sẵn sàng, ghế không còn khả dụng hoặc trạng thái không cho phép giữ chỗ. Cùng Idempotency-Key với nội dung khác trả IDEMPOTENCY_KEY_REUSED; yêu cầu cùng key đang xử lý trả REQUEST_IN_PROGRESS."
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ErrorResponse'}
-              examples:
-                seatUnavailable:
-                  value:
-                    code: SEAT_UNAVAILABLE
-                    message: Một hoặc nhiều ghế không còn khả dụng.
-                    details: {maGheKhongKhaDung: [G12]}
-                    timestamp: '2026-10-11T09:32:01+07:00'
-                    traceId: req-hold-002
-                tripNotReady:
-                  value:
-                    code: INVALID_STATE_TRANSITION
-                    message: Chuyến cần được gán xe và nhà xe trước khi nhận giữ chỗ.
-                    details: {}
-                    timestamp: '2026-10-11T09:32:02+07:00'
-                    traceId: req-hold-not-ready-001
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
-        '500': {$ref: '#/components/responses/InternalError'}
-  /api/don-dat-ve/{maDon}/giu-cho:
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B01
+      x-contract-status: implemented
+  /api/booking/{maDon}:
+    parameters:
+    - $ref: '#/components/parameters/BookingMaDon'
     get:
-      tags: [B — Giữ chỗ và đơn đặt vé]
-      operationId: getGiuCho
-      summary: "[B02] Xem quyền giữ và thời hạn"
-      description: |-
-        Xem các ghế đang giữ và thời hạn giữ của đơn.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn; nếu chính sách che giấu tài nguyên được áp dụng, trả 404 khi đơn ngoài phạm vi.
-      x-api-id: B02
-      x-contract-status: proposed
-      x-roles: [KH]
-      security: [{cookieAuth: []}]
-      x-authentication-required: true
-      x-ownership: Chỉ chủ đơn; có thể trả 404 ngoài phạm vi nếu chính sách che giấu tài nguyên.
-      parameters:
-        - {$ref: '#/components/parameters/MaDon'}
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: getBookingOrder
+      summary: B02/B05 Get an order and its current preview
+      description: KHACH_HANG only; the caller must own the order. Passenger data is returned only when this authenticated
+        account and order have a snapshot in the current JSESSIONID. A new servlet session still loads the persisted
+        order and holds, with hanhKhach=[] and coTheChotGia=false. Paid orders remain readable; maChuyen is derived
+        from holds or tickets. Historical orders without holds may have thoiDiemBatDau and thoiDiemHetHan null. A
+        GET reports an invalid selected promotion without clearing it from storage. When expiry is first detected,
+        it commits the hold and order as HET_HAN and returns 409 HOLD_EXPIRED.
+      x-roles:
+      - KHACH_HANG
       responses:
         '200':
-          description: Trạng thái giữ của từng ghế và deadline server.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
+          description: Current order, holds, issued tickets, and price preview.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/HoldResponse'}
-              examples:
-                success:
-                  value:
-                    maDon: DDV01
-                    maChuyen: CX01
-                    trangThaiDon: CHO_XU_LY
-                    serverTime: '2026-10-11T09:32:00+07:00'
-                    thoiDiemBatDau: '2026-10-11T09:30:00+07:00'
-                    thoiDiemHetHan: '2026-10-11T09:45:00+07:00'
-                    danhSachGiuCho: [{maGiuCho: GC01, maGhe: G11, trangThai: DANG_GIU}, {maGiuCho: GC02, maGhe: G12, trangThai: DANG_GIU}]
-        '401': {$ref: '#/components/responses/Unauthenticated'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-  /api/don-dat-ve/{maDon}:
-    get:
-      tags: [B — Giữ chỗ và đơn đặt vé]
-      operationId: getDonDatVe
-      summary: "[B05] Xem đơn đặt vé"
-      description: |-
-        Xem chi tiết đơn đặt vé.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH), nhà xe (NX), quản trị viên (AD). Phạm vi: KH chỉ xem đơn của mình; NX theo nhà xe trong phạm vi; AD theo quyền quản trị.
-      x-api-id: B05
-      x-contract-status: proposed
-      x-roles: [KH, NX, AD]
-      security: [{cookieAuth: []}]
-      x-authentication-required: true
-      x-ownership: KH chỉ đọc đơn của mình; NX theo nhà xe trong phạm vi; AD theo quyền quản trị.
-      parameters:
-        - {$ref: '#/components/parameters/MaDon'}
-      responses:
-        '200':
-          description: |-
-            Đơn, holds, hành khách, vé và giaDaChot nếu có.
-            Sau C02, tải lại B05 để lấy phienBanGia từ giaDaChot cho D01;
-            backend vẫn xác thực lại trạng thái đơn và deadline. GET không chốt giá.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/OrderResponse'}
-              examples:
-                success:
-                  value:
-                    maDon: DDV01
-                    maChuyen: CX01
-                    trangThaiDon: CHO_XU_LY
-                    khachDatTen: Nguyen Van A
-                    khachDatSoDienThoai: '0900000001'
-                    ghiChu: null
-                    danhSachGiuCho: [{maGiuCho: GC01, maGhe: G11, trangThai: DANG_GIU}, {maGiuCho: GC02, maGhe: G12, trangThai: DANG_GIU}]
-                    hanhKhach: []
-                    danhSachVe: []
-                    giaDaChot: null
-                afterPriceFreeze:
-                  value:
-                    maDon: DDV01
-                    maChuyen: CX01
-                    trangThaiDon: CHO_XU_LY
-                    khachDatTen: Nguyen Van A
-                    khachDatSoDienThoai: '0900000001'
-                    ghiChu: null
-                    danhSachGiuCho: [{maGiuCho: GC01, maGhe: G11, trangThai: DANG_GIU}, {maGiuCho: GC02, maGhe: G12, trangThai: DANG_GIU}]
-                    hanhKhach: []
-                    danhSachVe: []
-                    giaDaChot:
-                      maBaoGia: BG01
-                      maDon: DDV01
-                      donViTienTe: VND
-                      thoiDiemBaoGia: '2026-10-11T09:32:00+07:00'
-                      thoiDiemHetHan: '2026-10-11T09:45:00+07:00'
-                      tongTienGoc: '500000'
-                      tongTienGiam: '50000'
-                      tongThanhToan: '450000'
-                      chiTietGia:
-                        - {maGhe: G11, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}
-                        - {maGhe: G12, giaGoc: '300000', tienGiam: '30000', thanhTien: '270000'}
-                      ketQuaKhuyenMai: {hopLe: true, duocGiam: '50000'}
-                      phienBanGia: 1
-        '401': {$ref: '#/components/responses/Unauthenticated'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B02/B05
+      x-contract-status: implemented
     patch:
-      tags: [B — Giữ chỗ và đơn đặt vé]
-      operationId: patchDonDatVe
-      summary: "[B03] Cập nhật liên hệ hoặc ghi chú đơn"
-      description: |-
-        Chỉ cập nhật các trường có trong body; gửi ghiChu: null để xóa ghi chú.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn; mã đơn trên body không được dùng để thay mã đơn trên đường dẫn.
-      x-api-id: B03
-      x-contract-status: proposed
-      x-roles: [KH]
-      security: [{cookieAuth: []}]
-      x-authentication-required: true
-      x-ownership: Chỉ chủ đơn; mã đơn trên đường dẫn là tài nguyên được cập nhật.
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: patchBookingContact
+      summary: B03 Update order contact fields
+      description: KHACH_HANG only; owner access. Only khachDatTen, khachDatSoDienThoai, and ghiChu are accepted.
+        At least one field is required. PATCH does not extend the hold. PostgreSQL stores a redacted idempotency response
+        with hanhKhach=[] and coTheChotGia=false. A complete response replay is available only if the full response
+        cache was written and remains in the current HTTP session. The cache may be absent after a crash between database
+        commit and the session write, or after session loss; retry then returns the redacted database order state.
+        Read the order to verify the current session snapshot or re-enter passengers if the session was lost.
+      x-roles:
+      - KHACH_HANG
       parameters:
-        - $ref: "#/components/parameters/CsrfToken"
-        - {$ref: '#/components/parameters/MaDon'}
-        - {$ref: '#/components/parameters/IdempotencyKey'}
+      - $ref: '#/components/parameters/BookingCsrfToken'
+      - $ref: '#/components/parameters/BookingIdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/DraftContactPatch'}
-            examples:
-              updateContact:
-                value: {khachDatTen: Nguyen Van A, khachDatSoDienThoai: '0900000001', ghiChu: null}
-            x-invalid-examples:
-              emptyBookingName:
-                value: {khachDatTen: ''}
+            schema:
+              $ref: '#/components/schemas/BookingContactPatch'
+            example:
+              khachDatTen: Nguyen Van A
+              khachDatSoDienThoai: 0900000001
+              ghiChu: null
       responses:
         '200':
-          description: Đơn hiện có sau cập nhật.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
+          description: Updated order.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/OrderResponse'}
-              examples:
-                success:
-                  value:
-                    maDon: DDV01
-                    maChuyen: CX01
-                    trangThaiDon: CHO_XU_LY
-                    khachDatTen: Nguyen Van A
-                    khachDatSoDienThoai: '0900000001'
-                    ghiChu: null
-                    danhSachGiuCho: [{maGiuCho: GC01, maGhe: G11, trangThai: DANG_GIU}, {maGiuCho: GC02, maGhe: G12, trangThai: DANG_GIU}]
-                    hanhKhach: []
-                    danhSachVe: []
-                    giaDaChot: null
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
         '400':
-          description: Dữ liệu body không hợp lệ.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ErrorResponse'}
-              examples:
-                emptyBookingName:
-                  value:
-                    code: VALIDATION_ERROR
-                    message: Request không hợp lệ.
-                    details:
-                      fieldErrors: [{field: khachDatTen, code: MIN_LENGTH, message: Tên người đặt không được để trống.}]
-                    timestamp: '2026-10-11T09:30:00+07:00'
-                    traceId: req-order-validation-001
-        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
-        '401': {$ref: '#/components/responses/Unauthenticated'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {$ref: '#/components/responses/StateConflict'}
-  /api/don-dat-ve:
+          $ref: '#/components/responses/BookingBadRequest'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B03
+      x-contract-status: implemented
+  /api/booking:
     get:
       tags: [B — Giữ chỗ và đơn đặt vé]
       operationId: listDonDatVe
@@ -653,111 +513,95 @@ paths:
                   value: {items: [], page: 1, size: 20, totalItems: 0, totalPages: 0}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
-  /api/don-dat-ve/{maDon}/huy:
+  /api/booking/{maDon}/huy:
+    parameters:
+    - $ref: '#/components/parameters/BookingMaDon'
     post:
-      tags: [B — Giữ chỗ và đơn đặt vé]
-      operationId: huyDonDatVe
-      summary: "[B07] Hủy đơn chưa thanh toán"
-      description: |-
-        Hủy đơn chưa thanh toán theo trạng thái hiện tại. Ví dụ thành công dùng DDV02, một đơn độc lập ở nhánh thay thế; DDV01 thuộc nhánh đã đi tới thanh toán.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn; máy chủ kiểm tra quyền và trạng thái của đơn.
-      x-api-id: B07
-      x-contract-status: proposed
-      x-roles: [KH]
-      security: [{cookieAuth: []}]
-      x-authentication-required: true
-      x-ownership: Chỉ chủ đơn; máy chủ kiểm tra trạng thái và quyền trên tài nguyên.
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: cancelBookingOrder
+      summary: B07 Cancel a draft order
+      description: KHACH_HANG only; owner access. The JSON body is optional; send {} when a body is required by the
+        client. Repeated cancellation of the same order is idempotent and clears passenger data from the current HTTP
+        session.
+      x-roles:
+      - KHACH_HANG
       parameters:
-        - $ref: "#/components/parameters/CsrfToken"
-        - {$ref: '#/components/parameters/MaDon'}
-        - {$ref: '#/components/parameters/IdempotencyKey'}
+      - $ref: '#/components/parameters/BookingCsrfToken'
+      - $ref: '#/components/parameters/BookingIdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
       responses:
         '200':
-          description: Đơn đã được hủy theo quy tắc nghiệp vụ.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
+          description: Order is cancelled and holds are released.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/CancelOrderResponse'}
-              examples:
-                success:
-                  value: {maDon: DDV02, trangThaiDon: DA_HUY, thoiDiemHuy: '2026-10-11T09:35:00+07:00'}
-        '401': {$ref: '#/components/responses/Unauthenticated'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {$ref: '#/components/responses/StateConflict'}
-  /api/don-dat-ve/{maDon}/hanh-khach:
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B07
+      x-contract-status: implemented
+  /api/booking/{maDon}/hanh-khach:
+    parameters:
+    - $ref: '#/components/parameters/BookingMaDon'
     put:
-      tags: [B — Giữ chỗ và đơn đặt vé]
-      operationId: replaceHanhKhach
-      summary: "[B04] Gán đầy đủ hành khách cho các ghế đang giữ"
-      description: |-
-        Thay toàn bộ danh sách hành khách của đơn; không tạo đơn hoặc ghế giữ mới.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn; danh sách ghế phải khớp toàn bộ ghế đang giữ.
-      x-api-id: B04
-      x-contract-status: proposed
-      x-roles: [KH]
-      security: [{cookieAuth: []}]
-      x-authentication-required: true
-      x-ownership: Chỉ chủ đơn; danh sách ghế phải khớp các ghế đang giữ.
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: replaceBookingPassengers
+      summary: B04 Save all passengers for held seats
+      description: KHACH_HANG only; owner access. The submitted unique seat IDs must exactly match all current holds.
+        Validate the full list before replacing the normalized passenger snapshot in the current JSESSIONID. Passenger
+        data is not written to ve_xe or another passenger table.
+      x-roles:
+      - KHACH_HANG
       parameters:
-        - $ref: "#/components/parameters/CsrfToken"
-        - {$ref: '#/components/parameters/MaDon'}
+      - $ref: '#/components/parameters/BookingCsrfToken'
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/PassengerUpdate'}
-            examples:
-              passengers:
-                value:
-                  hanhKhach: [{maGhe: G11, hoTen: Nguyen Van A, soDienThoai: '0900000001', cccd: null}, {maGhe: G12, hoTen: Tran Thi B, soDienThoai: '0900000002', cccd: null}]
-            x-invalid-examples:
-              emptyPassengers:
-                value: {hanhKhach: []}
+            schema:
+              $ref: '#/components/schemas/BookingPassengerUpdate'
+            example:
+              hanhKhach:
+              - maGhe: G11
+                hoTen: Nguyen Van A
+                soDienThoai: 0900000001
+                cccd: null
       responses:
         '200':
-          description: Đơn sau khi thay dữ liệu hành khách.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
+          description: Order with normalized passengers retained in the current HTTP session; danhSachVe remains empty
+            before issuance.
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/OrderResponse'}
-              examples:
-                success:
-                  value:
-                    maDon: DDV01
-                    maChuyen: CX01
-                    trangThaiDon: CHO_XU_LY
-                    khachDatTen: Nguyen Van A
-                    khachDatSoDienThoai: '0900000001'
-                    ghiChu: null
-                    danhSachGiuCho: [{maGiuCho: GC01, maGhe: G11, trangThai: DANG_GIU}, {maGiuCho: GC02, maGhe: G12, trangThai: DANG_GIU}]
-                    hanhKhach: [{maGhe: G11, hoTen: Nguyen Van A, soDienThoai: '0900000001', cccd: null}, {maGhe: G12, hoTen: Tran Thi B, soDienThoai: '0900000002', cccd: null}]
-                    danhSachVe: []
-                    giaDaChot: null
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
         '400':
-          description: Dữ liệu body không hợp lệ.
-          headers:
-            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ErrorResponse'}
-              examples:
-                emptyPassengers:
-                  value:
-                    code: VALIDATION_ERROR
-                    message: Request không hợp lệ.
-                    details:
-                      fieldErrors: [{field: hanhKhach, code: MIN_ITEMS, message: Cần có ít nhất một hành khách.}]
-                    timestamp: '2026-10-11T09:30:00+07:00'
-                    traceId: req-passenger-validation-001
-        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
-        '401': {$ref: '#/components/responses/Unauthenticated'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {$ref: '#/components/responses/HoldExpired'}
-  /api/don-dat-ve/{maDon}/bao-gia:
+          $ref: '#/components/responses/BookingBadRequest'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B04
+      x-contract-status: implemented
+  /api/booking/{maDon}/bao-gia:
     post:
       tags: [C — Báo giá và phương thức thanh toán]
       operationId: previewBaoGia
@@ -845,7 +689,7 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/PromotionConflict'}
-  /api/don-dat-ve/{maDon}/chot-gia:
+  /api/booking/{maDon}/chot-gia:
     post:
       tags: [C — Báo giá và phương thức thanh toán]
       operationId: chotGia
@@ -944,7 +788,7 @@ paths:
                 success:
                   value: [{maPhuongThuc: PT01, tenPhuongThuc: Chuyển khoản, moTa: Thanh toán trực tuyến, trangThai: HOAT_DONG}]
         '500': {$ref: '#/components/responses/InternalError'}
-  /api/don-dat-ve/{maDon}/thanh-toan:
+  /api/booking/{maDon}/thanh-toan:
     post:
       tags: [D — Thanh toán và vé điện tử]
       operationId: createPayment
@@ -1523,6 +1367,149 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
 
+  /api/booking/{maDon}/ghe/{maGhe}:
+    parameters:
+    - $ref: '#/components/parameters/BookingMaDon'
+    - $ref: '#/components/parameters/BookingMaGhe'
+    delete:
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: dropBookingSeat
+      summary: B08a Drop a held seat
+      description: KHACH_HANG only; owner access. Remove the passenger for this seat from the current HTTP session.
+        Dropping the last held seat ends the draft order as DA_HUY and clears its passenger snapshot.
+      x-roles:
+      - KHACH_HANG
+      parameters:
+      - $ref: '#/components/parameters/BookingCsrfToken'
+      responses:
+        '200':
+          description: Updated order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B08a
+      x-contract-status: implemented
+  /api/booking/{maDon}/doi-ghe:
+    parameters:
+    - $ref: '#/components/parameters/BookingMaDon'
+    put:
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: swapBookingSeat
+      summary: B08b Change one held seat
+      description: KHACH_HANG only; owner access. The old hold is released and new hold is created atomically. Move
+        the passenger maGhe to the new seat while preserving passenger fields. A failed swap leaves the old hold and
+        session snapshot unchanged.
+      x-roles:
+      - KHACH_HANG
+      parameters:
+      - $ref: '#/components/parameters/BookingCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingSeatSwapRequest'
+            example:
+              maGheCu: G11
+              maGheMoi: G13
+      responses:
+        '200':
+          description: Updated order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
+        '400':
+          $ref: '#/components/responses/BookingBadRequest'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B08b
+      x-contract-status: implemented
+  /api/booking/{maDon}/khuyen-mai:
+    parameters:
+    - $ref: '#/components/parameters/BookingMaDon'
+    put:
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: selectBookingPromotion
+      summary: B08c Select a promotion for preview
+      description: KHACH_HANG only; owner access. Selection does not reserve quota or round preview amounts. Use DELETE
+        on this resource to remove the selected code.
+      x-roles:
+      - KHACH_HANG
+      parameters:
+      - $ref: '#/components/parameters/BookingCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingPromotionSelection'
+            example:
+              maKhuyenMai: KM10
+      responses:
+        '200':
+          description: Updated order and price preview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
+        '400':
+          $ref: '#/components/responses/BookingBadRequest'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B08c
+      x-contract-status: implemented
+    delete:
+      tags:
+      - B — Giữ chỗ và đơn đặt vé
+      operationId: removeBookingPromotion
+      summary: B08d Remove selected promotion
+      description: KHACH_HANG only; owner access.
+      x-roles:
+      - KHACH_HANG
+      parameters:
+      - $ref: '#/components/parameters/BookingCsrfToken'
+      responses:
+        '200':
+          description: Updated order and price preview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingOrderResponse'
+        '401':
+          $ref: '#/components/responses/BookingUnauthorized'
+        '403':
+          $ref: '#/components/responses/BookingForbidden'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '409':
+          $ref: '#/components/responses/BookingConflict'
+      x-api-id: B08d
+      x-contract-status: implemented
 components:
   securitySchemes:
     cookieAuth:
@@ -1539,7 +1526,7 @@ components:
       schema: {type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$'}
     OrderLocation:
       description: URI tài nguyên đơn vừa tạo.
-      schema: {type: string, format: uri-reference, example: /api/don-dat-ve/DDV01}
+      schema: {type: string, format: uri-reference, example: /api/booking/DDV01}
     PaymentLocation:
       description: URI tra cứu lần thanh toán đã ghi nhận.
       schema: {type: string, format: uri-reference, example: /api/thanh-toan/GD01}
@@ -1547,6 +1534,32 @@ components:
       description: URI tra cứu yêu cầu hoàn đã nhận.
       schema: {type: string, format: uri-reference, example: /api/hoan-tien/HT01}
   parameters:
+    BookingCsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+    BookingIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    BookingMaDon:
+      name: maDon
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/BookingId'
+    BookingMaGhe:
+      name: maGhe
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/BookingId'
     CsrfToken:
       in: header
       name: X-CSRF-Token
@@ -1603,6 +1616,36 @@ components:
       description: Mã yêu cầu hoàn opaque.
       schema: {$ref: '#/components/schemas/Id'}
   responses:
+    BookingBadRequest:
+      description: Invalid request or validation error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BookingErrorResponse'
+    BookingUnauthorized:
+      description: Missing or expired session.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BookingErrorResponse'
+    BookingForbidden:
+      description: Wrong role, CSRF failure, or caller does not own the order.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BookingErrorResponse'
+    BookingNotFound:
+      description: Order, trip, or seat not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BookingErrorResponse'
+    BookingConflict:
+      description: Seat unavailable, hold expired, invalid state, or idempotency conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BookingErrorResponse'
     BadRequest:
       description: Request, query hoặc header sai định dạng; fieldErrors chỉ xuất hiện khi được xác định.
       headers:
@@ -1760,6 +1803,357 @@ components:
             unavailable:
               value: {code: SERVICE_UNAVAILABLE, message: Dịch vụ tạm thời chưa sẵn sàng., details: {}, timestamp: '2026-10-11T09:33:03+07:00', traceId: req-provider-002}
   schemas:
+    BookingId:
+      type: string
+      minLength: 1
+      maxLength: 40
+    BookingTimestamp:
+      type: string
+      format: date-time
+    BookingDecimalMoney:
+      type: string
+      pattern: ^[0-9]+(\.[0-9]+)?$
+      description: Exact decimal preview value; unlike T05 integer-VND contracts, no rounding or scale reduction occurs
+        before T17 price freeze.
+    BookingHoldRequest:
+      type: object
+      required:
+      - maChuyen
+      - danhSachMaGhe
+      properties:
+        maChuyen:
+          $ref: '#/components/schemas/BookingId'
+        danhSachMaGhe:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/BookingId'
+      additionalProperties: false
+    BookingSeatHold:
+      type: object
+      required:
+      - maGiuCho
+      - maGhe
+      - trangThai
+      - thoiDiemBatDau
+      - thoiDiemHetHan
+      properties:
+        maGiuCho:
+          $ref: '#/components/schemas/BookingId'
+        maGhe:
+          $ref: '#/components/schemas/BookingId'
+        trangThai:
+          type: string
+          enum:
+          - DANG_GIU
+          - DA_XAC_NHAN
+          - HET_HAN
+          - DA_HUY
+        thoiDiemBatDau:
+          $ref: '#/components/schemas/BookingTimestamp'
+        thoiDiemHetHan:
+          $ref: '#/components/schemas/BookingTimestamp'
+      additionalProperties: false
+    BookingHoldSeatResponse:
+      type: object
+      required:
+      - maDon
+      - maChuyen
+      - trangThaiDon
+      - serverTime
+      - thoiDiemBatDau
+      - thoiDiemHetHan
+      - danhSachGheGiu
+      - danhSachGiuCho
+      properties:
+        maDon:
+          $ref: '#/components/schemas/BookingId'
+        maChuyen:
+          $ref: '#/components/schemas/BookingId'
+        trangThaiDon:
+          type: string
+        serverTime:
+          $ref: '#/components/schemas/BookingTimestamp'
+        thoiDiemBatDau:
+          $ref: '#/components/schemas/BookingTimestamp'
+        thoiDiemHetHan:
+          $ref: '#/components/schemas/BookingTimestamp'
+        danhSachGheGiu:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingId'
+        danhSachGiuCho:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingSeatHold'
+      additionalProperties: false
+    BookingContactPatch:
+      type: object
+      minProperties: 1
+      properties:
+        khachDatTen:
+          type: string
+          minLength: 1
+          maxLength: 120
+        khachDatSoDienThoai:
+          type: string
+          minLength: 1
+          maxLength: 20
+        ghiChu:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+      additionalProperties: false
+    BookingPassenger:
+      type: object
+      required:
+      - maGhe
+      - hoTen
+      - soDienThoai
+      properties:
+        maGhe:
+          $ref: '#/components/schemas/BookingId'
+        hoTen:
+          type: string
+          minLength: 1
+          maxLength: 120
+        soDienThoai:
+          type: string
+          minLength: 1
+          maxLength: 20
+        cccd:
+          type:
+          - string
+          - 'null'
+          maxLength: 20
+      additionalProperties: false
+    BookingPassengerUpdate:
+      type: object
+      required:
+      - hanhKhach
+      properties:
+        hanhKhach:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/BookingPassenger'
+      additionalProperties: false
+    BookingSeatSwapRequest:
+      type: object
+      required:
+      - maGheCu
+      - maGheMoi
+      properties:
+        maGheCu:
+          $ref: '#/components/schemas/BookingId'
+        maGheMoi:
+          $ref: '#/components/schemas/BookingId'
+      additionalProperties: false
+    BookingPromotionSelection:
+      type: object
+      required:
+      - maKhuyenMai
+      properties:
+        maKhuyenMai:
+          type: string
+          minLength: 1
+          maxLength: 40
+      additionalProperties: false
+    BookingSeatHoldSummary:
+      type: object
+      required:
+      - maGiuCho
+      - maGhe
+      - trangThai
+      - thoiDiemBatDau
+      - thoiDiemHetHan
+      properties:
+        maGiuCho:
+          $ref: '#/components/schemas/BookingId'
+        maGhe:
+          $ref: '#/components/schemas/BookingId'
+        trangThai:
+          type: string
+        thoiDiemBatDau:
+          $ref: '#/components/schemas/BookingTimestamp'
+        thoiDiemHetHan:
+          $ref: '#/components/schemas/BookingTimestamp'
+      additionalProperties: false
+    BookingOrderTicket:
+      type: object
+      required:
+      - maVe
+      - maGhe
+      - hoTen
+      - soDienThoai
+      - cccd
+      - giaVe
+      - trangThai
+      - ngayXuatVe
+      properties:
+        maVe:
+          $ref: '#/components/schemas/BookingId'
+        maGhe:
+          $ref: '#/components/schemas/BookingId'
+        hoTen:
+          type: string
+          minLength: 1
+          maxLength: 120
+        soDienThoai:
+          type: string
+          minLength: 1
+          maxLength: 20
+        cccd:
+          type:
+          - string
+          - 'null'
+        giaVe:
+          $ref: '#/components/schemas/BookingDecimalMoney'
+        trangThai:
+          type: string
+          enum:
+          - DA_XUAT_VE
+          - DA_LEN_XE
+          - DA_HOAN
+          - DA_HUY
+        ngayXuatVe:
+          anyOf:
+          - $ref: '#/components/schemas/BookingTimestamp'
+          - type: 'null'
+      additionalProperties: false
+    BookingPricePreview:
+      type: object
+      required:
+      - tongTienGoc
+      - tienGiam
+      - tongThanhToan
+      - maKhuyenMaiDaChon
+      - maKhuyenMaiApDung
+      - lyDoKhongApDung
+      properties:
+        tongTienGoc:
+          $ref: '#/components/schemas/BookingDecimalMoney'
+        tienGiam:
+          $ref: '#/components/schemas/BookingDecimalMoney'
+        tongThanhToan:
+          $ref: '#/components/schemas/BookingDecimalMoney'
+        maKhuyenMaiDaChon:
+          type:
+          - string
+          - 'null'
+        maKhuyenMaiApDung:
+          type:
+          - string
+          - 'null'
+        lyDoKhongApDung:
+          type:
+          - string
+          - 'null'
+      additionalProperties: false
+    BookingOrderResponse:
+      type: object
+      description: hanhKhach is a normalized passenger snapshot from the current authenticated account and JSESSIONID;
+        a fresh HTTP session returns an empty array. PATCH idempotency data in PostgreSQL redacts hanhKhach/coTheChotGia.
+        A complete PATCH replay is available only if its response was written and remains in the current HTTP session;
+        the cache may be absent after a crash between database commit and session write or after session loss, in which
+        case retry returns the redacted database order state. Expiry commits the hold and order as HET_HAN before returning
+        409 HOLD_EXPIRED. danhSachVe always stays empty before T17/T18 issuance. T16 never creates a ticket draft or
+        HanhKhach database entity.
+      required:
+      - maDon
+      - maChuyen
+      - trangThaiDon
+      - khachDatTen
+      - khachDatSoDienThoai
+      - ghiChu
+      - serverTime
+      - thoiDiemBatDau
+      - thoiDiemHetHan
+      - danhSachGiuCho
+      - hanhKhach
+      - danhSachVe
+      - giaTamTinh
+      - coTheChotGia
+      - giaDaChot
+      - thongBao
+      properties:
+        maDon:
+          $ref: '#/components/schemas/BookingId'
+        maChuyen:
+          $ref: '#/components/schemas/BookingId'
+        trangThaiDon:
+          type: string
+        khachDatTen:
+          type: string
+          minLength: 1
+          maxLength: 120
+        khachDatSoDienThoai:
+          type: string
+          minLength: 1
+          maxLength: 20
+        ghiChu:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+        serverTime:
+          $ref: '#/components/schemas/BookingTimestamp'
+        thoiDiemBatDau:
+          anyOf:
+          - $ref: '#/components/schemas/BookingTimestamp'
+          - type: 'null'
+        thoiDiemHetHan:
+          anyOf:
+          - $ref: '#/components/schemas/BookingTimestamp'
+          - type: 'null'
+        danhSachGiuCho:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingSeatHoldSummary'
+        hanhKhach:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingPassenger'
+        danhSachVe:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingOrderTicket'
+          description: Always empty until a ticket is actually issued.
+        giaTamTinh:
+          $ref: '#/components/schemas/BookingPricePreview'
+        coTheChotGia:
+          type: boolean
+          description: False until the current HTTP session has a valid passenger for every held seat.
+        giaDaChot:
+          type: 'null'
+        thongBao:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    BookingErrorResponse:
+      type: object
+      required:
+      - code
+      - message
+      - details
+      - timestamp
+      - traceId
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          $ref: '#/components/schemas/BookingTimestamp'
+        traceId:
+          type: string
+      additionalProperties: false
     Id:
       type: string
       minLength: 1
@@ -1796,7 +2190,7 @@ components:
       x-contract-status: proposed
     TrangThaiDon:
       type: string
-      enum: [CHO_XU_LY, DA_XAC_NHAN, CHO_THANH_TOAN, DA_THANH_TOAN, DA_HUY]
+      enum: [CHO_XU_LY, DA_XAC_NHAN, CHO_THANH_TOAN, DA_THANH_TOAN, DA_HUY, HET_HAN]
       description: States.TrangThaiDon; các giá trị được giữ đúng tên code hiện có.
       x-source-enum: States.java#TrangThaiDon
       x-contract-status: proposed
@@ -2008,7 +2402,7 @@ components:
       additionalProperties: false
     HoldResponse:
       type: object
-      required: [maDon, maChuyen, trangThaiDon, serverTime, thoiDiemBatDau, thoiDiemHetHan, danhSachGiuCho]
+      required: [maDon, maChuyen, trangThaiDon, serverTime, thoiDiemBatDau, thoiDiemHetHan, danhSachGheGiu, danhSachGiuCho]
       properties:
         maDon: {$ref: '#/components/schemas/Id'}
         maChuyen: {$ref: '#/components/schemas/Id'}
@@ -2016,15 +2410,20 @@ components:
         serverTime: {$ref: '#/components/schemas/OffsetDateTime'}
         thoiDiemBatDau: {$ref: '#/components/schemas/OffsetDateTime'}
         thoiDiemHetHan: {$ref: '#/components/schemas/OffsetDateTime'}
+        danhSachGheGiu:
+          type: array
+          items: {$ref: '#/components/schemas/Id'}
         danhSachGiuCho:
           type: array
           items:
             type: object
-            required: [maGiuCho, maGhe, trangThai]
+            required: [maGiuCho, maGhe, trangThai, thoiDiemBatDau, thoiDiemHetHan]
             properties:
               maGiuCho: {$ref: '#/components/schemas/Id'}
               maGhe: {$ref: '#/components/schemas/Id'}
               trangThai: {$ref: '#/components/schemas/TrangThaiGiuCho'}
+              thoiDiemBatDau: {$ref: '#/components/schemas/OffsetDateTime'}
+              thoiDiemHetHan: {$ref: '#/components/schemas/OffsetDateTime'}
             additionalProperties: true
       additionalProperties: true
     DraftContactPatch:
@@ -2045,44 +2444,55 @@ components:
           description: Danh sách đầy đủ; tập maGhe phải khớp toàn bộ ghế đang giữ.
           items:
             type: object
-            required: [maGhe, hoTen]
+            required: [maGhe, hoTen, soDienThoai]
             properties:
               maGhe: {$ref: '#/components/schemas/Id'}
               hoTen: {type: string, minLength: 1, maxLength: 120}
-              soDienThoai: {type: [string, 'null'], maxLength: 20}
-              cccd: {type: [string, 'null'], maxLength: 20, description: Định dạng/trường bắt buộc cần thống nhất.}
+              soDienThoai: {type: string, minLength: 1, maxLength: 20}
+              cccd: {type: [string, 'null'], maxLength: 20}
             additionalProperties: false
           x-business-unique-property: maGhe
       additionalProperties: false
     Passenger:
       type: object
-      required: [maGhe, hoTen, soDienThoai, cccd]
+      required: [maGhe, hoTen, soDienThoai]
       properties:
         maGhe: {$ref: '#/components/schemas/Id'}
         hoTen: {type: string, minLength: 1, maxLength: 120}
-        soDienThoai: {type: [string, 'null'], maxLength: 20}
+        soDienThoai: {type: string, minLength: 1, maxLength: 20}
         cccd: {type: [string, 'null'], maxLength: 20}
       additionalProperties: true
     OrderResponse:
       type: object
-      description: Thông tin liên hệ hiện được mô tả là bắt buộc và khác rỗng. Trước khi triển khai, nhóm cần thống nhất lấy liên hệ ban đầu từ hồ sơ khách hàng hay cho phép giá trị null; quyết định này đang chờ và không được ngầm hiểu là đã duyệt. Ví dụ giả định đã có thông tin liên hệ hợp lệ.
-      required: [maDon, maChuyen, trangThaiDon, khachDatTen, khachDatSoDienThoai, ghiChu, danhSachGiuCho, hanhKhach, danhSachVe, giaDaChot]
+      description: Tên và số điện thoại người đặt bắt buộc, khác rỗng. Hành khách được lưu tạm trong HTTP session của chủ đơn; session mới vẫn đọc được đơn và ghế nhưng trả danh sách rỗng. T16 không tạo dữ liệu hành khách hoặc vé nháp trong database.
+      required: [maDon, maChuyen, trangThaiDon, khachDatTen, khachDatSoDienThoai, ghiChu, serverTime, thoiDiemBatDau, thoiDiemHetHan, danhSachGiuCho, hanhKhach, danhSachVe, giaTamTinh, coTheChotGia, giaDaChot, thongBao]
       properties:
         maDon: {$ref: '#/components/schemas/Id'}
         maChuyen: {$ref: '#/components/schemas/Id'}
         trangThaiDon: {$ref: '#/components/schemas/TrangThaiDon'}
-        khachDatTen: {type: string, minLength: 1, maxLength: 120, description: Bắt buộc khác rỗng trong hợp đồng hiện tại; nguồn liên hệ ban đầu vẫn chờ nhóm quyết định.}
-        khachDatSoDienThoai: {type: string, minLength: 1, maxLength: 20, description: Bắt buộc khác rỗng trong hợp đồng hiện tại; nguồn liên hệ ban đầu vẫn chờ nhóm quyết định.}
+        khachDatTen: {type: string, minLength: 1, maxLength: 120}
+        khachDatSoDienThoai: {type: string, minLength: 1, maxLength: 20}
         ghiChu: {type: [string, 'null'], maxLength: 500}
+        serverTime: {$ref: '#/components/schemas/OffsetDateTime'}
+        thoiDiemBatDau:
+          anyOf:
+            - {$ref: '#/components/schemas/OffsetDateTime'}
+            - {type: 'null'}
+        thoiDiemHetHan:
+          anyOf:
+            - {$ref: '#/components/schemas/OffsetDateTime'}
+            - {type: 'null'}
         danhSachGiuCho:
           type: array
           items:
             type: object
-            required: [maGiuCho, maGhe, trangThai]
+            required: [maGiuCho, maGhe, trangThai, thoiDiemBatDau, thoiDiemHetHan]
             properties:
               maGiuCho: {$ref: '#/components/schemas/Id'}
               maGhe: {$ref: '#/components/schemas/Id'}
               trangThai: {$ref: '#/components/schemas/TrangThaiGiuCho'}
+              thoiDiemBatDau: {$ref: '#/components/schemas/OffsetDateTime'}
+              thoiDiemHetHan: {$ref: '#/components/schemas/OffsetDateTime'}
             additionalProperties: true
         hanhKhach:
           type: array
@@ -2090,11 +2500,19 @@ components:
         danhSachVe:
           type: array
           items: {$ref: '#/components/schemas/TicketSummary'}
+        giaTamTinh:
+          type: object
+          description: Tiền trong T16 preview là chuỗi thập phân chính xác; làm tròn chỉ khi chốt giá theo T17.
+          additionalProperties: true
+        coTheChotGia: {type: boolean}
         giaDaChot:
           anyOf:
             - {$ref: '#/components/schemas/FreezePriceResponse'}
             - type: 'null'
           description: null trước khi chốt giá; sau đó chứa snapshot đầy đủ đã chốt.
+        thongBao:
+          type: array
+          items: {type: string}
       additionalProperties: true
     TicketSummary:
       type: object

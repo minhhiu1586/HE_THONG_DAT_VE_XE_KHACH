@@ -18,6 +18,10 @@ public final class AccessPolicy {
     }
     public static void role(CurrentUser user, String path) { role(user, path, "POST"); }
     public static void role(CurrentUser user, String path, String method) {
+        if (path.equals("/api/booking") || path.startsWith("/api/booking/")) {
+            if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG) throw AccessControl.denied();
+            return;
+        }
         if(path.equals("/api/quan-ly/chuyen-xe") || path.startsWith("/api/quan-ly/chuyen-xe/")) {
             if(user.loaiTaiKhoan()!=LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan()!=LoaiTaiKhoan.NHA_XE) throw AccessControl.denied();
             if(user.loaiTaiKhoan()==LoaiTaiKhoan.NHA_XE && user.maNhaXe()==null) throw AccessControl.denied();
