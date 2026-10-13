@@ -106,6 +106,17 @@ interface RawRoute {
   trangThai: string;
 }
 
+export interface HoldSeatRequest {
+  maChuyen: string;
+  danhSachMaGhe: string[];
+}
+
+export interface HoldSeatResponse {
+  maDon: string;
+  thoiDiemHetHan: string;
+  danhSachGheGiu: string[];
+}
+
 function apiBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL;
   if (configured) return configured.replace(/\/$/, '');
@@ -126,6 +137,32 @@ async function apiGet<T>(path: string): Promise<T> {
     throw new Error(message);
   }
   return response.json() as Promise<T>;
+}
+
+async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${apiBase()}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    let message = `Máy chủ trả về lỗi ${response.status}.`;
+    try {
+      const problem = await response.json() as { message?: string };
+      if (problem.message) message = problem.message;
+    } catch {
+    }
+    throw new Error(message);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function holdSeats(request: HoldSeatRequest): Promise<HoldSeatResponse> {
+  return apiPost<HoldSeatResponse>('/booking/hold', request);
 }
 
 export async function getSearchOptions(): Promise<SearchOption[]> {

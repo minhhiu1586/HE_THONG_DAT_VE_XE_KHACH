@@ -4,7 +4,13 @@ import { useCallback, useSyncExternalStore } from "react";
 
 import type { Passenger, TripDetail } from "../types";
 
-type State = { trip?: TripDetail; selectedSeats: string[]; passenger?: Passenger; orderId?: string };
+type State = {
+  trip?: TripDetail;
+  selectedSeats: string[];
+  passenger?: Passenger;
+  orderId?: string;
+  expiredAt?: string;
+};
 
 let state: State = { selectedSeats: [] };
 const listeners = new Set<() => void>();
@@ -23,6 +29,10 @@ export const bookingStore = {
         ? state.selectedSeats.filter((seat) => seat !== id)
         : [...state.selectedSeats, id],
     };
+    emit();
+  },
+  setHoldSession: (orderId: string, expiredAt: string) => {
+    state = { ...state, orderId, expiredAt };
     emit();
   },
   clear: () => {

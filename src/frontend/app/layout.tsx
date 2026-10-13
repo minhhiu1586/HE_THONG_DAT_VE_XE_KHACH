@@ -1,8 +1,8 @@
 import "./globals.css";
 
 import Link from "next/link";
-import { AuthProvider } from "@/components/Account/AuthProvider";
-import AccountActions from "@/components/Account/AccountActions";
+import { AuthProvider } from '@/components/Account/AuthProvider';
+import AccountActions from '@/components/SiteHeader/AccountActions';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

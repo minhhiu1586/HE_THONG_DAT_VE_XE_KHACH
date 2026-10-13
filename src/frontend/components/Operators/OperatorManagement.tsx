@@ -126,7 +126,7 @@ export default function OperatorManagement() {
   if (loading || !user) return <main className={styles.page}>Đang kiểm tra quyền…</main>;
   if (user.loaiTaiKhoan !== 'ADMIN') return <main className={styles.page} role="alert">Bạn không có quyền quản lý nhà xe.</main>;
   return <main className={styles.page}>
-    <header className={styles.heading}><div><h1>Quản lý nhà xe</h1><p>Hồ sơ, trạng thái và tài khoản quản lý</p></div>
+    <header className={styles.heading}><div><p className={styles.eyebrow}>QUẢN TRỊ HỆ THỐNG</p><h1>Quản lý nhà xe</h1><p>Hồ sơ, trạng thái và tài khoản quản lý</p></div>
       <button disabled={busy} onClick={() => { setSelected(null); setForm(empty); setManagers([]); setNotice(''); focusDetails('input:not(:disabled):not([readonly])'); }}>+ Thêm nhà xe</button></header>
     {error && <p className={styles.error} role="alert">{error}</p>}{notice && <p className={styles.notice} role="status">{notice}</p>}
     <div className={styles.grid}>

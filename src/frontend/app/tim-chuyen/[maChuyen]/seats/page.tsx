@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { api } from "@/services/api";
+import { getTrip, getTripSeats, holdSeats } from "@/lib/api";
 import { bookingStore, useBookingStore } from "@/store/useBookingStore";
 import SeatLayout from "@/components/booking/SeatLayout";
 import type { SeatMap, TripDetail } from "@/types";
@@ -17,31 +17,56 @@ export default function SeatsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api
-      .trip(tripId)
+  // State mới để khóa nút bấm khi đang gọi API giữ ghế
+  const [isHolding, setIsHolding] = useState(false);
+
+ useEffect(() => {
+    getTrip(tripId) // Sửa api.trip thành getTrip
       .then(async (detail) => {
         if (!detail.maXe) {
-          throw new Error(
-            "Chuyến chưa được gán xe nên chưa có sơ đồ ghế.",
-          );
+          throw new Error("Chuyến chưa được gán xe nên chưa có sơ đồ ghế.");
         }
-        const seats = await api.seats(detail.maXe);
+        const seatResponse = await getTripSeats(detail.maXe); // Sửa api.seats thành getTripSeats
         setTrip(detail);
         setMap({
           maChuyen: tripId,
           maXe: detail.maXe,
-          danhSachGhe: seats,
+          danhSachGhe: seatResponse.danhSachGhe,
         });
         bookingStore.set({ trip: detail });
       })
       .catch((e) =>
-        setError(
-          e instanceof Error ? e.message : "Không thể tải sơ đồ ghế.",
-        ),
+        setError(e instanceof Error ? e.message : "Không thể tải sơ đồ ghế.")
       )
       .finally(() => setLoading(false));
   }, [tripId]);
+
+  // Hàm xử lý giữ ghế trước khi sang trang Checkout
+  const handleContinue = async () => {
+    if (booking.selectedSeats.length === 0) return;
+
+    setIsHolding(true);
+    try {
+      // Gọi trực tiếp hàm holdSeats
+      const response = await holdSeats({
+        maChuyen: tripId,
+        danhSachMaGhe: booking.selectedSeats,
+      });
+
+      // Lưu mã đơn và thời gian hết hạn vào Store
+      bookingStore.setHoldSession(response.maDon, response.thoiDiemHetHan);
+
+      // Chuyển sang trang Checkout
+      router.push(`/${tripId}/checkout`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ghế đã bị người khác chọn. Vui lòng chọn ghế khác!");
+      if (map?.maXe) {
+        getTripSeats(map.maXe).then(res => setMap({ ...map, danhSachGhe: res.danhSachGhe }));
+      }
+    } finally {
+      setIsHolding(false);
+    }
+  };
 
   return (
     <main className="page">
@@ -68,9 +93,7 @@ export default function SeatsPage() {
               <h1>
                 {trip.benDi?.tenBenXe ?? trip.benDi?.maBenXe ?? trip.maTuyen}{" "}
                 <span>→</span>{" "}
-                {trip.benDen?.tenBenXe ??
-                  trip.benDen?.maBenXe ??
-                  "Điểm đến"}
+                {trip.benDen?.tenBenXe ?? trip.benDen?.maBenXe ?? "Điểm đến"}
               </h1>
               <p>
                 {trip.ngayKhoiHanh} · {trip.gioKhoiHanh.slice(0, 5)} ·{" "}
@@ -103,17 +126,16 @@ export default function SeatsPage() {
             <p>Giá tham khảo</p>
             <strong className="total">
               {(
-                booking.selectedSeats.length *
-                Number(trip.giaThamKhao ?? 0)
+                booking.selectedSeats.length * Number(trip.giaThamKhao ?? 0)
               ).toLocaleString("vi-VN")}
               đ
             </strong>
             <button
               className="primary-button full"
-              disabled={!booking.selectedSeats.length}
-              onClick={() => router.push(`/${tripId}/checkout`)}
+              disabled={!booking.selectedSeats.length || isHolding}
+              onClick={handleContinue}
             >
-              Tiếp tục <span>→</span>
+              {isHolding ? "Đang giữ ghế..." : "Tiếp tục <span>→</span>"}
             </button>
             {!booking.selectedSeats.length && (
               <small>Chọn ít nhất một ghế để tiếp tục</small>
