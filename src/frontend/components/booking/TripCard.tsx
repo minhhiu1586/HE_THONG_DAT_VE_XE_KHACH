@@ -1,10 +1,10 @@
-import type { TripSummary } from "@/types";
+import type { SearchTrip } from "@/lib/api";
 
 export default function TripCard({
   trip,
   onChoose,
 }: {
-  trip: TripSummary;
+  trip: SearchTrip;
   onChoose: () => void;
 }) {
   return (
@@ -12,7 +12,7 @@ export default function TripCard({
       <div className="trip-company">
         <div className="company-logo">NX</div>
         <div>
-          <strong>{trip.maTuyen ?? "Chuyến xe"}</strong>
+          <strong>{trip.tenNhaXe ?? trip.tenTuyen}</strong>
           <small>
             {trip.maXe ? `Xe ${trip.maXe}` : "Đang cập nhật thông tin xe"}
           </small>
@@ -22,7 +22,7 @@ export default function TripCard({
         <div>
           <strong>{trip.gioKhoiHanh.slice(0, 5)}</strong>
           <small>
-            {trip.benDi?.tenBenXe ?? trip.benDi?.maBenXe ?? "Điểm đi theo tuyến"}
+            {trip.tenBenDi}
           </small>
         </div>
         <div className="route-line">
@@ -31,27 +31,21 @@ export default function TripCard({
           <i />
         </div>
         <div>
-          <strong>{trip.gioDenDuKien?.slice(0, 5) ?? "--:--"}</strong>
+          <strong>{trip.gioDenDuKien.slice(11, 16)}</strong>
           <small>
-            {trip.benDen?.tenBenXe ??
-              trip.benDen?.maBenXe ??
-              "Điểm đến theo tuyến"}
+            {trip.tenBenDen}
           </small>
         </div>
       </div>
       <div className="trip-price">
         <small>
-          {trip.trangThai === "CHUA_KHOI_HANH"
-            ? "Sẵn sàng đặt vé"
-            : trip.trangThai ?? "Đang cập nhật"}
+          {trip.trangThaiNhanDatVe === 'HET_CHO' ? 'Hết chỗ' : `${trip.soGheTrong} ghế còn`}
         </small>
         <strong>
-          {trip.giaThamKhao
-            ? `${Number(trip.giaThamKhao).toLocaleString("vi-VN")}đ`
-            : "Liên hệ"}
+          {`${Number(trip.giaVeDuKien).toLocaleString("vi-VN")}đ`}
         </strong>
         <button className="outline-button" onClick={onChoose}>
-          Chọn chuyến
+          Xem chi tiết
         </button>
       </div>
     </article>

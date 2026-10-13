@@ -34,7 +34,8 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
     } catch (error) { setError(errorMessage(error)); }
     finally { sending.current = false; setBusy(false); }
   }
-  return <div className={styles.page}><section className={styles.card}>
+  return <main className={styles.page}><section className={styles.card}>
+    <p className={styles.eyebrow}>TÀI KHOẢN VEXERE</p>
     <h1>{register ? 'Tạo tài khoản' : 'Đăng nhập'}</h1>
     <p className={styles.muted}>{register ? 'Đăng ký tài khoản khách hàng để sử dụng VeXe.' : 'Đăng nhập để quản lý hồ sơ và sử dụng các chức năng của bạn.'}</p>
     {notice && <p className={styles.error} role="status">{notice}</p>}
@@ -51,5 +52,5 @@ export default function AuthForm({ register = false }: { register?: boolean }) {
       <button className={styles.primary} disabled={busy}>{busy ? 'Đang xử lý…' : register ? 'Đăng ký' : 'Đăng nhập'}</button>
     </form>
     <div className={styles.links}><Link href={register ? '/dang-nhap' : '/dang-ky'}>{register ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký'}</Link><Link href="/">Về trang chủ</Link></div>
-  </section></div>;
+  </section></main>;
 }

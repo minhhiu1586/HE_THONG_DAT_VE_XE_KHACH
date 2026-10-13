@@ -66,6 +66,9 @@ nav a:first-child{
     font-weight:700
 }
 .ghost-button,.outline-button{
+    display:inline-flex;
+    align-items:center;
+    text-decoration:none;
     background:#fff;
     border:1px solid var(--line);
     border-radius:8px;
@@ -73,6 +76,10 @@ nav a:first-child{
     color:var(--ink);
     font-weight:600
 }
+.account-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.account-actions a{color:var(--teal);font-weight:600;text-decoration:none}
+.detail-actions{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}
+.detail-actions button{cursor:pointer}
 .hero{
     min-height:465px;
     display:flex;
