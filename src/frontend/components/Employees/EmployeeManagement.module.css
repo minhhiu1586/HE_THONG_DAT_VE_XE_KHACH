@@ -50,3 +50,53 @@
 @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .form { grid-template-columns: 1fr; } .page { padding: 16px; border-radius: 12px; } .heading { align-items: start; flex-direction: column; gap: 0; } .filters > label { width: 100%; } .summary div { padding: 12px; } .panel { padding: 16px; } }
 @media (max-width: 420px) { .summary { grid-template-columns: 1fr; } }
+
+.page, .profile, .admin, .panel, .card, .form, .filters, .heading, .row, .grid, .list { min-width: 0; }
+.form > *, .filters > *, .heading > *, .sectionTitle > * { min-width: 0; }
+.scroll, .tableWrap { min-width: 0; width: 100%; max-width: 100%; overflow-x: auto; }
+.form label, .page label { line-height: 1.5; }
+.page button, .primary, .secondary { min-height: 42px; white-space: normal; line-height: 1.5; }
+.page td, .table td { overflow-wrap: anywhere; max-width: 320px; }
+.scope, .badge, .mutedBadge { white-space: normal; line-height: 1.5; }
+@media (max-width: 600px) {
+  .form input, .form select, .form textarea, .filters input, .filters select { font-size: 16px; }
+  .page h1, .profileHeading h1 { font-size: 28px; }
+  .page h2 { font-size: 21px; }
+}
+
+.page { font-size: 14px; line-height: 1.5; }
+.page h1 { font-size: 28px; line-height: 1.3; font-weight: 700; }
+.page h2 { font-size: 20px; line-height: 1.4; }
+.page label { font-size: 13px; }
+.page input, .page select { min-height: 40px; padding: 8px 10px; font-size: 14px; }
+.page button { min-height: 34px; padding: 7px 10px; font-size: 13px; line-height: 1.4; }
+.page table { font-size: 13px; }
+.page td, .page th { padding: 9px 10px; line-height: 1.5; }
+.page th { white-space: nowrap; }
+.page td button { white-space: nowrap; margin: 2px; }
+.panel { padding: 20px; margin-block: 16px; }
+@media (max-width: 600px) {
+  .page h1 { font-size: 24px; }
+  .page input, .page select { font-size: 16px; }
+}
+
+
+.page .form, .page .filters { align-items: end; }
+.page .form label, .page .filters label { display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; min-width: 0; line-height: 20px; }
+.page input:not([type="checkbox"]):not([type="radio"]), .page select {
+  box-sizing: border-box; width: 100%; min-width: 0; height: 42px; min-height: 42px;
+  padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+  font-family: inherit; font-size: 14px; line-height: 22px;
+}
+.page .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.page .filters > label { flex: 1 1 180px; }
+.page .filters > button, .page .form > button, .page .actions > button {
+  box-sizing: border-box; min-height: 42px; height: 42px; padding: 9px 16px; margin: 0;
+  line-height: 22px; white-space: nowrap; align-self: end; justify-self: start;
+  width: max-content; max-width: 100%; flex: 0 0 auto;
+}
+.page table button { height: auto; min-height: 34px; padding: 7px 10px; }
+@media (max-width: 600px) {
+  .page input:not([type="checkbox"]):not([type="radio"]), .page select { font-size: 16px; }
+  .page .filters > label { flex-basis: 100%; }
+}

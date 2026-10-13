@@ -29,6 +29,10 @@ export default function VehicleManagement() {
   const isAdmin = user?.loaiTaiKhoan === 'ADMIN'; const allowed = isAdmin || user?.loaiTaiKhoan === 'NHA_XE';
   const [tab, setTab] = useState<'vehicles' | 'types'>('vehicles');
   const [types, setTypes] = useState<Kind[]>([]); const [operators, setOperators] = useState<Operator[]>([]); const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehiclePage, setVehiclePage] = useState(1);
+  const vehiclePages = Math.max(1, Math.ceil(vehicles.length / 10));
+  const currentVehiclePage = Math.min(vehiclePage, vehiclePages);
+  const visibleVehicles = vehicles.slice((currentVehiclePage - 1) * 10, currentVehiclePage * 10);
   const [typeResults, setTypeResults] = useState<Kind[]>([]);
   const [typeForm, setTypeForm] = useState(emptyType); const [editingType, setEditingType] = useState(false);
   const [vehicleForm, setVehicleForm] = useState(emptyVehicle); const [editingVehicle, setEditingVehicle] = useState(false);
@@ -44,7 +48,7 @@ export default function VehicleManagement() {
   function interaction(event: React.SyntheticEvent<HTMLDivElement>) { if (event.target instanceof Element && event.target.closest('button,input,select,textarea,a')) clearNotice(); }
   async function loadVehicles() {
     const params = new URLSearchParams({ q: query, maLoaiXe: filterType, maNhaXe: filterOwner, trangThai: filterState });
-    const data = await request<Vehicle[]>(`/xe?${params}`); setVehicles(data); return data;
+    const data = await request<Vehicle[]>(`/xe?${params}`); setVehicles(data); setVehiclePage(1); return data;
   }
   async function action(operation: () => Promise<void>, message: string) {
     if (sending.current) return;
@@ -156,11 +160,17 @@ export default function VehicleManagement() {
         <label>Lọc trạng thái<select value={filterState} onChange={e => setFilterState(e.target.value)}><option value="">Tất cả</option>{Object.entries(vehicleStates).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <button disabled={busy} onClick={() => void action(async () => { await loadVehicles(); }, '')}>Lọc xe</button></div>
         <div className={styles.scroll}><table><thead><tr><th>Mã xe</th><th>Biển số</th><th>Loại xe</th><th>Nhà xe</th><th>Trạng thái</th><th>Đăng kiểm</th><th>Thao tác</th></tr></thead><tbody>
-          {vehicles.map(vehicle => <tr key={vehicle.maXe}><td>{vehicle.maXe}</td><td>{vehicle.bienSo}</td><td>{types.find(type => type.maLoaiXe === vehicle.maLoaiXe)?.tenLoaiXe || vehicle.maLoaiXe}</td><td>{operators.find(owner => owner.maNhaXe === vehicle.maNhaXe)?.tenNhaXe || vehicle.maNhaXe}</td><td>{vehicleStates[vehicle.trangThai]}</td><td>{vehicle.dangKiemConHieuLuc ? 'Còn hiệu lực' : 'Chưa đủ điều kiện'}</td><td>
+          {visibleVehicles.map(vehicle => <tr key={vehicle.maXe}><td>{vehicle.maXe}</td><td>{vehicle.bienSo}</td><td>{types.find(type => type.maLoaiXe === vehicle.maLoaiXe)?.tenLoaiXe || vehicle.maLoaiXe}</td><td>{operators.find(owner => owner.maNhaXe === vehicle.maNhaXe)?.tenNhaXe || vehicle.maNhaXe}</td><td>{vehicleStates[vehicle.trangThai]}</td><td>{vehicle.dangKiemConHieuLuc ? 'Còn hiệu lực' : 'Chưa đủ điều kiện'}</td><td>
             <button onClick={() => editVehicle(vehicle)}>Sửa</button><button onClick={() => void detail(vehicle)}>Chi tiết / ghế</button>
             <button disabled={busy} onClick={() => { if (window.confirm(`Xóa xe ${vehicle.bienSo}?`)) void action(async () => { await request(`/xe/${encodeURIComponent(vehicle.maXe)}`, 'DELETE'); await loadVehicles(); if (selected?.maXe === vehicle.maXe) { setSelected(null); setSeats([]); } }, 'Đã xóa xe.'); }}>Xóa</button>
           </td></tr>)}{vehicles.length === 0 && <tr><td colSpan={7}>Không có xe phù hợp.</td></tr>}
         </tbody></table></div>
+        <div className={styles.pagination}>
+          <span>{vehicles.length} xe · Hiển thị {vehicles.length ? (currentVehiclePage - 1) * 10 + 1 : 0}–{Math.min(currentVehiclePage * 10, vehicles.length)}</span>
+          <div><button type="button" disabled={busy || currentVehiclePage === 1} onClick={() => setVehiclePage(currentVehiclePage - 1)}>Trang trước</button>
+          <span>Trang {currentVehiclePage}/{vehiclePages}</span>
+          <button type="button" disabled={busy || currentVehiclePage >= vehiclePages} onClick={() => setVehiclePage(currentVehiclePage + 1)}>Trang sau</button></div>
+        </div>
       </section>
       {selected && <section ref={detailTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>Chi tiết xe · {selected.bienSo}</h2>
         <p>Nhà xe: {operators.find(owner => owner.maNhaXe === selected.maNhaXe)?.tenNhaXe || selected.maNhaXe}. Đăng kiểm: {selected.ngayDangKiem} → {selected.hanDangKiem}.</p>

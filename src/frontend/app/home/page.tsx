@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 import SearchForm from "../../components/booking/SearchForm";
 import PopularRoutes from "../../components/ui/PopularRoutes";
@@ -14,36 +15,13 @@ export default function Home() {
 
   return (
     <main>
-      <section className="hero">
-        <div className="hero-copy">
-          <span className="eyebrow">
-            HÀNH TRÌNH CỦA BẠN, BẮT ĐẦU TỪ ĐÂY
-          </span>
-          <h1>
-            Đi xa hơn,
-            <br />
-            <em>trọn niềm vui.</em>
-          </h1>
-          <p>
-            Tìm kiếm và đặt vé xe khách dễ dàng, an toàn
-            <br />
-            với hàng nghìn chuyến xe mỗi ngày.
-          </p>
-        </div>
-        <div className="hero-art">
-          <div className="sun" />
-          <div className="road" />
-          <span className="art-label">
-            CHỦ ĐỘNG
-            <br />
-            MỌI HÀNH TRÌNH
-          </span>
-        </div>
+      <section className="hero-banner" aria-label="Banner giới thiệu Vexere">
+        <Image src="/images/home-banner.jpg" alt="Vexere – banner giới thiệu dịch vụ di chuyển" width={1800} height={790} priority unoptimized sizes="100vw" />
       </section>
       <section className="search-wrap">
         <div className="section-heading">
           <span className="eyebrow">TÌM KIẾM CHUYẾN XE</span>
-          <h2>Bạn muốn đi đâu hôm nay?</h2>
+          <h1>Bạn muốn đi đâu hôm nay?</h1>
         </div>
         <SearchForm onSubmit={submit} />
       </section>

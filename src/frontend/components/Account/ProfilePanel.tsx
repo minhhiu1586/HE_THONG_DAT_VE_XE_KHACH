@@ -37,6 +37,7 @@ export default function ProfilePanel() {
     <header className={styles.profileHeading}><p className={styles.eyebrow}>TÀI KHOẢN CỦA BẠN</p><h1>Hồ sơ cá nhân</h1><p>Quản lý thông tin và bảo mật tài khoản.</p></header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {success && <p className={styles.success} role="status">{success}</p>}
+    <div className={styles.profileGrid}>
     <section className={styles.card}><h2>Thông tin cá nhân</h2><p className={styles.muted}>Vai trò: {roles[user.loaiTaiKhoan]}</p>
       <form onInvalid={vietnameseValidation} onInput={clearValidation} className={styles.form} onSubmit={event => submit(event)} key={user.maNguoiDung + user.email + user.soDienThoai}>
         <label>Họ tên<input name="hoTen" defaultValue={user.hoTen} autoComplete="name" maxLength={160} required /></label>
@@ -51,13 +52,14 @@ export default function ProfilePanel() {
       </form>
     </section>
     <section className={styles.card}><h2>Đổi mật khẩu</h2><p className={styles.muted}>Sau khi đổi mật khẩu, bạn cần đăng nhập lại trên tất cả thiết bị.</p>
-      <form onInvalid={vietnameseValidation} onInput={clearValidation} className={styles.form} onSubmit={event => submit(event, true)}>
+      <form onInvalid={vietnameseValidation} onInput={clearValidation} className={`${styles.form} ${styles.passwordForm}`} onSubmit={event => submit(event, true)}>
         <label>Mật khẩu hiện tại<input name="matKhauHienTai" type="password" autoComplete="current-password" maxLength={128} required /></label>
-        <label>Mật khẩu mới<input name="matKhauMoi" type="password" autoComplete="new-password" minLength={10} maxLength={128} required /></label>
-        <p className={styles.muted}>Mật khẩu cần 10–128 ký tự, có chữ và số.</p>
+        <label>Mật khẩu mới<input name="matKhauMoi" aria-describedby="new-password-hint" type="password" autoComplete="new-password" minLength={10} maxLength={128} required /></label>
+        <p id="new-password-hint" className={styles.muted}>Dùng ít nhất 10 ký tự, kết hợp chữ và số.</p>
         <label>Xác nhận mật khẩu mới<input name="xacNhan" type="password" autoComplete="new-password" maxLength={128} required /></label>
         <button className={styles.primary} disabled={busy}>{busy ? 'Đang xử lý…' : 'Đổi mật khẩu'}</button>
       </form>
     </section>
+    </div>
   </div>;
 }
