@@ -11,6 +11,9 @@ services:
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       VEHICLE_TURNAROUND_MINUTES: ${VEHICLE_TURNAROUND_MINUTES:-30}
       TRIP_BOOKING_CUTOFF_MINUTES: ${TRIP_BOOKING_CUTOFF_MINUTES:-60}
+      VNP_TMN_CODE: ${VNP_TMN_CODE:-}
+      VNP_HASH_SECRET: ${VNP_HASH_SECRET:-}
+      VNP_RETURN_URL: ${VNP_RETURN_URL:-http://localhost:8080/api/thanh-toan/return/vnpay}
     volumes:
       - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
       - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT/WEB-INF/lib/postgresql-42.7.5.jar:/usr/local/tomcat/lib/postgresql-42.7.5.jar:ro
@@ -40,6 +43,7 @@ services:
       - ./docs/database/schema/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
       - ./docs/database/schema/004_booking_order.sql:/docker-entrypoint-initdb.d/004_booking_order.sql:ro
       - ./docs/database/schema/005_booking_session.sql:/docker-entrypoint-initdb.d/005_booking_session.sql:ro
+      - ./docs/database/schema/006_payment_vnpay.sql:/docker-entrypoint-initdb.d/006_payment_vnpay.sql:ro
       - ./docs/database/seed/001_catalog.sql:/docker-entrypoint-initdb.d/004_catalog.sql:ro
       - ./docs/database/seed/002_accounts_staff_fleet.sql:/docker-entrypoint-initdb.d/005_accounts_staff_fleet.sql:ro
       - ./docs/database/seed/003_routes_trips.sql:/docker-entrypoint-initdb.d/006_routes_trips.sql:ro

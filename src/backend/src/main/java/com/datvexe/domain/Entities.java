@@ -284,6 +284,8 @@ public final class Entities {
         @Column(name = "so_dien_thoai_khach_hang", nullable = false, length = 30) public String soDienThoaiKhachHang;
         @Column(name = "cccd_hanh_khach", length = 20) public String cccdHanhKhach;
         @Column(name = "gia_ve", nullable = false, precision = 14, scale = 2) public BigDecimal giaVe;
+        /** Opaque QR token from the approved diagram; it never contains passenger data. */
+        @Column(name = "ma_qr", nullable = false, unique = true, length = 80) public String maQR = UUID.randomUUID().toString();
         @Column(name = "ngay_xuat_ve") public LocalDateTime ngayXuatVe;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
         public TrangThaiVe trangThai = TrangThaiVe.DA_XUAT_VE;
