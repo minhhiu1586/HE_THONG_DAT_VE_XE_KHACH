@@ -2,8 +2,9 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-import { api } from "../../services/api";
-import type { SearchValues, Station } from "../../types";
+import { getSearchOptions, type SearchOption } from '@/lib/api';
+import { clearValidation, vietnameseValidation } from '@/lib/form-validation';
+import type { SearchValues } from "../../types";
 
 export default function SearchForm({
   onSubmit,
@@ -16,52 +17,22 @@ export default function SearchForm({
     initial ?? {
       from: "",
       to: "",
-      date: new Date().toISOString().slice(0, 10),
+      date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
     },
   );
-  const [stations, setStations] = useState<Station[]>([]);
-
-useEffect(() => {
-    if (
-      initial &&
-      (initial.from !== values.from ||
-        initial.to !== values.to ||
-        initial.date !== values.date)
-    ) {
-      setValues(initial);
-    }
-  }, [initial, values.from, values.to, values.date]);
+  const [options, setOptions] = useState<SearchOption[]>([]);
 
   useEffect(() => {
-    api.stations()
-      .then(setStations)
-      .catch(() => setStations([]));
+    getSearchOptions().then(setOptions).catch(() => setOptions([]));
   }, []);
 
-  useEffect(() => {
-    if (!initial || !stations.length) return;
-    const label = (value: string) =>
-      stations.find(
-        (station) =>
-          station.maBenXe === value || station.tenBenXe === value,
-      )?.tenBenXe ?? value;
-    setValues((current) => ({
-      ...current,
-      from: label(initial.from),
-      to: label(initial.to),
-    }));
-  }, [initial?.from, initial?.to, stations]);
-
   const resolve = (value: string) =>
-    stations.find(
-      (station) =>
-        station.maBenXe === value ||
-        station.tenBenXe.toLowerCase() === value.toLowerCase(),
-    )?.maBenXe ?? value;
+    options.find(option => option.value === value || option.label.toLowerCase() === value.trim().toLowerCase()
+      || option.value.split(':')[1]?.toLowerCase() === value.trim().toLowerCase())?.value ?? value.trim();
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!values.from || !values.to || !values.date || values.from === values.to) {
+    if (!values.from || !values.to || !values.date || resolve(values.from) === resolve(values.to)) {
       return;
     }
     onSubmit({
@@ -72,7 +43,7 @@ useEffect(() => {
   };
 
   return (
-    <form className="search-form" onSubmit={submit}>
+    <form className="search-form" onInvalid={vietnameseValidation} onInput={clearValidation} onSubmit={submit}>
       <label>
         <span>Điểm đi</span>
         <input
@@ -95,9 +66,9 @@ useEffect(() => {
         />
       </label>
       <datalist id="stations">
-        {stations.map((station) => (
-          <option key={station.maBenXe} value={station.tenBenXe}>
-            {station.maBenXe}
+        {options.map((option) => (
+          <option key={option.value} value={option.label}>
+            {option.value}
           </option>
         ))}
       </datalist>
@@ -106,7 +77,7 @@ useEffect(() => {
         <input
           required
           type="date"
-          min={new Date().toISOString().slice(0, 10)}
+          min={new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())}
           value={values.date}
           onChange={(e) => setValues({ ...values, date: e.target.value })}
         />
@@ -114,7 +85,7 @@ useEffect(() => {
       <button className="primary-button" type="submit">
         Tìm chuyến <span>→</span>
       </button>
-      {values.from && values.to && values.from === values.to && (
+      {values.from && values.to && resolve(values.from) === resolve(values.to) && (
         <small className="field-error">
           Điểm đi và điểm đến phải khác nhau.
         </small>

@@ -1,7 +1,8 @@
 import "./globals.css";
 
 import Link from "next/link";
-import { AuthProvider } from "@/components/Account/AuthProvider";
+import { AuthProvider } from '@/components/Account/AuthProvider';
+import AccountActions from '@/components/SiteHeader/AccountActions';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -20,7 +21,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/trips">Tìm chuyến</Link>
             <a href="#support">Hỗ trợ</a>
           </nav>
-          <Link className="ghost-button" href="/dang-nhap">Đăng nhập</Link>
+          <AccountActions />
         </header>
         {children}
         <footer id="support">
