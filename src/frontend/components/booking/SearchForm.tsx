@@ -21,9 +21,16 @@ export default function SearchForm({
   );
   const [stations, setStations] = useState<Station[]>([]);
 
-  useEffect(() => {
-    if (initial) setValues(initial);
-  }, [initial]);
+useEffect(() => {
+    if (
+      initial &&
+      (initial.from !== values.from ||
+        initial.to !== values.to ||
+        initial.date !== values.date)
+    ) {
+      setValues(initial);
+    }
+  }, [initial, values.from, values.to, values.date]);
 
   useEffect(() => {
     api.stations()
@@ -43,7 +50,7 @@ export default function SearchForm({
       from: label(initial.from),
       to: label(initial.to),
     }));
-  }, [initial, stations]);
+  }, [initial?.from, initial?.to, stations]);
 
   const resolve = (value: string) =>
     stations.find(
