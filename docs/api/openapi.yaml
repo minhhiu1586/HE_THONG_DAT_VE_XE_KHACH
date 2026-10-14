@@ -3,13 +3,12 @@ info:
   title: Hệ thống đặt vé xe khách API
   version: 0.1.0-draft
   description: |-
-    Hợp đồng mục tiêu A–F; API booking T16 đã triển khai được đánh dấu implemented.
+    Hợp đồng A–F; các API đã triển khai được đánh dấu implemented.
     D04 dùng VNPay IPN, ReturnURL chỉ hiển thị và D06 dùng QueryDR khi chạy localhost.
-    Bản cập nhật ngày 2026-10-13 phản ánh API booking T16;
-    T17 bổ sung C01/C02; T18 triển khai D01–D07 theo payment-vnpay.md.
-    Các phần còn lại giữ hợp đồng mục tiêu. Enum bám theo class diagram đã chốt.
-    Những lựa chọn chưa chốt, gồm trạng thái khả dụng ghế và quy trình hoàn tiền,
-    được đánh dấu trong tài liệu. T07 bổ sung phiên cookie datvexe_session;
+    Bản cập nhật ngày 2026-10-14 phản ánh T16–T19: T17 bổ sung C01/C02,
+    T18 triển khai D01–D07, T19 triển khai E01/E03–E05, preview/hoàn theo đơn,
+    quản trị chính sách và xác minh/thử lại. E02 vẫn là hợp đồng đề xuất.
+    T07 bổ sung phiên cookie datvexe_session;
     xem account-auth.md và account-openapi.yaml. Quyền nghiệp vụ A–F cần tích hợp T07.1.
   contact:
     name: Nhóm T05
@@ -373,6 +372,38 @@ paths:
           $ref: '#/components/responses/BookingConflict'
       x-api-id: B01
       x-contract-status: implemented
+  /api/booking/me:
+    get:
+      tags: [B — Giữ chỗ và đơn đặt vé]
+      operationId: getMyBookingOrders
+      summary: Lịch sử đơn của khách đang đăng nhập
+      description: Danh sách đơn theo ngày đặt giảm dần, không nhận query và chưa phân trang theo T30. tongTien là tổng gốc; số thực trả bằng tongTien trừ tienGiam. Không thay đổi trạng thái đơn khi đọc lịch sử.
+      x-contract-status: implemented
+      x-roles: [KHACH_HANG]
+      responses:
+        '200':
+          description: Chỉ các đơn thuộc tài khoản hiện tại.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [maDon, trangThai, tongTien, tienGiam, thoiDiemHetHan, ngayDat]
+                  properties:
+                    maDon: {type: string}
+                    trangThai: {$ref: '#/components/schemas/TrangThaiDon'}
+                    tongTien: {$ref: '#/components/schemas/MoneyVnd'}
+                    tienGiam: {$ref: '#/components/schemas/MoneyVnd'}
+                    thoiDiemHetHan: {type: [string, 'null'], format: date-time}
+                    ngayDat: {$ref: '#/components/schemas/OffsetDateTime'}
+                    maChuyen: {type: string}
+                    tuyenXe: {type: [string, 'null']}
+                    ngayKhoiHanh: {type: string, format: date}
+                    gioKhoiHanh: {type: string}
+        '400': {$ref: '#/components/responses/BookingBadRequest'}
+        '401': {$ref: '#/components/responses/BookingUnauthorized'}
+        '403': {$ref: '#/components/responses/BookingForbidden'}
   /api/booking/{maDon}:
     parameters:
     - $ref: '#/components/parameters/BookingMaDon'
@@ -657,6 +688,7 @@ paths:
                       - {maGhe: G11, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}
                       - {maGhe: G12, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}
                     ketQuaKhuyenMai: {hopLe: true, duocGiam: '40000'}
+                    chinhSachHoanVe: null
                 noPromotion:
                   value:
                     maBaoGia: BG02
@@ -671,6 +703,7 @@ paths:
                       - {maGhe: G11, giaGoc: '200000', tienGiam: '0', thanhTien: '200000'}
                       - {maGhe: G12, giaGoc: '200000', tienGiam: '0', thanhTien: '200000'}
                     ketQuaKhuyenMai: null
+                    chinhSachHoanVe: null
         '400':
           description: Dữ liệu body không hợp lệ.
           headers:
@@ -745,6 +778,7 @@ paths:
                     tongThanhToan: '360000'
                     chiTietGia: [{maGhe: G11, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}, {maGhe: G12, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000'}]
                     ketQuaKhuyenMai: {hopLe: true, duocGiam: '40000'}
+                    chinhSachHoanVe: null
         '400':
           description: Dữ liệu body không hợp lệ.
           headers:
@@ -1137,10 +1171,266 @@ paths:
               schema: {$ref: '#/components/schemas/TicketResponse'}
               examples:
                 success:
-                  value: {maVe: VE01, maDon: DDV01, maChuyen: CX01, maGhe: G11, hoTenHanhKhach: Nguyen Van A, trangThai: DA_XUAT_VE, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000', donViTienTe: VND, qrToken: opaque-server-token, thoiDiemPhatHanh: '2026-10-11T09:40:00+07:00'}
+                  value: {maVe: VE01, maDon: DDV01, maChuyen: CX01, maGhe: G11, hoTenHanhKhach: Nguyen Van A, trangThai: DA_XUAT_VE, giaGoc: '200000', tienGiam: '20000', thanhTien: '180000', donViTienTe: VND, qrToken: opaque-server-token, thoiDiemPhatHanh: '2026-10-11T09:40:00+07:00', dangHoan: false}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /api/quan-tri/chinh-sach-hoan-ve:
+    get:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: listRefundPolicies
+      summary: Danh sách chính sách hoàn vé
+      description: Admin-only. Trang bắt đầu từ 1, mặc định 1; size từ 1 đến 100, mặc định 20.
+      x-contract-status: implemented
+      x-roles: [ADMIN]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: Chỉ quản trị viên.
+      parameters:
+        - {$ref: '#/components/parameters/Page'}
+        - {$ref: '#/components/parameters/Size'}
+      responses:
+        '200':
+          description: Trang chính sách hoàn vé.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundPolicyPage'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: createRefundPolicy
+      summary: Tạo chính sách hoàn vé
+      description: Admin-only. Tỷ lệ là JSON number; phiHoan là chuỗi VND nguyên.
+      x-contract-status: implemented
+      x-roles: [ADMIN]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: Chỉ quản trị viên.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefundPolicyCreateRequest'}
+      responses:
+        '201':
+          description: Chính sách được tạo.
+          headers:
+            Location: {description: URL chi tiết chính sách mới, schema: {type: string, format: uri-reference}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundPolicy'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/RefundConflict'}
+  /api/quan-tri/chinh-sach-hoan-ve/{maChinhSach}:
+    parameters:
+      - {name: maChinhSach, in: path, required: true, schema: {$ref: '#/components/schemas/Id'}}
+    get:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: getRefundPolicyAdmin
+      summary: Xem chính sách hoàn vé
+      x-contract-status: implemented
+      x-roles: [ADMIN]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: Chỉ quản trị viên.
+      responses:
+        '200':
+          description: Chính sách hoàn vé.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundPolicy'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: updateRefundPolicy
+      summary: Cập nhật chính sách hoàn vé
+      description: Mã chính sách lấy từ URL; body không nhận maChinhSach.
+      x-contract-status: implemented
+      x-roles: [ADMIN]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: Chỉ quản trị viên.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefundPolicyUpdateRequest'}
+      responses:
+        '200':
+          description: Chính sách sau cập nhật.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundPolicy'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/RefundConflict'}
+  /api/quan-tri/chinh-sach-hoan-ve/{maChinhSach}/trang-thai:
+    put:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: updateRefundPolicyStatus
+      summary: Đổi trạng thái chính sách hoàn vé
+      x-contract-status: implemented
+      x-roles: [ADMIN]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: Chỉ quản trị viên.
+      parameters:
+        - {name: maChinhSach, in: path, required: true, schema: {$ref: '#/components/schemas/Id'}}
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefundPolicyStatusRequest'}
+      responses:
+        '200':
+          description: Chính sách sau đổi trạng thái.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundPolicy'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/RefundConflict'}
+  /api/booking/{maDon}/hoan-tien/du-kien:
+    post:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: previewBookingRefund
+      summary: Xem trước hoàn vé theo đơn
+      description: Chỉ tính preview; không tạo yêu cầu hoàn hoặc đổi trạng thái vé.
+      x-contract-status: implemented
+      x-roles: [KH]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: Chỉ chủ đơn.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/MaDon'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefundBatchRequest'}
+      responses:
+        '200':
+          description: Số tiền hoàn dự kiến và dòng tính theo từng vé.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundPreview'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/RefundConflict'}
+  /api/booking/{maDon}/hoan-tien:
+    post:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: createBookingRefund
+      summary: Gửi yêu cầu hoàn vé theo đơn
+      description: Một yêu cầu hoàn cho danh sách vé; 202 chỉ xác nhận đã nhận, không xác nhận tiền đã hoàn.
+      x-contract-status: implemented
+      x-roles: [KH]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: Chỉ chủ đơn.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/MaDon'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefundBatchRequest'}
+      responses:
+        '202':
+          description: Yêu cầu đã nhận; trạng thái cuối phụ thuộc kết quả đã đối soát.
+          headers:
+            Location: {$ref: '#/components/headers/RefundLocation'}
+            X-Trace-Id: {$ref: '#/components/headers/TraceId'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/RefundConflict'}
+  /api/hoan-tien/{maHoanTien}/xac-minh:
+    post:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: verifyRefund
+      summary: Đối soát kết quả hoàn đang chờ hoặc chưa rõ
+      description: Gọi QueryDR bằng đúng mã tương quan của yêu cầu gốc. Không gửi lại yêu cầu hoàn.
+      x-contract-status: implemented
+      x-roles: [KH, ADMIN, NHA_XE]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: KH theo chủ đơn; ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/MaHoanTien'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, maxProperties: 0, additionalProperties: false}
+      responses:
+        '200':
+          description: Trạng thái hoàn sau khi xác minh hoặc trạng thái chưa đổi nếu không đủ điều kiện đối soát.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/RefundConflict'}
+  /api/hoan-tien/{maHoanTien}/thu-lai:
+    post:
+      tags: [E — Hủy vé và hoàn tiền]
+      operationId: retryRefund
+      summary: Thử lại yêu cầu hoàn đã xác nhận thất bại
+      description: Chỉ cho phép sau trạng thái THAT_BAI; giữ nguyên mã yêu cầu và tương quan thanh toán gốc.
+      x-contract-status: implemented
+      x-roles: [ADMIN, NHA_XE]
+      security: [{cookieAuth: []}]
+      x-authentication-required: true
+      x-ownership: ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/MaHoanTien'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, maxProperties: 0, additionalProperties: false}
+      responses:
+        '202':
+          description: Yêu cầu thử lại đã nhận; chưa xác nhận tiền đã hoàn.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RefundResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/RefundConflict'}
   /api/ve-xe/{maVe}/chinh-sach-hoan:
     get:
       tags: [E — Hủy vé và hoàn tiền]
@@ -1150,7 +1440,7 @@ paths:
         Xem chính sách và số tiền hoàn dự kiến; thao tác này không tạo yêu cầu hoàn hoặc đổi trạng thái vé.
         Yêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ vé; máy chủ tính số tiền và khả năng hoàn theo chính sách.
       x-api-id: E01
-      x-contract-status: proposed
+      x-contract-status: implemented
       x-roles: [KH]
       security: [{cookieAuth: []}]
       x-authentication-required: true
@@ -1167,7 +1457,8 @@ paths:
               schema: {$ref: '#/components/schemas/RefundPolicyResponse'}
               examples:
                 success:
-                  value: {maVe: VE01, chinhSach: {maChinhSach: CS01, soGioToiThieuTruocKhoiHanh: 0, tyLeHoan: '100', phiHoan: '0', choPhepHoanHuyVe: true}, duocYeuCauHoan: true, soTienDuKienHoan: '180000', donViTienTe: VND, lyDoKhongDuocHoan: null, thoiDiemTinh: '2026-10-11T10:00:00+07:00'}
+                  value: {maVe: VE01, chinhSach: {maChinhSach: CS01, tenChinhSach: Demo, soGioToiThieuTruocKhoiHanh: 24, tyLeHoan: 80, phiHoan: '0', choPhepHoanVeKhuyenMai: true, trangThai: HOAT_DONG}, duocYeuCauHoan: true, soTienDuKienHoan: '144000', donViTienTe: VND, lyDoKhongDuocHoan: null, thoiDiemTinh: '2026-10-11T10:00:00+07:00'}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -1177,14 +1468,14 @@ paths:
       operationId: huyVeXe
       summary: "[E02] Hủy vé theo chính sách"
       description: |-
-        Chỉ hủy trực tiếp khi chính sách cho phép; thao tác này không bỏ qua quy trình yêu cầu hoàn tiền. Ví dụ VE02 minh họa trường hợp giả định được phép hủy nhưng không tạo yêu cầu hoàn; chính sách này vẫn đang chờ nhóm xác nhận.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH), nhân viên (NV), nhà xe (NX). Phạm vi: KH theo chủ vé; NV/NX theo phạm vi và chính sách được duyệt.
+        E02 là hợp đồng đề xuất; route hủy trực tiếp chưa được triển khai. Điều kiện hủy và quyền thao tác cần được thống nhất riêng.
+        Ví dụ bên dưới chỉ minh họa response dự kiến, không phải runtime contract.
       x-api-id: E02
       x-contract-status: proposed
-      x-roles: [KH, NV, NX]
+      x-roles: [KH]
       security: [{cookieAuth: []}]
       x-authentication-required: true
-      x-ownership: KH theo chủ vé; NV/NX theo phạm vi và chính sách được duyệt.
+      x-ownership: 'Đề xuất: chủ vé; chưa được triển khai.'
       parameters:
         - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaVe'}
@@ -1210,14 +1501,14 @@ paths:
       operationId: createRefund
       summary: "[E03] Gửi yêu cầu hoàn tiền cho một vé"
       description: |-
-        Máy chủ xác định số tiền hoàn. Trả 202 khi đã nhận yêu cầu xử lý; điều đó chưa khẳng định tiền đã được hoàn. Có thể bỏ trường lyDo hoặc gửi JSON object rỗng ({}) nếu không có lý do; quy định bắt buộc lý do vẫn chờ nhóm thống nhất.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH), nhân viên (NV), nhà xe (NX). Phạm vi: KH theo chủ vé; NV/NX theo phạm vi và chính sách được duyệt.
+        Máy chủ xác định số tiền hoàn từ chính sách snapshot và các dòng vé đã chọn. Trả 202 khi đã nhận yêu cầu xử lý; điều đó chưa khẳng định tiền đã được hoàn. Body là JSON object; lyDo tùy chọn.
+        Yêu cầu đăng nhập. Quyền: khách hàng (KH), chỉ chủ vé. Đây là yêu cầu hoàn; 202 chưa xác nhận tiền đã hoàn.
       x-api-id: E03
-      x-contract-status: proposed
-      x-roles: [KH, NV, NX]
+      x-contract-status: implemented
+      x-roles: [KH]
       security: [{cookieAuth: []}]
       x-authentication-required: true
-      x-ownership: KH theo chủ vé; NV/NX theo phạm vi và chính sách được duyệt.
+      x-ownership: Chỉ chủ vé.
       parameters:
         - $ref: "#/components/parameters/CsrfToken"
         - {$ref: '#/components/parameters/MaVe'}
@@ -1243,7 +1534,7 @@ paths:
               schema: {$ref: '#/components/schemas/RefundResponse'}
               examples:
                 accepted:
-                  value: {maHoanTien: HT01, maVe: VE01, maGiaoDichGoc: GD01, soTienHoan: '180000', trangThai: CHO_XU_LY, thoiDiemTao: '2026-10-11T10:00:00+07:00'}
+                  value: {maHoanTien: HT01, maDon: DDV01, maGiaoDichGoc: GD01, maChinhSach: CS01, soTienHoan: '144000', donViTienTe: VND, trangThai: CHO_XU_LY, chiTiet: [{maVe: VE01, giaThucTra: '180000', tyLeHoan: '80', phiHoan: '0', soTienHoan: '144000'}], thoiDiemTao: '2026-10-11T10:00:00+07:00', thoiDiemXacNhan: null, maGiaoDichCong: null, lyDoLoi: null, lichSu: [{thaoTac: TAO_YEU_CAU, maRequestCong: null, maKetQua: null, maGiaoDichCong: null, thoiDiem: '2026-10-11T10:00:00+07:00'}]}
         '400': {$ref: '#/components/responses/BadRequest'}
         '415': {$ref: '#/components/responses/UnsupportedMediaType'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
@@ -1256,13 +1547,13 @@ paths:
       summary: "[E05] Lịch sử yêu cầu hoàn của vé"
       description: |-
         Liệt kê lịch sử yêu cầu hoàn tiền đã được hệ thống ghi nhận cho vé; dữ liệu lấy từ lịch sử nội bộ.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH), nhà xe (NX), quản trị viên (AD). Phạm vi: giới hạn theo vé trên đường dẫn và quyền sở hữu/phạm vi của người gọi.
+        Yêu cầu đăng nhập. Quyền: KH theo chủ đơn; ADMIN; NHA_XE theo nhà xe sở hữu chuyến.
       x-api-id: E05
-      x-contract-status: proposed
-      x-roles: [KH, NX, AD]
+      x-contract-status: implemented
+      x-roles: [KH, ADMIN, NHA_XE]
       security: [{cookieAuth: []}]
       x-authentication-required: true
-      x-ownership: Giới hạn theo vé trên đường dẫn và quyền sở hữu/phạm vi.
+      x-ownership: KH theo chủ đơn; ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.
       parameters:
         - {$ref: '#/components/parameters/MaVe'}
         - {$ref: '#/components/parameters/Page'}
@@ -1270,11 +1561,11 @@ paths:
         - name: sort
           in: query
           required: false
-          description: Allowlist field,asc|desc; mặc định thoiDiemTao,desc.
+          description: Allowlist field,asc|desc; mặc định thoiDiemTao,asc.
           schema:
             type: string
             enum: ['thoiDiemTao,asc', 'thoiDiemTao,desc']
-            default: thoiDiemTao,desc
+            default: thoiDiemTao,asc
       responses:
         '200':
           description: Trang lịch sử yêu cầu hoàn của vé.
@@ -1303,19 +1594,19 @@ paths:
       operationId: getRefund
       summary: "[E04] Tra cứu yêu cầu hoàn tiền"
       description: |-
-        Tra cứu yêu cầu hoàn tiền. Trạng thái hoàn là chuỗi cho tới khi quy trình trạng thái được duyệt; CHO_XU_LY chỉ là ví dụ tạm.
-        Yêu cầu đăng nhập. Quyền: khách hàng (KH), nhà xe (NX), quản trị viên (AD). Phạm vi: KH theo chủ vé; NX theo phạm vi; AD theo quyền quản trị.
+        Tra cứu yêu cầu hoàn tiền và trạng thái kỹ thuật. `maGiaoDichGoc` liên kết bản ghi hoàn với giao dịch nguồn; nó không chứng minh lần thanh toán gốc thành công.
+        Yêu cầu đăng nhập. Quyền: KH theo chủ đơn; ADMIN; NHA_XE theo nhà xe sở hữu chuyến.
       x-api-id: E04
-      x-contract-status: proposed
-      x-roles: [KH, NX, AD]
+      x-contract-status: implemented
+      x-roles: [KH, ADMIN, NHA_XE]
       security: [{cookieAuth: []}]
       x-authentication-required: true
-      x-ownership: KH theo chủ vé; NX theo phạm vi; AD theo quyền quản trị.
+      x-ownership: KH theo chủ đơn; ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.
       parameters:
         - {$ref: '#/components/parameters/MaHoanTien'}
       responses:
         '200':
-          description: Yêu cầu hoàn, tiền do server tính và trạng thái hiện tại.
+          description: Bản ghi yêu cầu hoàn và trạng thái kỹ thuật hiện tại. Không phải bằng chứng cho lần thanh toán gốc.
           headers:
             X-Trace-Id: {$ref: '#/components/headers/TraceId'}
           content:
@@ -1323,7 +1614,8 @@ paths:
               schema: {$ref: '#/components/schemas/RefundResponse'}
               examples:
                 success:
-                  value: {maHoanTien: HT01, maVe: VE01, maGiaoDichGoc: GD01, soTienHoan: '180000', trangThai: CHO_XU_LY, thoiDiemTao: '2026-10-11T10:00:00+07:00'}
+                  value: {maHoanTien: HT01, maDon: DDV01, maGiaoDichGoc: GD01, maChinhSach: CS01, soTienHoan: '144000', donViTienTe: VND, trangThai: CHO_XU_LY, chiTiet: [{maVe: VE01, giaThucTra: '180000', tyLeHoan: '80', phiHoan: '0', soTienHoan: '144000'}], thoiDiemTao: '2026-10-11T10:00:00+07:00', thoiDiemXacNhan: null, maGiaoDichCong: null, lyDoLoi: null, lichSu: [{thaoTac: TAO_YEU_CAU, maRequestCong: null, maKetQua: null, maGiaoDichCong: null, thoiDiem: '2026-10-11T10:00:00+07:00'}]}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -2147,6 +2439,8 @@ components:
       type: object
       required:
       - maVe
+      - maTraCuu
+      - qrImage
       - maGhe
       - hoTen
       - soDienThoai
@@ -2154,9 +2448,19 @@ components:
       - giaVe
       - trangThai
       - ngayXuatVe
+      - dangHoan
       properties:
         maVe:
           $ref: '#/components/schemas/BookingId'
+        maTraCuu:
+          type: string
+          minLength: 5
+          maxLength: 5
+        qrImage:
+          type:
+          - string
+          - 'null'
+          description: Null khi vé đang bị khóa bởi yêu cầu hoàn hoặc vé đã hoàn/không còn hiệu lực.
         maGhe:
           $ref: '#/components/schemas/BookingId'
         hoTen:
@@ -2184,6 +2488,9 @@ components:
           anyOf:
           - $ref: '#/components/schemas/BookingTimestamp'
           - type: 'null'
+        dangHoan:
+          type: boolean
+          description: True khi yêu cầu hoàn đang chờ xử lý hoặc cần đối soát; vé khi đó không có QR.
       additionalProperties: false
     BookingPricePreview:
       type: object
@@ -2240,6 +2547,7 @@ components:
       - coTheChotGia
       - giaDaChot
       - thongBao
+      - chinhSachHoanVe
       properties:
         maDon:
           $ref: '#/components/schemas/BookingId'
@@ -2307,6 +2615,11 @@ components:
           type: array
           items:
             type: string
+        chinhSachHoanVe:
+          anyOf:
+          - {$ref: '#/components/schemas/RefundPolicy'}
+          - {type: 'null'}
+          description: Snapshot chính sách hoàn của đơn; null nếu không có.
       additionalProperties: false
     BookingErrorResponse:
       type: object
@@ -2687,6 +3000,11 @@ components:
         thongBao:
           type: array
           items: {type: string}
+        chinhSachHoanVe:
+          anyOf:
+          - {$ref: '#/components/schemas/RefundPolicy'}
+          - {type: 'null'}
+          description: Snapshot chính sách dùng cho đơn; null nếu đơn không có chính sách.
       additionalProperties: true
     TicketSummary:
       type: object
@@ -2731,7 +3049,7 @@ components:
       additionalProperties: false
     QuoteResponse:
       type: object
-      required: [maBaoGia, maDon, donViTienTe, thoiDiemBaoGia, thoiDiemHetHan, tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia, ketQuaKhuyenMai]
+      required: [maBaoGia, maDon, donViTienTe, thoiDiemBaoGia, thoiDiemHetHan, tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia, ketQuaKhuyenMai, chinhSachHoanVe]
       properties:
         maBaoGia: {$ref: '#/components/schemas/Id'}
         maDon: {$ref: '#/components/schemas/Id'}
@@ -2752,10 +3070,15 @@ components:
             hopLe: {type: boolean}
             duocGiam: {$ref: '#/components/schemas/MoneyVnd'}
           additionalProperties: true
+        chinhSachHoanVe:
+          anyOf:
+          - {$ref: '#/components/schemas/RefundPolicy'}
+          - {type: 'null'}
+          description: Snapshot chính sách hoàn của đơn tại thời điểm báo giá; null nếu không có.
       additionalProperties: true
     FreezePriceResponse:
       type: object
-      required: [maBaoGia, maDon, trangThaiDon, donViTienTe, thoiDiemHetHan, tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia, ketQuaKhuyenMai]
+      required: [maBaoGia, maDon, trangThaiDon, donViTienTe, thoiDiemHetHan, tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia, ketQuaKhuyenMai, chinhSachHoanVe]
       properties:
         maBaoGia: {$ref: '#/components/schemas/Id'}
         maDon: {$ref: '#/components/schemas/Id'}
@@ -2775,6 +3098,11 @@ components:
             hopLe: {type: boolean}
             duocGiam: {$ref: '#/components/schemas/MoneyVnd'}
           additionalProperties: false
+        chinhSachHoanVe:
+          anyOf:
+          - {$ref: '#/components/schemas/RefundPolicy'}
+          - {type: 'null'}
+          description: Snapshot chính sách hoàn đã chốt; null nếu không có.
       additionalProperties: false
     PaymentMethodDto:
       type: object
@@ -2836,32 +3164,87 @@ components:
     RefundRequest:
       type: object
       properties:
-        lyDo: {type: [string, 'null'], maxLength: 500, description: Có thể bỏ qua hoặc gửi null nếu không có lý do; việc bắt buộc trường này còn chờ thống nhất chính sách.}
+        lyDo: {type: [string, 'null'], maxLength: 500, description: Lý do tùy chọn. Có thể bỏ qua hoặc gửi null.}
+      additionalProperties: false
+    RefundBatchRequest:
+      type: object
+      required: [danhSachMaVe]
+      properties:
+        danhSachMaVe:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: {$ref: '#/components/schemas/Id'}
+        lyDo: {type: [string, 'null'], maxLength: 500}
+      additionalProperties: false
+    RefundLine:
+      type: object
+      required: [maVe, giaThucTra, tyLeHoan, phiHoan, soTienHoan]
+      properties:
+        maVe: {$ref: '#/components/schemas/Id'}
+        giaThucTra: {$ref: '#/components/schemas/MoneyVnd'}
+        tyLeHoan:
+          type: string
+          pattern: '^(100(\.0{1,2})?|[0-9]{1,2}(\.[0-9]{1,2})?)$'
+          description: Tỷ lệ phần trăm chính sách snapshot theo chuỗi chính xác trong từng dòng hoàn.
+        phiHoan: {$ref: '#/components/schemas/MoneyVnd'}
+        soTienHoan: {$ref: '#/components/schemas/MoneyVnd'}
+      additionalProperties: false
+    RefundHistory:
+      type: object
+      required: [thaoTac, maRequestCong, maKetQua, maGiaoDichCong, thoiDiem]
+      properties:
+        thaoTac: {type: string}
+        maRequestCong: {type: [string, 'null']}
+        maKetQua: {type: [string, 'null']}
+        maGiaoDichCong: {type: [string, 'null']}
+        thoiDiem: {$ref: '#/components/schemas/OffsetDateTime'}
+      additionalProperties: false
+    RefundPreview:
+      type: object
+      required: [maDon, maGiaoDichGoc, maChinhSach, soTienHoan, donViTienTe, chiTiet, thoiDiemTinh]
+      properties:
+        maDon: {$ref: '#/components/schemas/Id'}
+        maGiaoDichGoc: {type: [string, 'null']}
+        maChinhSach: {type: [string, 'null']}
+        soTienHoan: {$ref: '#/components/schemas/MoneyVnd'}
+        donViTienTe: {type: string, const: VND}
+        chiTiet:
+          type: array
+          items: {$ref: '#/components/schemas/RefundLine'}
+        thoiDiemTinh: {$ref: '#/components/schemas/OffsetDateTime'}
       additionalProperties: false
     RefundResponse:
       type: object
-      required: [maHoanTien, maVe, maGiaoDichGoc, soTienHoan, trangThai, thoiDiemTao]
+      description: 202 trả snapshot tiếp nhận CHO_XU_LY giống nhau cho lần đầu và replay cùng key; GET trả trạng thái hiện tại. Chỉ kết quả provider khớp tương quan đã lưu mới chốt vé; thiếu tương quan giữ CAN_DOI_SOAT. maGiaoDichGoc là liên kết bản ghi, không chứng minh lần thanh toán nguồn đã thành công.
+      required: [maHoanTien, maDon, maGiaoDichGoc, maChinhSach, soTienHoan, donViTienTe, trangThai, chiTiet, thoiDiemTao, thoiDiemXacNhan, maGiaoDichCong, lyDoLoi, lichSu]
       properties:
         maHoanTien: {$ref: '#/components/schemas/Id'}
-        maVe: {$ref: '#/components/schemas/Id'}
+        maDon: {$ref: '#/components/schemas/Id'}
         maGiaoDichGoc:
           anyOf:
             - {$ref: '#/components/schemas/TransactionId'}
             - {type: 'null'}
-          description: Mã giao dịch nguồn nếu xác định được.
+          description: Giao dịch thành công ban đầu liên kết với đơn; trường này không chứng minh lần thanh toán gốc đã thành công.
+        maChinhSach: {type: [string, 'null']}
         soTienHoan: {$ref: '#/components/schemas/MoneyVnd'}
-        trangThai:
-          type: string
-          minLength: 1
-          description: State machine hoàn chưa được chốt; giá trị ví dụ CHO_XU_LY chỉ tạm dùng, không phải enum chính thức.
-          example: CHO_XU_LY
-          x-decision-status: pending-decision
-          x-example-status-provisional: true
+        donViTienTe: {type: string, const: VND}
+        trangThai: {type: string, enum: [CHO_XU_LY, THANH_CONG, THAT_BAI, CAN_DOI_SOAT]}
+        chiTiet:
+          type: array
+          items: {$ref: '#/components/schemas/RefundLine'}
         thoiDiemTao: {$ref: '#/components/schemas/OffsetDateTime'}
+        thoiDiemXacNhan: {type: [string, 'null'], format: date-time}
+        maGiaoDichCong: {type: [string, 'null']}
+        lyDoLoi: {type: [string, 'null']}
+        lichSu:
+          type: array
+          items: {$ref: '#/components/schemas/RefundHistory'}
       additionalProperties: true
     TicketResponse:
       type: object
-      required: [maVe, maDon, maChuyen, maGhe, hoTenHanhKhach, trangThai, giaGoc, tienGiam, thanhTien, donViTienTe, qrToken, thoiDiemPhatHanh]
+      required: [maVe, maTraCuu, maDon, maChuyen, maGhe, hoTenHanhKhach, soDienThoaiHanhKhach, cccdHanhKhach, trangThai, giaGoc, tienGiam, thanhTien, donViTienTe, qrToken, thoiDiemPhatHanh, dangHoan]
       properties:
         maVe: {$ref: '#/components/schemas/Id'}
         maTraCuu: {type: string, minLength: 5, maxLength: 5, description: Public ticket reference for customer display}
@@ -2876,8 +3259,14 @@ components:
         tienGiam: {$ref: '#/components/schemas/MoneyVnd'}
         thanhTien: {$ref: '#/components/schemas/MoneyVnd'}
         donViTienTe: {type: string, const: VND}
-        qrToken: {type: string, minLength: 1, description: Token do server cấp; không gửi qua URL hoặc log.}
+        qrToken:
+          type: [string, 'null']
+          minLength: 1
+          description: Token do server cấp; null khi yêu cầu hoàn đang khóa vé, vé đã hoàn hoặc vé không còn hiệu lực. Không gửi qua URL hoặc log.
         thoiDiemPhatHanh: {$ref: '#/components/schemas/OffsetDateTime'}
+        dangHoan:
+          type: boolean
+          description: True khi yêu cầu hoàn đang chờ xử lý hoặc cần đối soát; khi đó QR bị khóa.
       additionalProperties: true
     RefundPolicyResponse:
       type: object
@@ -2885,23 +3274,69 @@ components:
       properties:
         maVe: {$ref: '#/components/schemas/Id'}
         chinhSach:
-          type: [object, 'null']
-          description: Điều kiện chính sách dùng để tính preview nếu có.
-          required: [maChinhSach, soGioToiThieuTruocKhoiHanh, tyLeHoan, phiHoan, choPhepHoanHuyVe]
-          properties:
-            maChinhSach: {$ref: '#/components/schemas/Id'}
-            soGioToiThieuTruocKhoiHanh: {type: integer, minimum: 0, description: Số giờ tối thiểu trước giờ khởi hành.}
-            tyLeHoan: {type: string, pattern: '^(100(\.0{1,2})?|[0-9]{1,2}(\.[0-9]{1,2})?)$', description: Tỷ lệ phần trăm từ 0 đến 100, biểu diễn bằng chuỗi chính xác.}
-            phiHoan: {$ref: '#/components/schemas/MoneyVnd'}
-            choPhepHoanHuyVe: {type: boolean}
-          additionalProperties: true
-          x-contract-status: proposed
+          anyOf:
+            - {$ref: '#/components/schemas/RefundPolicy'}
+            - {type: 'null'}
+          x-contract-status: implemented
         duocYeuCauHoan: {type: boolean}
         soTienDuKienHoan: {$ref: '#/components/schemas/MoneyVnd'}
         donViTienTe: {type: string, const: VND}
         lyDoKhongDuocHoan: {type: [string, 'null'], maxLength: 500}
         thoiDiemTinh: {$ref: '#/components/schemas/OffsetDateTime'}
       additionalProperties: true
+    RefundPolicy:
+      type: object
+      required: [maChinhSach, tenChinhSach, soGioToiThieuTruocKhoiHanh, tyLeHoan, phiHoan, choPhepHoanVeKhuyenMai, trangThai]
+      properties:
+        maChinhSach: {$ref: '#/components/schemas/Id'}
+        tenChinhSach: {type: string, minLength: 1, maxLength: 160}
+        soGioToiThieuTruocKhoiHanh: {type: integer, minimum: 0}
+        tyLeHoan: {type: number, minimum: 0, maximum: 100, multipleOf: 0.01, description: JSON number từ 0 đến 100, tối đa hai chữ số thập phân.}
+        phiHoan: {$ref: '#/components/schemas/MoneyVnd'}
+        choPhepHoanVeKhuyenMai: {type: boolean}
+        trangThai: {type: string, enum: [HOAT_DONG, TAM_NGUNG, NGUNG_AP_DUNG]}
+      additionalProperties: false
+    RefundPolicyCreateRequest:
+      type: object
+      required: [maChinhSach, tenChinhSach, soGioToiThieuTruocKhoiHanh, tyLeHoan, phiHoan, choPhepHoanVeKhuyenMai]
+      properties:
+        maChinhSach: {$ref: '#/components/schemas/Id'}
+        tenChinhSach: {type: string, minLength: 1, maxLength: 160}
+        soGioToiThieuTruocKhoiHanh: {type: integer, minimum: 0}
+        tyLeHoan: {type: number, minimum: 0, maximum: 100, multipleOf: 0.01}
+        phiHoan: {$ref: '#/components/schemas/MoneyVnd'}
+        choPhepHoanVeKhuyenMai: {type: boolean}
+        trangThai: {type: [string, 'null'], enum: [HOAT_DONG, TAM_NGUNG, NGUNG_AP_DUNG, null]}
+      additionalProperties: false
+    RefundPolicyUpdateRequest:
+      type: object
+      required: [tenChinhSach, soGioToiThieuTruocKhoiHanh, tyLeHoan, phiHoan, choPhepHoanVeKhuyenMai]
+      properties:
+        tenChinhSach: {type: string, minLength: 1, maxLength: 160}
+        soGioToiThieuTruocKhoiHanh: {type: integer, minimum: 0}
+        tyLeHoan: {type: number, minimum: 0, maximum: 100, multipleOf: 0.01}
+        phiHoan: {$ref: '#/components/schemas/MoneyVnd'}
+        choPhepHoanVeKhuyenMai: {type: boolean}
+        trangThai: {type: [string, 'null'], enum: [HOAT_DONG, TAM_NGUNG, NGUNG_AP_DUNG, null]}
+      additionalProperties: false
+    RefundPolicyStatusRequest:
+      type: object
+      required: [trangThai]
+      properties:
+        trangThai: {type: string, enum: [HOAT_DONG, TAM_NGUNG, NGUNG_AP_DUNG]}
+      additionalProperties: false
+    RefundPolicyPage:
+      type: object
+      required: [items, page, size, totalItems, totalPages]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/RefundPolicy'}
+        page: {type: integer, minimum: 1}
+        size: {type: integer, minimum: 1, maximum: 100}
+        totalItems: {type: integer, minimum: 0}
+        totalPages: {type: integer, minimum: 0}
+      additionalProperties: false
     CancelTicketResponse:
       type: object
       required: [maVe, trangThai, thoiDiemHuy, canTaoYeuCauHoan]

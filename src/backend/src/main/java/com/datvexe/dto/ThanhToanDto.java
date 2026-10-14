@@ -69,7 +69,8 @@ public final class ThanhToanDto {
             String donViTienTe,
             String qrToken,
             OffsetDateTime thoiDiemPhatHanh,
-            TrangThaiVe trangThai) implements Serializable {
+            TrangThaiVe trangThai,
+            boolean dangHoan) implements Serializable {
         @Serial private static final long serialVersionUID = 1L;
     }
 }

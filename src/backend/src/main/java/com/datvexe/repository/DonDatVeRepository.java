@@ -30,7 +30,8 @@ public final class DonDatVeRepository extends JpaRepository<DonDatVe> {
         return em.createQuery("select count(t) from ThanhToan t where t.donDatVe.maDon = :order "
                 + "and t.trangThai in :states", Long.class)
                 .setParameter("order", orderId)
-                .setParameter("states", List.of(TrangThaiThanhToan.CHO_XU_LY, TrangThaiThanhToan.THANH_CONG))
+                .setParameter("states", List.of(TrangThaiThanhToan.CHO_XU_LY, TrangThaiThanhToan.THANH_CONG,
+                        TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN, TrangThaiThanhToan.DA_HOAN_TIEN))
                 .getSingleResult() > 0;
     }
 

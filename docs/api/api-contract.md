@@ -6,7 +6,7 @@ Tài liệu mô tả hợp đồng mục tiêu cho 29 API A01–F03. Bản mô t
 
 - Trường bắt buộc, tùy chọn và nullable được ghi riêng theo API; thiếu trường khác với `null`. JSON thành công là object/array trực tiếp, không bọc thêm `data`.
 - Quyền: `P` công khai; `KH` khách đã đăng nhập và là chủ tài nguyên; `NV` nhân viên có quyền/được phân công; `NX` nhà xe trong phạm vi của mình; `AD` quản trị có quyền; `CG` cổng thanh toán đã được xác minh. Backend phải kiểm tra chủ tài nguyên và phạm vi; T07 dùng phiên cookie/CSRF và T07.1 cung cấp helper phạm vi theo [account-auth.md](account-auth.md) và [hướng dẫn tích hợp](../tasks/T07.1-integration.md). Vai trò cho từng hành động nghiệp vụ vẫn phải đối chiếu T01.
-- Quy ước chung về kiểu dữ liệu, phân trang, lỗi và idempotency nằm trong [README](README.md). Các API cần `Idempotency-Key`: **B01, B03, B07, C02, D01, E02, E03, F02**; các mã lỗi 409 dùng chung được mô tả tại [mục 8](README.md#8-chống-xử-lý-lặp). Bảng dưới đây chỉ liệt kê lỗi nghiệp vụ chính.
+- Quy ước chung về kiểu dữ liệu, phân trang, lỗi và idempotency nằm trong [README](README.md). Các API hoàn tiền cần `Idempotency-Key`: E03, batch create và retry; E02 hiện chưa triển khai. Các mã lỗi 409 dùng chung được mô tả tại [mục 8](README.md#8-chống-xử-lý-lặp). Bảng dưới đây chỉ liệt kê lỗi nghiệp vụ chính.
 - Hợp đồng chi tiết của T17 nằm trong [booking-pricing.md](booking-pricing.md) và [booking-pricing-openapi.json](booking-pricing-openapi.json); C01/C02 ở dưới chỉ là chỉ mục ngắn.
 
 ## A — Tìm chuyến và xem ghế
@@ -158,6 +158,9 @@ A03 hiện chuyển từ array đang có sang `Page` theo đề xuất. `maXe` v
 | B04 | PUT `/api/booking/{maDon}/hanh-khach` | KH | Path `maDon`; body thay toàn bộ `hanhKhach` (ít nhất 1). Mỗi phần tử cần `maGhe`, `hoTen`, `soDienThoai`; `maGhe` không trùng và tập `maGhe` phải khớp toàn bộ ghế đang giữ cho đơn. `cccd` tùy chọn, chuỗi tối đa 20 ký tự hoặc `null`. | 200 cùng `OrderResponse` ([ví dụ nháp](#b03-và-b04--đơn-nháp)) | 409 `HOLD_EXPIRED` |
 | B06 | GET `/api/booking` | KH | Query tùy chọn `page`, `size`, `trangThaiDon`, `maChuyen`, `tuNgay`, `denNgay`, `sort`; sort theo `ngayTao` hoặc `thoiDiemKhoiHanh`, chiều `asc\|desc`. | 200 `Page<OrderResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 400 `VALIDATION_ERROR` |
 | B07 | POST `/api/booking/{maDon}/huy` | KH | Path `maDon`; body tùy chọn, nếu gửi thì `{}`. | 200 `OrderResponse` (hợp đồng T16 tại [booking-order.md](booking-order.md)) | 409 `INVALID_STATE_TRANSITION` |
+| Lịch sử T30 | GET `/api/booking/me` | KH | Không nhận query; chỉ đơn của phiên đăng nhập, theo `ngayDat` giảm dần. | 200 mảng tóm tắt đơn | 400, 401, 403 |
+
+T30 hiện triển khai lịch sử tại `/api/booking/me`, chưa phân trang; B06 phân trang vẫn là hợp đồng đề xuất. Mỗi phần tử lịch sử có `maDon`, `trangThai`, `tongTien` (tổng gốc), `tienGiam`, `ngayDat`, `thoiDiemHetHan` (có thể null) và thông tin chuyến nếu có. Số tiền thực trả là `tongTien − tienGiam`; endpoint lịch sử chỉ đọc và không thay đổi trạng thái đơn.
 
 B01 giữ toàn bộ ghế và tạo một đơn nháp trong cùng giao dịch nguyên tử; B03 và B04 chỉ cập nhật đơn do B01 tạo. Máy chủ nên kiểm tra lại chuyến trước khi giữ. Với B04, `soDienThoai` của từng hành khách là bắt buộc; danh sách hành khách được giữ tạm trong HTTP session, không tạo hàng hành khách hoặc vé nháp trong database. Cùng `JSESSIONID` đọc lại được snapshot; session mới vẫn đọc được đơn và ghế nhưng trả `hanhKhach: []` và `coTheChotGia: false`. Hợp đồng module [booking-order.md](booking-order.md) là nguồn có thẩm quyền cho chi tiết B01–B08 của T16; những mục B còn lại tại đây giữ phạm vi tương lai của T05.
 
@@ -273,6 +276,7 @@ Tên người đặt và hành khách dài 1–120 ký tự; số điện thoạ
   },
   "coTheChotGia": true,
   "giaDaChot": null,
+  "chinhSachHoanVe": null,
   "thongBao": []
 }
 ```
@@ -316,6 +320,7 @@ Tên người đặt và hành khách dài 1–120 ký tự; số điện thoạ
     }
   ],
   "danhSachVe": [],
+  "chinhSachHoanVe": null,
   "giaDaChot": {
     "donViTienTe": "VND",
     "tongTienGoc": "400000",
@@ -438,7 +443,8 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
   "ketQuaKhuyenMai": {
     "hopLe": true,
     "duocGiam": "40000"
-  }
+  },
+  "chinhSachHoanVe": null
 }
 ```
 
@@ -473,7 +479,8 @@ C01 chỉ xem trước báo giá và không giữ lượt khuyến mãi. C02 ch�
   "ketQuaKhuyenMai": {
     "hopLe": true,
     "duocGiam": "40000"
-  }
+  },
+  "chinhSachHoanVe": null
 }
 ```
 
@@ -567,7 +574,8 @@ Phương thức `MIEN_PHI` chỉ dùng khi `tongThanhToan` bằng `0`; backend x
   "thanhTien": "180000",
   "donViTienTe": "VND",
   "qrToken": "opaque-server-token",
-  "thoiDiemPhatHanh": "2026-10-11T09:40:00+07:00"
+  "thoiDiemPhatHanh": "2026-10-11T09:40:00+07:00",
+  "dangHoan": false
 }
 ```
 
@@ -575,75 +583,93 @@ Phương thức `MIEN_PHI` chỉ dùng khi `tongThanhToan` bằng `0`; backend x
 
 | ID | Phương thức + đường dẫn | Quyền | Tham số / yêu cầu | Phản hồi thành công | Lỗi nghiệp vụ chính |
 | --- | --- | --- | --- | --- | --- |
-| E01 | GET `/api/ve-xe/{maVe}/chinh-sach-hoan` | KH | Path `maVe` | 200 `RefundPolicyResponse` ([ví dụ](#e01--điều-kiện-hoàn)) | 404 `RESOURCE_NOT_FOUND` |
-| E02 | POST `/api/ve-xe/{maVe}/huy` | KH; NV/NX theo chính sách | Path `maVe`; không có body | 200 `CancelTicketResponse` ([ví dụ](#e02--hủy-vé)) | 409 `REFUND_NOT_ALLOWED` |
-| E03 | POST `/api/ve-xe/{maVe}/hoan-tien` | KH; NV/NX theo chính sách | Path `maVe`; body JSON bắt buộc. `lyDo` tùy chọn, là chuỗi tối đa 500 ký tự hoặc `null`; không có lý do thì gửi `{}`. | 202 `RefundResponse` ([ví dụ](#e03-và-e04--yêu-cầu-hoàn)) | 409 `REFUND_NOT_ALLOWED` |
-| E04 | GET `/api/hoan-tien/{maHoanTien}` | KH; NX/AD theo quyền | Path `maHoanTien` | 200 cùng `RefundResponse` ([ví dụ](#e03-và-e04--yêu-cầu-hoàn)) | 404 `RESOURCE_NOT_FOUND` |
-| E05 | GET `/api/ve-xe/{maVe}/hoan-tien` | KH; NX/AD theo quyền | Path `maVe`; query `page`, `size`, `sort` (`thoiDiemTao,asc\|desc`). | 200 `Page<RefundResponse>` (wrapper mẫu tại [README](README.md#4-phân-trang-lọc-và-sắp-xếp)) | 404 `RESOURCE_NOT_FOUND` |
+| E01 | GET `/api/ve-xe/{maVe}/chinh-sach-hoan` | KH, chủ vé | Path `maVe` | 200 preview chính sách và số tiền | 404 `RESOURCE_NOT_FOUND` |
+| E02 | POST `/api/ve-xe/{maVe}/huy` | Đề xuất, chưa triển khai | Hợp đồng dự kiến; quyền và quy trình chưa chốt | Response minh họa, không phải runtime contract | — |
+| E03 | POST `/api/ve-xe/{maVe}/hoan-tien` | KH, chủ vé | Path `maVe`; body `{}` hoặc `{"lyDo":"..."}`; CSRF và `Idempotency-Key` | 202 `RefundResponse` | 403, 409 `REFUND_NOT_ALLOWED` |
+| E04 | GET `/api/hoan-tien/{maHoanTien}` | KH chủ đơn; ADMIN; NHA_XE đúng phạm vi | Path `maHoanTien` | 200 `RefundResponse` | 403, 404 `RESOURCE_NOT_FOUND` |
+| E05 | GET `/api/ve-xe/{maVe}/hoan-tien` | KH chủ đơn; ADMIN; NHA_XE đúng phạm vi | Path `maVe`; `page`, `size`, `sort` (`thoiDiemTao,asc\|desc`; mặc định `asc`) | 200 `Page<RefundResponse>` | 400, 403, 404 |
+| Batch preview | POST `/api/booking/{maDon}/hoan-tien/du-kien` | KH, chủ đơn | Body `danhSachMaVe` và `lyDo` tùy chọn; CSRF | 200 `RefundPreview` | 403, 409 |
+| Batch create | POST `/api/booking/{maDon}/hoan-tien` | KH, chủ đơn | Body `danhSachMaVe` và `lyDo` tùy chọn; CSRF và `Idempotency-Key` | 202 một `RefundResponse` với nhiều dòng vé | 403, 409 |
+| Verify | POST `/api/hoan-tien/{maHoanTien}/xac-minh` | KH chủ đơn; ADMIN; NHA_XE đúng phạm vi | Body `{}`; CSRF | 200 trạng thái đã đối soát hoặc trạng thái hiện tại | 403, 409 |
+| Retry | POST `/api/hoan-tien/{maHoanTien}/thu-lai` | ADMIN; NHA_XE đúng phạm vi | Body `{}`; CSRF và `Idempotency-Key`; chỉ khi `THAT_BAI` | 202 `RefundResponse` | 403, 409 |
+| Policy admin | GET/POST `/api/quan-tri/chinh-sach-hoan-ve`; GET/PUT `/api/quan-tri/chinh-sach-hoan-ve/{maChinhSach}`; PUT `.../{maChinhSach}/trang-thai` | ADMIN | Ghi cần CSRF; `tyLeHoan` là JSON number | 200/201 policy hoặc trang policy | 400, 403, 404, 409 |
 
-Điều kiện hủy trực tiếp và vòng đời hoàn tiền còn chờ thống nhất. E01 chỉ xem khoản dự kiến; E03 để server chốt số tiền. Một yêu cầu gắn với một vé, không vượt phần tiền của vé. Không giải phóng ghế chỉ vì đã nhận yêu cầu hoàn.
+Các route được bảo vệ dùng session cookie `datvexe_session`. E01 và batch preview chỉ tính trước; máy chủ vẫn tự tính lại khi tạo yêu cầu. Mỗi yêu cầu có thể chứa một hoặc nhiều vé và không vượt phần tiền đã thu. `202` trả snapshot tiếp nhận `CHO_XU_LY` giống nhau cho lần đầu và replay cùng key; E04 trả trạng thái hiện tại. Không giải phóng ghế khi nhận yêu cầu hoàn. E02 hủy trực tiếp vẫn là đề xuất và chưa được triển khai.
 
-### Request body
-
-#### E03 — Gửi yêu cầu hoàn
+### Ví dụ request policy
 
 ```json
 {
-  "lyDo": "Thay đổi kế hoạch"
+  "maChinhSach": "CS_DEMO",
+  "tenChinhSach": "Demo",
+  "soGioToiThieuTruocKhoiHanh": 24,
+  "tyLeHoan": 80,
+  "phiHoan": "0",
+  "choPhepHoanVeKhuyenMai": true,
+  "trangThai": "HOAT_DONG"
 }
 ```
 
-### Ví dụ response thành công
+`tyLeHoan` nhận JSON number từ 0 đến 100, tối đa hai chữ số thập phân. `phiHoan` và mọi tiền VND là chuỗi số nguyên không dấu phân cách. Chính sách demo là 24 giờ, 80%, phí 0 và cho phép vé khuyến mãi; chỉ một chính sách được hoạt động tại một thời điểm.
 
-#### E01 — Điều kiện hoàn
+### Ví dụ E01 — Điều kiện hoàn
 
 ```json
 {
   "maVe": "VE01",
   "chinhSach": {
-    "maChinhSach": "CS01",
-    "soGioToiThieuTruocKhoiHanh": 0,
-    "tyLeHoan": "100",
+    "maChinhSach": "CS_DEMO",
+    "tenChinhSach": "Demo",
+    "soGioToiThieuTruocKhoiHanh": 24,
+    "tyLeHoan": 80,
     "phiHoan": "0",
-    "choPhepHoanHuyVe": true
+    "choPhepHoanVeKhuyenMai": true,
+    "trangThai": "HOAT_DONG"
   },
   "duocYeuCauHoan": true,
-  "soTienDuKienHoan": "180000",
+  "soTienDuKienHoan": "144000",
   "donViTienTe": "VND",
   "lyDoKhongDuocHoan": null,
   "thoiDiemTinh": "2026-10-11T10:00:00+07:00"
 }
 ```
 
-`chinhSach` có thể là `null`; cấu trúc trong ví dụ là đề xuất. `tyLeHoan` là chuỗi phần trăm.
-
-#### E02 — Hủy vé
+### Batch preview request
 
 ```json
 {
-  "maVe": "VE02",
-  "trangThai": "DA_HUY",
-  "thoiDiemHuy": "2026-10-11T10:00:00+07:00",
-  "canTaoYeuCauHoan": false
+  "danhSachMaVe": ["VE01", "VE02"],
+  "lyDo": "Thay đổi kế hoạch"
 }
 ```
 
-Đây là tình huống giả định độc lập với ví dụ E03 bên dưới: vé `VE02` được hủy nhưng không tạo yêu cầu hoàn (`canTaoYeuCauHoan: false`). Nếu cần hoàn tiền cho vé `VE01`, dùng luồng E03 riêng. Điều kiện hủy và chính sách hoàn tiền còn chờ thống nhất.
-
-#### E03 và E04 — Yêu cầu hoàn
+### Example E03/E04 refund record
 
 ```json
 {
   "maHoanTien": "HT01",
-  "maVe": "VE01",
+  "maDon": "DDV01",
   "maGiaoDichGoc": "GD01",
-  "soTienHoan": "180000",
+  "maChinhSach": "CS_DEMO",
+  "soTienHoan": "144000",
+  "donViTienTe": "VND",
   "trangThai": "CHO_XU_LY",
-  "thoiDiemTao": "2026-10-11T10:00:00+07:00"
+  "chiTiet": [
+    {"maVe":"VE01","giaThucTra":"180000","tyLeHoan":"80","phiHoan":"0","soTienHoan":"144000"}
+  ],
+  "thoiDiemTao": "2026-10-11T10:00:00+07:00",
+  "thoiDiemXacNhan": null,
+  "maGiaoDichCong": null,
+  "lyDoLoi": null,
+  "lichSu": [
+    {"thaoTac":"TAO_YEU_CAU","maRequestCong":null,"maKetQua":null,"maGiaoDichCong":null,"thoiDiem":"2026-10-11T10:00:00+07:00"}
+  ]
 }
 ```
 
-`trangThai` là chuỗi; `CHO_XU_LY` hiện chỉ là giá trị ví dụ tạm, chưa phải enum đã chốt. `maGiaoDichGoc` có thể là `null` nếu chưa xác định.
+Trạng thái refund gồm đúng `CHO_XU_LY`, `THANH_CONG`, `THAT_BAI`, `CAN_DOI_SOAT`. Vé chỉ chuyển `DA_HOAN` sau khi kết quả hoàn đã được xác nhận. Khi yêu cầu đang chờ hoặc cần đối soát, `dangHoan` là `true` và QR là `null`; vé đã hoàn cũng không có QR. `maGiaoDichGoc` là tham chiếu tương quan, không phải bằng chứng lần thanh toán gốc đã thành công.
+
+Với VNPay, dùng đúng dữ liệu tương quan của lần thanh toán gốc thành công. Nếu kết quả chưa rõ, không tự động gửi lại; hãy gọi verify trước. Phải lưu kết quả provider đã khớp tương quan trước khi chốt trạng thái vé; quy trình phục hồi có thể hoàn tất từ bằng chứng đã lưu mà không gửi refund lần nữa. Thiếu dữ liệu tương quan thì giữ `CAN_DOI_SOAT`. Chỉ thử lại khi đã xác nhận `THAT_BAI`. Bộ tính tiền thuần Java; bản ghi refund và khóa dữ liệu do service/database quản lý, không thêm JPA entity. Frontend, email, dọn exception, T21 và T23 nằm ngoài phạm vi. Kết quả kiểm thử thực chạy và giới hạn tích hợp nằm trong [ticket-refund.md](ticket-refund.md); chưa thực hiện hoàn tiền sandbox thật.
 
 ## F — Kiểm vé
 

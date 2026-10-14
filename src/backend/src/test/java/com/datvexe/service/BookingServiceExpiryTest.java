@@ -7,10 +7,16 @@ import com.datvexe.dto.BookingDto.OrderResponse;
 import com.datvexe.dto.BookingDto.PassengerRequest;
 import com.datvexe.dto.BookingDto.PassengersRequest;
 import com.datvexe.dto.BookingDto.TicketResponse;
+import com.datvexe.dto.PricingDto.FreezePriceResponse;
 import com.datvexe.dto.PricingDto.PriceSummary;
+import com.datvexe.dto.PricingDto.QuoteRequest;
+import com.datvexe.dto.PricingDto.QuoteSnapshot;
+import com.datvexe.dto.PricingDto.FreezeRequest;
 import com.datvexe.security.AccountException;
 import com.datvexe.security.CurrentUser;
 import com.datvexe.security.RequestIdentity;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
@@ -42,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class BookingServiceExpiryTest {
+public final class BookingServiceExpiryTest {
     private static final ZoneId ZONE = TripSaleRules.ZONE;
     private static final String USER_ID = "BUYER";
     private static final String SESSION_ID = "SESSION";
@@ -63,6 +69,17 @@ class BookingServiceExpiryTest {
                 "jakarta.persistence.jdbc.password", "",
                 "hibernate.hbm2ddl.auto", "create-drop"));
         expiresAt = LocalDateTime.of(2030, 1, 1, 10, 15);
+        inTransaction(RefundSchemaFixture::create);
+        // Freeze requests also exercise the idempotency try-lock. The shared H2 fixture
+        // provides the blocking advisory lock used by quotes and policy operations.
+        inTransaction(em -> em.createNativeQuery("CREATE ALIAS IF NOT EXISTS PG_TRY_ADVISORY_XACT_LOCK FOR "
+                + "'com.datvexe.service.BookingServiceExpiryTest.tryAdvisoryLock'").executeUpdate());
+        inTransaction(em -> em.createNativeQuery("CREATE TABLE api_idempotency ("
+                + "user_id varchar(40) NOT NULL, method varchar(10) NOT NULL, path varchar(240) NOT NULL, "
+                + "request_key varchar(128) NOT NULL, request_hash varchar(64) NOT NULL, status integer NOT NULL, "
+                + "response_body text NOT NULL, created_at timestamp with time zone NOT NULL, "
+                + "expires_at timestamp with time zone NOT NULL, "
+                + "PRIMARY KEY (user_id, method, path, request_key))").executeUpdate());
         inTransaction(this::createBaseFixture);
     }
 
@@ -180,6 +197,73 @@ class BookingServiceExpiryTest {
     }
 
     @Test
+    void orderHistoryIsScopedAndKeepsPaidLegacyOrderWithoutHolds() {
+        inTransaction(em -> {
+            DonDatVe paid = em.find(DonDatVe.class, ORDER_ID);
+            paid.trangThai = TrangThaiDon.DA_THANH_TOAN;
+            paid.tongTien = new BigDecimal("100000");
+            paid.tienGiam = new BigDecimal("15000");
+            em.remove(em.find(GiuCho.class, HOLD_ID));
+
+            VeXe issued = new VeXe();
+            issued.maVe = "LEGACY_TICKET";
+            issued.maTraCuu = "LG001";
+            issued.chuyenXe = em.find(ChuyenXe.class, TRIP_ID);
+            issued.ghe = em.find(Ghe.class, "SEAT");
+            issued.donDatVe = paid;
+            issued.hoTenKhachHang = "Buyer";
+            issued.soDienThoaiKhachHang = "0900000000";
+            issued.giaVe = new BigDecimal("100000");
+            issued.ngayXuatVe = expiresAt.minusMinutes(10);
+            issued.trangThai = TrangThaiVe.DA_XUAT_VE;
+            em.persist(issued);
+
+            NguoiDung otherBuyer = new NguoiDung();
+            otherBuyer.maNguoiDung = "OTHER_BUYER";
+            otherBuyer.hoTen = "Other buyer";
+            otherBuyer.soDienThoai = "0900000009";
+            otherBuyer.email = "other@example.test";
+            otherBuyer.matKhau = "test-hash";
+            otherBuyer.loaiTaiKhoan = LoaiTaiKhoan.KHACH_HANG;
+            otherBuyer.trangThai = TrangThaiTaiKhoan.HOAT_DONG;
+            em.persist(otherBuyer);
+
+            DonDatVe otherOrder = new DonDatVe();
+            otherOrder.maDon = "OTHER_ORDER";
+            otherOrder.nguoiDat = otherBuyer;
+            otherOrder.ngayDat = expiresAt.minusMinutes(1);
+            otherOrder.khachDatTen = otherBuyer.hoTen;
+            otherOrder.khachDatSoDienThoai = otherBuyer.soDienThoai;
+            otherOrder.trangThai = TrangThaiDon.DA_HUY;
+            em.persist(otherOrder);
+        });
+
+        setRequest("GET", "/api/booking/my-orders");
+        ArrayNode history = (ArrayNode) service(expiresAt).getMyOrders().body();
+        assertEquals(1, history.size());
+        JsonNode paid = history.get(0);
+        assertEquals(ORDER_ID, paid.path("maDon").asText());
+        assertEquals("DA_THANH_TOAN", paid.path("trangThai").asText());
+        assertEquals("100000", paid.path("tongTien").asText());
+        assertEquals("15000", paid.path("tienGiam").asText());
+        assertTrue(paid.path("thoiDiemHetHan").isNull());
+        assertEquals(expiresAt.minusMinutes(15).atZone(ZONE).toOffsetDateTime().toString(),
+                paid.path("ngayDat").asText());
+        assertEquals(TRIP_ID, paid.path("maChuyen").asText());
+        assertEquals("Route", paid.path("tuyenXe").asText());
+        assertEquals(expiresAt.plusDays(1).toLocalDate().toString(), paid.path("ngayKhoiHanh").asText());
+        assertEquals(LocalTime.NOON.toString(), paid.path("gioKhoiHanh").asText());
+
+        inTransaction(em -> {
+            DonDatVe preserved = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.DA_THANH_TOAN, preserved.trangThai);
+            assertEquals(0, preserved.tongTien.compareTo(new BigDecimal("100000")));
+            assertEquals(0, preserved.tienGiam.compareTo(new BigDecimal("15000")));
+            assertEquals(TrangThaiVe.DA_XUAT_VE, em.find(VeXe.class, "LEGACY_TICKET").trangThai);
+        });
+    }
+
+    @Test
     void frozenOrderGetUsesPersistedPriceAndKeepsPassengersWhenRouteFareChanges() {
         seedFrozenOrderWithPromotion("HIST");
         inTransaction(em -> em.find(TuyenXe.class, "ROUTE").giaCoBan = BigDecimal.valueOf(125000));
@@ -196,6 +280,63 @@ class BookingServiceExpiryTest {
         assertEquals("10000", frozen.tongTienGiam());
         assertEquals("90000", frozen.tongThanhToan());
         assertEquals("90000", frozen.chiTietGia().getFirst().thanhTien());
+    }
+
+    @Test
+    void quoteShowsActiveRefundPolicyAndPolicySwitchRejectsFreezeWithoutMutatingOrder() {
+        prepareSellableTrip();
+        createRefundPolicy("POLICY_BEFORE", TrangThaiChinhSach.HOAT_DONG, "80");
+
+        QuoteSnapshot quote = quote();
+        assertNotNull(quote.response().chinhSachHoanVe());
+        assertEquals("POLICY_BEFORE", quote.response().chinhSachHoanVe().maChinhSach());
+
+        switchActivePolicy("POLICY_BEFORE", "POLICY_AFTER", "60");
+        setRequest("POST", "/api/booking/" + ORDER_ID + "/chot-gia");
+        AccountException changed = assertThrows(AccountException.class, () -> service(expiresAt.minusMinutes(1))
+                .chotGia(ORDER_ID, new FreezeRequest(quote.response().maBaoGia()), "POLICY-SWITCH-KEY",
+                        List.of(passenger()), quote));
+        assertEquals("PRICE_CHANGED", changed.code());
+
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.CHO_XU_LY, order.trangThai);
+            assertEquals(0, order.tongTien.compareTo(BigDecimal.ZERO));
+            assertEquals(0, order.tienGiam.compareTo(BigDecimal.ZERO));
+            assertNull(order.chinhSachHoanVe);
+            assertEquals(TrangThaiGiuCho.DANG_GIU, em.find(GiuCho.class, HOLD_ID).trangThai);
+        });
+    }
+
+    @Test
+    void freezePersistsQuotedRefundPolicyAfterGlobalPolicySwitch() {
+        prepareSellableTrip();
+        createRefundPolicy("POLICY_FROZEN", TrangThaiChinhSach.HOAT_DONG, "80");
+        QuoteSnapshot quote = quote();
+
+        setRequest("POST", "/api/booking/" + ORDER_ID + "/chot-gia");
+        FreezePriceResponse frozen = (FreezePriceResponse) service(expiresAt.minusMinutes(1))
+                .chotGia(ORDER_ID, new FreezeRequest(quote.response().maBaoGia()), "POLICY-FREEZE-KEY",
+                        List.of(passenger()), quote).body();
+        assertNotNull(frozen.chinhSachHoanVe());
+        assertEquals("POLICY_FROZEN", frozen.chinhSachHoanVe().maChinhSach());
+
+        switchActivePolicy("POLICY_FROZEN", "POLICY_LATER", "55");
+
+        setRequest("GET", "/api/booking/" + ORDER_ID);
+        OrderResponse order = (OrderResponse) service(expiresAt.minusMinutes(1))
+                .getOrder(ORDER_ID, List.of(passenger())).body();
+        assertNotNull(order.chinhSachHoanVe());
+        assertEquals("POLICY_FROZEN", order.chinhSachHoanVe().maChinhSach());
+
+        setRequest("POST", "/api/booking/" + ORDER_ID + "/chot-gia");
+        FreezePriceResponse repeated = (FreezePriceResponse) service(expiresAt.minusMinutes(1))
+                .chotGia(ORDER_ID, new FreezeRequest(quote.response().maBaoGia()), "POLICY-REPEAT-KEY",
+                        List.of(passenger()), quote).body();
+        assertEquals("POLICY_FROZEN", repeated.chinhSachHoanVe().maChinhSach());
+
+        inTransaction(em -> assertEquals("POLICY_FROZEN",
+                em.find(DonDatVe.class, ORDER_ID).chinhSachHoanVe.maChinhSach));
     }
 
     @Test
@@ -348,6 +489,102 @@ class BookingServiceExpiryTest {
         });
     }
 
+    private QuoteSnapshot quote() {
+        setRequest("POST", "/api/booking/" + ORDER_ID + "/bao-gia");
+        return service(expiresAt.minusMinutes(1)).baoGia(ORDER_ID, new QuoteRequest(null), List.of(passenger()));
+    }
+
+    private void createRefundPolicy(String id, TrangThaiChinhSach status, String rate) {
+        inTransaction(em -> {
+            ChinhSachHoanVe policy = new ChinhSachHoanVe();
+            policy.maChinhSach = id;
+            policy.tenChinhSach = "Test refund policy " + id;
+            policy.soGioToiThieuTruocKhoiHanh = 24;
+            policy.tyLeHoan = new BigDecimal(rate);
+            policy.phiHoan = BigDecimal.ZERO;
+            policy.choPhepHoanVeKhuyenMai = true;
+            policy.trangThai = status;
+            em.persist(policy);
+        });
+    }
+
+    private void switchActivePolicy(String previousId, String nextId, String nextRate) {
+        inTransaction(em -> {
+            em.find(ChinhSachHoanVe.class, previousId).trangThai = TrangThaiChinhSach.TAM_NGUNG;
+            ChinhSachHoanVe next = new ChinhSachHoanVe();
+            next.maChinhSach = nextId;
+            next.tenChinhSach = "Test refund policy " + nextId;
+            next.soGioToiThieuTruocKhoiHanh = 24;
+            next.tyLeHoan = new BigDecimal(nextRate);
+            next.phiHoan = BigDecimal.ZERO;
+            next.choPhepHoanVeKhuyenMai = true;
+            next.trangThai = TrangThaiChinhSach.HOAT_DONG;
+            em.persist(next);
+        });
+    }
+
+    /** Give these policy tests the minimum valid operational state required for pricing. */
+    private void prepareSellableTrip() {
+        inTransaction(em -> {
+            NhaXe operator = em.find(NhaXe.class, "OP");
+            TuyenXe route = em.find(TuyenXe.class, "ROUTE");
+            route.trangThai = TrangThaiTuyenXe.DANG_KHAI_THAC;
+
+            LoaiXe vehicleType = new LoaiXe();
+            vehicleType.maLoaiXe = "BUS_TYPE";
+            vehicleType.tenLoaiXe = "Test bus";
+            vehicleType.soChoNgoi = 1;
+            vehicleType.soTang = 1;
+            em.persist(vehicleType);
+
+            Xe vehicle = em.find(Xe.class, "BUS");
+            vehicle.loaiXe = vehicleType;
+            vehicle.soChoNgoi = 1;
+            vehicle.nhaXe = operator;
+            vehicle.trangThai = TrangThaiXe.SAN_SANG;
+            vehicle.ngayDangKiem = LocalDate.of(2029, 1, 1);
+            vehicle.hanDangKiem = LocalDate.of(2040, 1, 1);
+
+            ChuyenXe trip = em.find(ChuyenXe.class, TRIP_ID);
+            trip.trangThai = TrangThaiChuyen.DANG_MO_BAN;
+            trip.gioDenDuKien = LocalDateTime.of(trip.ngayKhoiHanh, LocalTime.of(15, 0));
+
+            NhanVien driver = employee("DRIVER", "driver@example.test", "0900000001", LoaiNhanVien.TAI_XE, operator);
+            driver.soBangLai = "DL-TEST";
+            driver.ngayHetHanBangLai = LocalDate.of(2040, 1, 1);
+            NhanVien assistant = employee("ASSISTANT", "assistant@example.test", "0900000002", LoaiNhanVien.PHU_XE, operator);
+            em.persist(driver);
+            em.persist(assistant);
+
+            PhanCongChuyenXe chiefAssignment = new PhanCongChuyenXe();
+            chiefAssignment.maPhanCong = "ASSIGN_DRIVER";
+            chiefAssignment.chuyenXe = trip;
+            chiefAssignment.nhanVien = driver;
+            chiefAssignment.vaiTro = VaiTroChuyen.TAI_XE_CHINH;
+            em.persist(chiefAssignment);
+
+            PhanCongChuyenXe assistantAssignment = new PhanCongChuyenXe();
+            assistantAssignment.maPhanCong = "ASSIGN_ASSISTANT";
+            assistantAssignment.chuyenXe = trip;
+            assistantAssignment.nhanVien = assistant;
+            assistantAssignment.vaiTro = VaiTroChuyen.PHU_XE;
+            em.persist(assistantAssignment);
+        });
+    }
+
+    private static NhanVien employee(
+            String id, String email, String phone, LoaiNhanVien type, NhaXe operator) {
+        NhanVien employee = new NhanVien();
+        employee.maNhanVien = id;
+        employee.hoTen = id;
+        employee.soDienThoai = phone;
+        employee.email = email;
+        employee.loaiNhanVien = type;
+        employee.trangThai = TrangThaiNhanVien.DANG_LAM_VIEC;
+        employee.nhaXe = operator;
+        return employee;
+    }
+
     private void createBaseFixture(EntityManager em) {
         NguoiDung buyer = new NguoiDung();
         buyer.maNguoiDung = USER_ID;
@@ -410,6 +647,10 @@ class BookingServiceExpiryTest {
     private void setRequest(String method, String path) {
         RequestIdentity.set(new RequestIdentity.Context(
                 new CurrentUser(USER_ID, LoaiTaiKhoan.KHACH_HANG, null, null, SESSION_ID), method, path, null));
+    }
+
+    public static Boolean tryAdvisoryLock(Long ignored) {
+        return Boolean.TRUE;
     }
 
     private void inTransaction(java.util.function.Consumer<EntityManager> work) {

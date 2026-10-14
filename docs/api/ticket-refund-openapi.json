@@ -1,0 +1,4959 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Ticket refund API",
+    "version": "0.1.0-draft",
+    "description": "Focused contract for T19 refund, refund policy, booking price policy snapshots, and ticket QR state. E02 direct cancellation remains proposed."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Gốc triển khai; các path bên dưới đã gồm tiền tố /api."
+    }
+  ],
+  "tags": [
+    {
+      "name": "B — Giữ chỗ và đơn đặt vé"
+    },
+    {
+      "name": "C — Báo giá và phương thức thanh toán"
+    },
+    {
+      "name": "D — Thanh toán và vé điện tử"
+    },
+    {
+      "name": "E — Hủy vé và hoàn tiền"
+    }
+  ],
+  "paths": {
+    "/api/booking/{maDon}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/BookingMaDon"
+        }
+      ],
+      "get": {
+        "tags": [
+          "B — Giữ chỗ và đơn đặt vé"
+        ],
+        "operationId": "getBookingOrder",
+        "summary": "B02/B05 Get an order and its current preview",
+        "description": "KHACH_HANG only; the caller must own the order. Passenger data is returned only when this authenticated account and order have a snapshot in the current JSESSIONID. A new servlet session still loads the persisted order and holds, with hanhKhach=[] and coTheChotGia=false. Paid orders remain readable; maChuyen is derived from holds or tickets. Historical orders without holds may have thoiDiemBatDau and thoiDiemHetHan null. A GET reports an invalid selected promotion without clearing it from storage. When expiry is first detected, it commits the hold and order as HET_HAN and returns 409 HOLD_EXPIRED.",
+        "x-roles": [
+          "KHACH_HANG"
+        ],
+        "responses": {
+          "200": {
+            "description": "Current order, holds, issued tickets, and price preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingOrderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/BookingUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/BookingForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/BookingNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BookingConflict"
+          }
+        },
+        "x-api-id": "B02/B05",
+        "x-contract-status": "implemented"
+      },
+      "patch": {
+        "tags": [
+          "B — Giữ chỗ và đơn đặt vé"
+        ],
+        "operationId": "patchBookingContact",
+        "summary": "B03 Update order contact fields",
+        "description": "KHACH_HANG only; owner access. Only khachDatTen, khachDatSoDienThoai, and ghiChu are accepted. At least one field is required. PATCH does not extend the hold. PostgreSQL stores a redacted idempotency response with hanhKhach=[] and coTheChotGia=false. A complete response replay is available only if the full response cache was written and remains in the current HTTP session. The cache may be absent after a crash between database commit and the session write, or after session loss; retry then returns the redacted database order state. Read the order to verify the current session snapshot or re-enter passengers if the session was lost.",
+        "x-roles": [
+          "KHACH_HANG"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BookingCsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/BookingIdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingContactPatch"
+              },
+              "example": {
+                "khachDatTen": "Nguyen Van A",
+                "khachDatSoDienThoai": "0900000001",
+                "ghiChu": null
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingOrderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BookingBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/BookingUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/BookingForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/BookingNotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BookingConflict"
+          }
+        },
+        "x-api-id": "B03",
+        "x-contract-status": "implemented"
+      }
+    },
+    "/api/booking/{maDon}/bao-gia": {
+      "post": {
+        "tags": [
+          "C — Báo giá và phương thức thanh toán"
+        ],
+        "operationId": "previewBaoGia",
+        "summary": "[C01] Tính báo giá và mã khuyến mãi",
+        "description": "Tính báo giá xem trước; không giữ lượt khuyến mãi. Báo giá gắn với đơn và không vượt thời hạn giữ chỗ.\nYêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn; máy chủ tính giá, không nhận giá do client tự tính.\nMã khuyến mãi là phạm vi dùng chung; diagram chưa có trường để giới hạn theo nhà xe hoặc tuyến.\nT16 có thể trả preview thập phân chính xác; T17 làm tròn tổng giảm HALF_UP khi chốt.",
+        "x-api-id": "C01",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ chủ đơn; không nhận giá do client tính.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/MaDon"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequest"
+              },
+              "examples": {
+                "withPromotion": {
+                  "value": {
+                    "maKhuyenMai": "KM10"
+                  }
+                },
+                "withoutPromotion": {
+                  "value": {
+                    "maKhuyenMai": null
+                  }
+                }
+              },
+              "x-invalid-examples": {
+                "invalidPromotionType": {
+                  "value": {
+                    "maKhuyenMai": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Báo giá preview theo từng ghế.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteResponse"
+                },
+                "examples": {
+                  "withPromotion": {
+                    "value": {
+                      "maBaoGia": "BG01",
+                      "maDon": "DDV01",
+                      "donViTienTe": "VND",
+                      "thoiDiemBaoGia": "2026-10-11T09:32:00+07:00",
+                      "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
+                      "tongTienGoc": "400000",
+                      "tongTienGiam": "40000",
+                      "tongThanhToan": "360000",
+                      "chiTietGia": [
+                        {
+                          "maGhe": "G11",
+                          "giaGoc": "200000",
+                          "tienGiam": "20000",
+                          "thanhTien": "180000"
+                        },
+                        {
+                          "maGhe": "G12",
+                          "giaGoc": "200000",
+                          "tienGiam": "20000",
+                          "thanhTien": "180000"
+                        }
+                      ],
+                      "ketQuaKhuyenMai": {
+                        "hopLe": true,
+                        "duocGiam": "40000"
+                      },
+                      "chinhSachHoanVe": null
+                    }
+                  },
+                  "noPromotion": {
+                    "value": {
+                      "maBaoGia": "BG02",
+                      "maDon": "DDV01",
+                      "donViTienTe": "VND",
+                      "thoiDiemBaoGia": "2026-10-11T09:32:10+07:00",
+                      "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
+                      "tongTienGoc": "400000",
+                      "tongTienGiam": "0",
+                      "tongThanhToan": "400000",
+                      "chiTietGia": [
+                        {
+                          "maGhe": "G11",
+                          "giaGoc": "200000",
+                          "tienGiam": "0",
+                          "thanhTien": "200000"
+                        },
+                        {
+                          "maGhe": "G12",
+                          "giaGoc": "200000",
+                          "tienGiam": "0",
+                          "thanhTien": "200000"
+                        }
+                      ],
+                      "ketQuaKhuyenMai": null,
+                      "chinhSachHoanVe": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu body không hợp lệ.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "invalidPromotionType": {
+                    "value": {
+                      "code": "VALIDATION_ERROR",
+                      "message": "Request không hợp lệ.",
+                      "details": {
+                        "fieldErrors": [
+                          {
+                            "field": "maKhuyenMai",
+                            "code": "INVALID_TYPE",
+                            "message": "Mã khuyến mãi phải là chuỗi hoặc null."
+                          }
+                        ]
+                      },
+                      "timestamp": "2026-10-11T09:30:00+07:00",
+                      "traceId": "req-quote-validation-001"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/PromotionConflict"
+          }
+        }
+      }
+    },
+    "/api/booking/{maDon}/chot-gia": {
+      "post": {
+        "tags": [
+          "C — Báo giá và phương thức thanh toán"
+        ],
+        "operationId": "chotGia",
+        "summary": "[C02] Chốt snapshot giá đơn",
+        "description": "Chốt đúng báo giá đã gửi; không tự tính hoặc chốt một giá khác. C02 kiểm tra lại quota trong cùng transaction,\nchuyển đơn sang CHO_THANH_TOAN và giữ các ghế ở DANG_GIU; không tạo vé.\nMã khuyến mãi không có phạm vi riêng theo nhà xe hoặc tuyến vì diagram không có trường scope.\nDatabase chỉ lưu tổng gốc, tổng giảm và mã áp dụng trên đơn; dòng phân bổ được dựng lại từ dữ liệu đã chốt.\nYêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ đơn.",
+        "x-api-id": "C02",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ chủ đơn; cập nhật snapshot nguyên tử và quota logic trong một transaction.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/MaDon"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FreezePriceRequest"
+              },
+              "examples": {
+                "freezeQuote": {
+                  "value": {
+                    "maBaoGia": "BG01"
+                  }
+                }
+              },
+              "x-invalid-examples": {
+                "missingQuoteId": {
+                  "value": {}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Snapshot giá đã được chốt.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FreezePriceResponse"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "maBaoGia": "BG01",
+                      "maDon": "DDV01",
+                      "donViTienTe": "VND",
+                      "trangThaiDon": "CHO_THANH_TOAN",
+                      "thoiDiemHetHan": "2026-10-11T09:45:00+07:00",
+                      "tongTienGoc": "400000",
+                      "tongTienGiam": "40000",
+                      "tongThanhToan": "360000",
+                      "chiTietGia": [
+                        {
+                          "maGhe": "G11",
+                          "giaGoc": "200000",
+                          "tienGiam": "20000",
+                          "thanhTien": "180000"
+                        },
+                        {
+                          "maGhe": "G12",
+                          "giaGoc": "200000",
+                          "tienGiam": "20000",
+                          "thanhTien": "180000"
+                        }
+                      ],
+                      "ketQuaKhuyenMai": {
+                        "hopLe": true,
+                        "duocGiam": "40000"
+                      },
+                      "chinhSachHoanVe": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu body không hợp lệ.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missingQuoteId": {
+                    "value": {
+                      "code": "VALIDATION_ERROR",
+                      "message": "Request không hợp lệ.",
+                      "details": {
+                        "fieldErrors": [
+                          {
+                            "field": "maBaoGia",
+                            "code": "REQUIRED",
+                            "message": "Cần gửi mã báo giá."
+                          }
+                        ]
+                      },
+                      "timestamp": "2026-10-11T09:30:00+07:00",
+                      "traceId": "req-freeze-validation-001"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/QuoteConflict"
+          }
+        }
+      }
+    },
+    "/api/booking/{maDon}/hoan-tien/du-kien": {
+      "post": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "previewBookingRefund",
+        "summary": "Xem trước hoàn vé theo đơn",
+        "description": "Chỉ tính preview; không tạo yêu cầu hoàn hoặc đổi trạng thái vé.",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ chủ đơn.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/MaDon"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Số tiền hoàn dự kiến và dòng tính theo từng vé.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      }
+    },
+    "/api/booking/{maDon}/hoan-tien": {
+      "post": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "createBookingRefund",
+        "summary": "Gửi yêu cầu hoàn vé theo đơn",
+        "description": "Một yêu cầu hoàn cho danh sách vé; 202 chỉ xác nhận đã nhận, không xác nhận tiền đã hoàn.",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ chủ đơn.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/MaDon"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Yêu cầu đã nhận; trạng thái cuối phụ thuộc kết quả đã đối soát.",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/RefundLocation"
+              },
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      }
+    },
+    "/api/ve-xe/{maVe}": {
+      "get": {
+        "tags": [
+          "D — Thanh toán và vé điện tử"
+        ],
+        "operationId": "getVeXe",
+        "summary": "[D05] Xem vé điện tử",
+        "description": "Xem vé điện tử đã phát hành.\nYêu cầu đăng nhập. Quyền: khách hàng (KH), nhân viên (NV), nhà xe (NX), quản trị viên (AD). Phạm vi: KH theo chủ đơn; NV theo chuyến được phân công; NX theo phạm vi; AD theo quyền quản trị.",
+        "x-api-id": "D05",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH",
+          "NV",
+          "NX",
+          "AD"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "KH theo chủ đơn; NV theo chuyến được phân công; NX theo phạm vi; AD theo quyền quản trị.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaVe"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vé và dữ liệu QR do server cấp.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketResponse"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "maVe": "VE01",
+                      "maDon": "DDV01",
+                      "maChuyen": "CX01",
+                      "maGhe": "G11",
+                      "hoTenHanhKhach": "Nguyen Van A",
+                      "trangThai": "DA_XUAT_VE",
+                      "giaGoc": "200000",
+                      "tienGiam": "20000",
+                      "thanhTien": "180000",
+                      "donViTienTe": "VND",
+                      "qrToken": "opaque-server-token",
+                      "thoiDiemPhatHanh": "2026-10-11T09:40:00+07:00",
+                      "dangHoan": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/ve-xe/{maVe}/chinh-sach-hoan": {
+      "get": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "getRefundPolicy",
+        "summary": "[E01] Xem điều kiện và tiền hoàn dự kiến",
+        "description": "Xem chính sách và số tiền hoàn dự kiến; thao tác này không tạo yêu cầu hoàn hoặc đổi trạng thái vé.\nYêu cầu đăng nhập. Quyền: khách hàng (KH). Phạm vi: chỉ chủ vé; máy chủ tính số tiền và khả năng hoàn theo chính sách.",
+        "x-api-id": "E01",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ chủ vé; máy chủ tính tiền và khả năng hoàn theo chính sách.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaVe"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preview có thể thay đổi trước khi tạo yêu cầu hoàn.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPolicyResponse"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "maVe": "VE01",
+                      "chinhSach": {
+                        "maChinhSach": "CS01",
+                        "tenChinhSach": "Demo",
+                        "soGioToiThieuTruocKhoiHanh": 24,
+                        "tyLeHoan": 80,
+                        "phiHoan": "0",
+                        "choPhepHoanVeKhuyenMai": true,
+                        "trangThai": "HOAT_DONG"
+                      },
+                      "duocYeuCauHoan": true,
+                      "soTienDuKienHoan": "144000",
+                      "donViTienTe": "VND",
+                      "lyDoKhongDuocHoan": null,
+                      "thoiDiemTinh": "2026-10-11T10:00:00+07:00"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/ve-xe/{maVe}/hoan-tien": {
+      "post": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "createRefund",
+        "summary": "[E03] Gửi yêu cầu hoàn tiền cho một vé",
+        "description": "Máy chủ xác định số tiền hoàn từ chính sách snapshot và các dòng vé đã chọn. Trả 202 khi đã nhận yêu cầu xử lý; điều đó chưa khẳng định tiền đã được hoàn. Body là JSON object; lyDo tùy chọn.\nYêu cầu đăng nhập. Quyền: khách hàng (KH), chỉ chủ vé. Đây là yêu cầu hoàn; 202 chưa xác nhận tiền đã hoàn.",
+        "x-api-id": "E03",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ chủ vé.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/MaVe"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundRequest"
+              },
+              "examples": {
+                "request": {
+                  "value": {
+                    "lyDo": "Thay đổi kế hoạch"
+                  }
+                },
+                "withoutReason": {
+                  "value": {}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Yêu cầu hoàn đã nhận; trạng thái cuối phụ thuộc workflow/provider.",
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/RefundLocation"
+              },
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                },
+                "examples": {
+                  "accepted": {
+                    "value": {
+                      "maHoanTien": "HT01",
+                      "maDon": "DDV01",
+                      "maGiaoDichGoc": "GD01",
+                      "maChinhSach": "CS01",
+                      "soTienHoan": "144000",
+                      "donViTienTe": "VND",
+                      "trangThai": "CHO_XU_LY",
+                      "chiTiet": [
+                        {
+                          "maVe": "VE01",
+                          "giaThucTra": "180000",
+                          "tyLeHoan": "80",
+                          "phiHoan": "0",
+                          "soTienHoan": "144000"
+                        }
+                      ],
+                      "thoiDiemTao": "2026-10-11T10:00:00+07:00",
+                      "thoiDiemXacNhan": null,
+                      "maGiaoDichCong": null,
+                      "lyDoLoi": null,
+                      "lichSu": [
+                        {
+                          "thaoTac": "TAO_YEU_CAU",
+                          "maRequestCong": null,
+                          "maKetQua": null,
+                          "maGiaoDichCong": null,
+                          "thoiDiem": "2026-10-11T10:00:00+07:00"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "415": {
+            "$ref": "#/components/responses/UnsupportedMediaType"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "listTicketRefunds",
+        "summary": "[E05] Lịch sử yêu cầu hoàn của vé",
+        "description": "Liệt kê lịch sử yêu cầu hoàn tiền đã được hệ thống ghi nhận cho vé; dữ liệu lấy từ lịch sử nội bộ.\nYêu cầu đăng nhập. Quyền: KH theo chủ đơn; ADMIN; NHA_XE theo nhà xe sở hữu chuyến.",
+        "x-api-id": "E05",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH",
+          "ADMIN",
+          "NHA_XE"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "KH theo chủ đơn; ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaVe"
+          },
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Size"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "description": "Allowlist field,asc|desc; mặc định thoiDiemTao,asc.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "thoiDiemTao,asc",
+                "thoiDiemTao,desc"
+              ],
+              "default": "thoiDiemTao,asc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trang lịch sử yêu cầu hoàn của vé.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/PageResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RefundResponse"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "items": [],
+                      "page": 1,
+                      "size": 20,
+                      "totalItems": 0,
+                      "totalPages": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/hoan-tien/{maHoanTien}": {
+      "get": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "getRefund",
+        "summary": "[E04] Tra cứu yêu cầu hoàn tiền",
+        "description": "Tra cứu yêu cầu hoàn tiền và trạng thái kỹ thuật. `maGiaoDichGoc` liên kết bản ghi hoàn với giao dịch nguồn; nó không chứng minh lần thanh toán gốc thành công.\nYêu cầu đăng nhập. Quyền: KH theo chủ đơn; ADMIN; NHA_XE theo nhà xe sở hữu chuyến.",
+        "x-api-id": "E04",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH",
+          "ADMIN",
+          "NHA_XE"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "KH theo chủ đơn; ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MaHoanTien"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bản ghi yêu cầu hoàn và trạng thái kỹ thuật hiện tại. Không phải bằng chứng cho lần thanh toán gốc.",
+            "headers": {
+              "X-Trace-Id": {
+                "$ref": "#/components/headers/TraceId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                },
+                "examples": {
+                  "success": {
+                    "value": {
+                      "maHoanTien": "HT01",
+                      "maDon": "DDV01",
+                      "maGiaoDichGoc": "GD01",
+                      "maChinhSach": "CS01",
+                      "soTienHoan": "144000",
+                      "donViTienTe": "VND",
+                      "trangThai": "CHO_XU_LY",
+                      "chiTiet": [
+                        {
+                          "maVe": "VE01",
+                          "giaThucTra": "180000",
+                          "tyLeHoan": "80",
+                          "phiHoan": "0",
+                          "soTienHoan": "144000"
+                        }
+                      ],
+                      "thoiDiemTao": "2026-10-11T10:00:00+07:00",
+                      "thoiDiemXacNhan": null,
+                      "maGiaoDichCong": null,
+                      "lyDoLoi": null,
+                      "lichSu": [
+                        {
+                          "thaoTac": "TAO_YEU_CAU",
+                          "maRequestCong": null,
+                          "maKetQua": null,
+                          "maGiaoDichCong": null,
+                          "thoiDiem": "2026-10-11T10:00:00+07:00"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/hoan-tien/{maHoanTien}/xac-minh": {
+      "post": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "verifyRefund",
+        "summary": "Đối soát kết quả hoàn đang chờ hoặc chưa rõ",
+        "description": "Gọi QueryDR bằng đúng mã tương quan của yêu cầu gốc. Không gửi lại yêu cầu hoàn.",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "KH",
+          "ADMIN",
+          "NHA_XE"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "KH theo chủ đơn; ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/MaHoanTien"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "maxProperties": 0,
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Trạng thái hoàn sau khi xác minh hoặc trạng thái chưa đổi nếu không đủ điều kiện đối soát.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      }
+    },
+    "/api/hoan-tien/{maHoanTien}/thu-lai": {
+      "post": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "retryRefund",
+        "summary": "Thử lại yêu cầu hoàn đã xác nhận thất bại",
+        "description": "Chỉ cho phép sau trạng thái THAT_BAI; giữ nguyên mã yêu cầu và tương quan thanh toán gốc.",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "ADMIN",
+          "NHA_XE"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "ADMIN theo quyền quản trị; NHA_XE theo nhà xe sở hữu chuyến.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          },
+          {
+            "$ref": "#/components/parameters/MaHoanTien"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "maxProperties": 0,
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Yêu cầu thử lại đã nhận; chưa xác nhận tiền đã hoàn.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      }
+    },
+    "/api/quan-tri/chinh-sach-hoan-ve": {
+      "get": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "listRefundPolicies",
+        "summary": "Danh sách chính sách hoàn vé",
+        "description": "Admin-only. Trang bắt đầu từ 1, mặc định 1; size từ 1 đến 100, mặc định 20.",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ quản trị viên.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Page"
+          },
+          {
+            "$ref": "#/components/parameters/Size"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trang chính sách hoàn vé.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPolicyPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "createRefundPolicy",
+        "summary": "Tạo chính sách hoàn vé",
+        "description": "Admin-only. Tỷ lệ là JSON number; phiHoan là chuỗi VND nguyên.",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ quản trị viên.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundPolicyCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Chính sách được tạo.",
+            "headers": {
+              "Location": {
+                "description": "URL chi tiết chính sách mới",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      }
+    },
+    "/api/quan-tri/chinh-sach-hoan-ve/{maChinhSach}": {
+      "parameters": [
+        {
+          "name": "maChinhSach",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "getRefundPolicyAdmin",
+        "summary": "Xem chính sách hoàn vé",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ quản trị viên.",
+        "responses": {
+          "200": {
+            "description": "Chính sách hoàn vé.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "updateRefundPolicy",
+        "summary": "Cập nhật chính sách hoàn vé",
+        "description": "Mã chính sách lấy từ URL; body không nhận maChinhSach.",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ quản trị viên.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundPolicyUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chính sách sau cập nhật.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      }
+    },
+    "/api/quan-tri/chinh-sach-hoan-ve/{maChinhSach}/trang-thai": {
+      "put": {
+        "tags": [
+          "E — Hủy vé và hoàn tiền"
+        ],
+        "operationId": "updateRefundPolicyStatus",
+        "summary": "Đổi trạng thái chính sách hoàn vé",
+        "x-contract-status": "implemented",
+        "x-roles": [
+          "ADMIN"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "x-authentication-required": true,
+        "x-ownership": "Chỉ quản trị viên.",
+        "parameters": [
+          {
+            "name": "maChinhSach",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundPolicyStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chính sách sau đổi trạng thái.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthenticated"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/RefundConflict"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "datvexe_session"
+      }
+    },
+    "headers": {
+      "TraceId": {
+        "description": "Mã truy vết do máy chủ tạo hoặc kiểm soát; có cùng giá trị với traceId trong phản hồi lỗi.",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "IdempotencyKey": {
+        "description": "Key do client sinh; cùng key và cùng payload trả lại cùng kết quả.",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        }
+      },
+      "OrderLocation": {
+        "description": "URI tài nguyên đơn vừa tạo.",
+        "schema": {
+          "type": "string",
+          "format": "uri-reference",
+          "example": "/api/booking/DDV01"
+        }
+      },
+      "PaymentLocation": {
+        "description": "URI tra cứu lần thanh toán đã ghi nhận.",
+        "schema": {
+          "type": "string",
+          "format": "uri-reference",
+          "example": "/api/thanh-toan/GD01"
+        }
+      },
+      "RefundLocation": {
+        "description": "URI tra cứu yêu cầu hoàn đã nhận.",
+        "schema": {
+          "type": "string",
+          "format": "uri-reference",
+          "example": "/api/hoan-tien/HT01"
+        }
+      }
+    },
+    "parameters": {
+      "BookingCsrfToken": {
+        "name": "X-CSRF-Token",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "BookingIdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "BookingMaDon": {
+        "name": "maDon",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/BookingId"
+        }
+      },
+      "BookingMaGhe": {
+        "name": "maGhe",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/BookingId"
+        }
+      },
+      "CsrfToken": {
+        "in": "header",
+        "name": "X-CSRF-Token",
+        "required": true,
+        "description": "Lấy từ đăng nhập hoặc GET /api/tai-khoan/me.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "description": "Số trang bắt đầu từ 1; mặc định 1.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "Size": {
+        "name": "size",
+        "in": "query",
+        "required": false,
+        "description": "Kích thước trang; mặc định 20, tối đa 100.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Bắt buộc cho thao tác ghi có thể retry. Key gắn với request payload và chủ thể.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        }
+      },
+      "MaChuyen": {
+        "name": "maChuyen",
+        "in": "path",
+        "required": true,
+        "description": "Mã chuyến opaque.",
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      },
+      "MaDon": {
+        "name": "maDon",
+        "in": "path",
+        "required": true,
+        "description": "Mã đơn opaque.",
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      },
+      "MaVe": {
+        "name": "maVe",
+        "in": "path",
+        "required": true,
+        "description": "Mã vé opaque.",
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      },
+      "MaGiaoDich": {
+        "name": "maGiaoDich",
+        "in": "path",
+        "required": true,
+        "description": "Mã giao dịch nội bộ, không phải mã giao dịch cổng.",
+        "schema": {
+          "$ref": "#/components/schemas/TransactionId"
+        }
+      },
+      "MaHoanTien": {
+        "name": "maHoanTien",
+        "in": "path",
+        "required": true,
+        "description": "Mã yêu cầu hoàn opaque.",
+        "schema": {
+          "$ref": "#/components/schemas/Id"
+        }
+      }
+    },
+    "responses": {
+      "BookingBadRequest": {
+        "description": "Invalid request or validation error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/BookingErrorResponse"
+            }
+          }
+        }
+      },
+      "BookingUnauthorized": {
+        "description": "Missing or expired session.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/BookingErrorResponse"
+            }
+          }
+        }
+      },
+      "BookingForbidden": {
+        "description": "Wrong role, CSRF failure, or caller does not own the order.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/BookingErrorResponse"
+            }
+          }
+        }
+      },
+      "BookingNotFound": {
+        "description": "Order, trip, or seat not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/BookingErrorResponse"
+            }
+          }
+        }
+      },
+      "BookingConflict": {
+        "description": "Seat unavailable, hold expired, invalid state, or idempotency conflict.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/BookingErrorResponse"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Request, query hoặc header sai định dạng; fieldErrors chỉ xuất hiện khi được xác định.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "validationError": {
+                "value": {
+                  "code": "VALIDATION_ERROR",
+                  "message": "Request không hợp lệ.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:00+07:00",
+                  "traceId": "req-validation-001"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Unauthenticated": {
+        "description": "Chưa đăng nhập, phiên hết hạn/thu hồi hoặc tài khoản không hoạt động; xác thực cookie theo T07.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "unauthenticated": {
+                "value": {
+                  "code": "UNAUTHENTICATED",
+                  "message": "Cần xác thực.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:00+07:00",
+                  "traceId": "req-auth-001"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Đã xác thực nhưng không đủ quyền hoặc ngoài phạm vi.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "forbidden": {
+                "value": {
+                  "code": "FORBIDDEN",
+                  "message": "Không có quyền thực hiện thao tác.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:00+07:00",
+                  "traceId": "req-auth-002"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Không tìm thấy hoặc không được phép biết tài nguyên tồn tại.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "notFound": {
+                "value": {
+                  "code": "RESOURCE_NOT_FOUND",
+                  "message": "Không tìm thấy tài nguyên.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:00+07:00",
+                  "traceId": "req-not-found-001"
+                }
+              }
+            }
+          }
+        }
+      },
+      "StateConflict": {
+        "description": "409 khi trạng thái hiện tại không cho phép thao tác. Cùng Idempotency-Key với nội dung khác trả IDEMPOTENCY_KEY_REUSED; yêu cầu cùng key đang xử lý trả REQUEST_IN_PROGRESS.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "conflict": {
+                "value": {
+                  "code": "INVALID_STATE_TRANSITION",
+                  "message": "Trạng thái hiện tại không cho phép thao tác.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:00+07:00",
+                  "traceId": "req-conflict-001"
+                }
+              },
+              "idempotencyKeyReused": {
+                "value": {
+                  "code": "IDEMPOTENCY_KEY_REUSED",
+                  "message": "Idempotency-Key đã được dùng với nội dung khác.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:01+07:00",
+                  "traceId": "req-conflict-002"
+                }
+              },
+              "requestInProgress": {
+                "value": {
+                  "code": "REQUEST_IN_PROGRESS",
+                  "message": "Yêu cầu cùng key vẫn đang xử lý.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:02+07:00",
+                  "traceId": "req-conflict-003"
+                }
+              }
+            }
+          }
+        }
+      },
+      "HoldExpired": {
+        "description": "Quyền giữ của đơn đã hết hạn.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "expired": {
+                "value": {
+                  "code": "HOLD_EXPIRED",
+                  "message": "Quyền giữ chỗ của đơn đã hết hạn.",
+                  "details": {
+                    "maDon": "DDV01",
+                    "thoiDiemHetHan": "2026-10-11T09:45:00+07:00"
+                  },
+                  "timestamp": "2026-10-11T09:46:00+07:00",
+                  "traceId": "req-order-003"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PromotionConflict": {
+        "description": "Mã khuyến mãi không áp dụng được theo điều kiện hiện tại.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "notApplicable": {
+                "value": {
+                  "code": "PROMOTION_NOT_APPLICABLE",
+                  "message": "Mã khuyến mãi không áp dụng được.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:32:00+07:00",
+                  "traceId": "req-quote-001"
+                }
+              }
+            }
+          }
+        }
+      },
+      "QuoteConflict": {
+        "description": "409 khi báo giá hết hạn, giá thay đổi hoặc quota khuyến mãi không còn. Cùng Idempotency-Key với nội dung khác trả IDEMPOTENCY_KEY_REUSED; yêu cầu cùng key đang xử lý trả REQUEST_IN_PROGRESS.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "quoteExpired": {
+                "value": {
+                  "code": "QUOTE_EXPIRED",
+                  "message": "Báo giá hết hiệu lực; hãy tính lại.",
+                  "details": {
+                    "maBaoGia": "BG01"
+                  },
+                  "timestamp": "2026-10-11T09:46:00+07:00",
+                  "traceId": "req-price-004"
+                }
+              },
+              "priceChanged": {
+                "value": {
+                  "code": "PRICE_CHANGED",
+                  "message": "Giá đã thay đổi; hãy tính lại báo giá.",
+                  "details": {
+                    "maDon": "DDV01"
+                  },
+                  "timestamp": "2026-10-11T09:46:01+07:00",
+                  "traceId": "req-price-005"
+                }
+              },
+              "promotionExhausted": {
+                "value": {
+                  "code": "PROMOTION_EXHAUSTED",
+                  "message": "Mã khuyến mãi đã hết lượt.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:46:02+07:00",
+                  "traceId": "req-price-006"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PaymentConflict": {
+        "description": "409 khi phương thức không hợp lệ, giá chưa chốt hoặc lần thanh toán khác đang xử lý. Cùng Idempotency-Key với nội dung khác trả IDEMPOTENCY_KEY_REUSED; yêu cầu cùng key đang xử lý trả REQUEST_IN_PROGRESS.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "processing": {
+                "value": {
+                  "code": "PAYMENT_PROCESSING",
+                  "message": "Có lần thanh toán đang xử lý; hãy tra cứu trước.",
+                  "details": {
+                    "maGiaoDich": "GD01"
+                  },
+                  "timestamp": "2026-10-11T09:33:01+07:00",
+                  "traceId": "req-pay-005"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RefundConflict": {
+        "description": "409 khi trạng thái vé không cho phép hủy/hoàn hoặc đã có yêu cầu hoàn đang xử lý. Cùng Idempotency-Key với nội dung khác trả IDEMPOTENCY_KEY_REUSED; yêu cầu cùng key đang xử lý trả REQUEST_IN_PROGRESS.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "refundNotAllowed": {
+                "value": {
+                  "code": "REFUND_NOT_ALLOWED",
+                  "message": "Vé chưa đủ điều kiện gửi yêu cầu hoàn tiền.",
+                  "details": {
+                    "maVe": "VE01"
+                  },
+                  "timestamp": "2026-10-11T10:00:01+07:00",
+                  "traceId": "req-refund-006"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Lỗi nội bộ; không trả stack trace hoặc dữ liệu nhạy cảm.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "internalError": {
+                "value": {
+                  "code": "INTERNAL_ERROR",
+                  "message": "Đã xảy ra lỗi nội bộ.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:00+07:00",
+                  "traceId": "req-error-001"
+                }
+              }
+            }
+          }
+        }
+      },
+      "UnsupportedMediaType": {
+        "description": "Content-Type không được hỗ trợ.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "unsupportedMediaType": {
+                "value": {
+                  "code": "UNSUPPORTED_MEDIA_TYPE",
+                  "message": "Chỉ hỗ trợ application/json.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:30:00+07:00",
+                  "traceId": "req-media-001"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ProviderError": {
+        "description": "Phụ thuộc thanh toán hoặc hoàn tiền gặp lỗi; tra cứu ID đã cấp trước khi retry.",
+        "headers": {
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "providerError": {
+                "value": {
+                  "code": "PAYMENT_PROVIDER_ERROR",
+                  "message": "Dịch vụ thanh toán chưa phản hồi ổn định.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:33:02+07:00",
+                  "traceId": "req-provider-001"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Dịch vụ tạm thời chưa sẵn sàng.",
+        "headers": {
+          "Retry-After": {
+            "description": "Thời gian chờ trước khi thử lại, theo giây.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "X-Trace-Id": {
+            "$ref": "#/components/headers/TraceId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "unavailable": {
+                "value": {
+                  "code": "SERVICE_UNAVAILABLE",
+                  "message": "Dịch vụ tạm thời chưa sẵn sàng.",
+                  "details": {},
+                  "timestamp": "2026-10-11T09:33:03+07:00",
+                  "traceId": "req-provider-002"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "BookingId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40
+      },
+      "BookingTimestamp": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "BookingDecimalMoney": {
+        "type": "string",
+        "pattern": "^[0-9]+(\\.[0-9]+)?$",
+        "description": "Exact decimal preview value; unlike T05 integer-VND contracts, no rounding or scale reduction occurs before T17 price freeze."
+      },
+      "BookingHoldRequest": {
+        "type": "object",
+        "required": [
+          "maChuyen",
+          "danhSachMaGhe"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "danhSachMaGhe": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/BookingId"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingSeatHold": {
+        "type": "object",
+        "required": [
+          "maGiuCho",
+          "maGhe",
+          "trangThai",
+          "thoiDiemBatDau",
+          "thoiDiemHetHan"
+        ],
+        "properties": {
+          "maGiuCho": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "trangThai": {
+            "type": "string",
+            "enum": [
+              "DANG_GIU",
+              "DA_XAC_NHAN",
+              "HET_HAN",
+              "DA_HUY"
+            ]
+          },
+          "thoiDiemBatDau": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          },
+          "thoiDiemHetHan": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingHoldSeatResponse": {
+        "type": "object",
+        "required": [
+          "maDon",
+          "maChuyen",
+          "trangThaiDon",
+          "serverTime",
+          "thoiDiemBatDau",
+          "thoiDiemHetHan",
+          "danhSachGheGiu",
+          "danhSachGiuCho"
+        ],
+        "properties": {
+          "maDon": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "trangThaiDon": {
+            "type": "string"
+          },
+          "serverTime": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          },
+          "thoiDiemBatDau": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          },
+          "thoiDiemHetHan": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          },
+          "danhSachGheGiu": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingId"
+            }
+          },
+          "danhSachGiuCho": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingSeatHold"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingContactPatch": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "khachDatTen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "khachDatSoDienThoai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "khachDatEmail": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254
+          },
+          "ghiChu": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingPassenger": {
+        "type": "object",
+        "required": [
+          "maGhe",
+          "hoTen",
+          "soDienThoai"
+        ],
+        "properties": {
+          "maGhe": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "hoTen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "soDienThoai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "cccd": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingPassengerUpdate": {
+        "type": "object",
+        "required": [
+          "hanhKhach"
+        ],
+        "properties": {
+          "hanhKhach": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/BookingPassenger"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingSeatSwapRequest": {
+        "type": "object",
+        "required": [
+          "maGheCu",
+          "maGheMoi"
+        ],
+        "properties": {
+          "maGheCu": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "maGheMoi": {
+            "$ref": "#/components/schemas/BookingId"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingPromotionSelection": {
+        "type": "object",
+        "required": [
+          "maKhuyenMai"
+        ],
+        "properties": {
+          "maKhuyenMai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingSeatHoldSummary": {
+        "type": "object",
+        "required": [
+          "maGiuCho",
+          "maGhe",
+          "trangThai",
+          "thoiDiemBatDau",
+          "thoiDiemHetHan"
+        ],
+        "properties": {
+          "maGiuCho": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "trangThai": {
+            "type": "string"
+          },
+          "thoiDiemBatDau": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          },
+          "thoiDiemHetHan": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingOrderTicket": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "maTraCuu",
+          "qrImage",
+          "maGhe",
+          "hoTen",
+          "soDienThoai",
+          "cccd",
+          "giaVe",
+          "trangThai",
+          "ngayXuatVe",
+          "dangHoan"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "maTraCuu": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 5
+          },
+          "qrImage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Null khi vé đang bị khóa bởi yêu cầu hoàn hoặc vé đã hoàn/không còn hiệu lực."
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "hoTen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "soDienThoai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "cccd": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "giaVe": {
+            "$ref": "#/components/schemas/BookingDecimalMoney"
+          },
+          "trangThai": {
+            "type": "string",
+            "enum": [
+              "DA_XUAT_VE",
+              "DA_LEN_XE",
+              "DA_HOAN",
+              "DA_HUY"
+            ]
+          },
+          "ngayXuatVe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dangHoan": {
+            "type": "boolean",
+            "description": "True khi yêu cầu hoàn đang chờ xử lý hoặc cần đối soát; vé khi đó không có QR."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingPricePreview": {
+        "type": "object",
+        "required": [
+          "tongTienGoc",
+          "tienGiam",
+          "tongThanhToan",
+          "maKhuyenMaiDaChon",
+          "maKhuyenMaiApDung",
+          "lyDoKhongApDung"
+        ],
+        "properties": {
+          "tongTienGoc": {
+            "$ref": "#/components/schemas/BookingDecimalMoney"
+          },
+          "tienGiam": {
+            "$ref": "#/components/schemas/BookingDecimalMoney"
+          },
+          "tongThanhToan": {
+            "$ref": "#/components/schemas/BookingDecimalMoney"
+          },
+          "maKhuyenMaiDaChon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maKhuyenMaiApDung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lyDoKhongApDung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingOrderResponse": {
+        "type": "object",
+        "description": "hanhKhach is a normalized passenger snapshot from the current authenticated account and JSESSIONID; a fresh HTTP session returns an empty array. PATCH idempotency data in PostgreSQL redacts hanhKhach/coTheChotGia. A complete PATCH replay is available only if its response was written and remains in the current HTTP session; the cache may be absent after a crash between database commit and session write or after session loss, in which case retry returns the redacted database order state. Expiry commits the hold and order as HET_HAN before returning 409 HOLD_EXPIRED. danhSachVe always stays empty before T17/T18 issuance. T16 never creates a ticket draft or HanhKhach database entity. T18 callbacks cannot assume the session passenger snapshot remains available.",
+        "required": [
+          "maDon",
+          "maChuyen",
+          "trangThaiDon",
+          "khachDatTen",
+          "khachDatSoDienThoai",
+          "ghiChu",
+          "serverTime",
+          "thoiDiemBatDau",
+          "thoiDiemHetHan",
+          "danhSachGiuCho",
+          "hanhKhach",
+          "danhSachVe",
+          "giaTamTinh",
+          "coTheChotGia",
+          "giaDaChot",
+          "thongBao",
+          "chinhSachHoanVe"
+        ],
+        "properties": {
+          "maDon": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/BookingId"
+          },
+          "trangThaiDon": {
+            "type": "string"
+          },
+          "khachDatTen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "khachDatSoDienThoai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "khachDatEmail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 254
+          },
+          "emailXacNhan": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "trangThai": {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "SENDING",
+                  "SENT",
+                  "FAILED",
+                  "UNKNOWN"
+                ]
+              },
+              "diaChi": {
+                "type": "string",
+                "format": "email"
+              },
+              "thoiDiemGui": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          },
+          "ghiChu": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "serverTime": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          },
+          "thoiDiemBatDau": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thoiDiemHetHan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BookingTimestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "danhSachGiuCho": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingSeatHoldSummary"
+            }
+          },
+          "hanhKhach": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingPassenger"
+            }
+          },
+          "danhSachVe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingOrderTicket"
+            },
+            "description": "Always empty until a ticket is actually issued."
+          },
+          "giaTamTinh": {
+            "$ref": "#/components/schemas/BookingPricePreview"
+          },
+          "coTheChotGia": {
+            "type": "boolean",
+            "description": "False until the current HTTP session has a valid passenger for every held seat."
+          },
+          "giaDaChot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrozenPrice"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "T16 returns null before C02; after T17 C02 succeeds, B05 returns the current persisted money snapshot. It has no quote version or quote timestamp and is not usable for payment after the order closes."
+          },
+          "thongBao": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chinhSachHoanVe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RefundPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snapshot chính sách hoàn của đơn; null nếu không có."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BookingErrorResponse": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "details",
+          "timestamp",
+          "traceId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object"
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/BookingTimestamp"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "description": "Mã opaque; client không suy luận quyền hoặc thứ tự từ mã.",
+        "example": "CX01"
+      },
+      "TransactionId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "description": "Mã giao dịch nội bộ opaque; tối đa 80 ký tự.",
+        "example": "GD01"
+      },
+      "LocalDate": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+        "description": "Ngày lịch địa phương Asia/Ho_Chi_Minh, YYYY-MM-DD.",
+        "example": "2026-10-12"
+      },
+      "LocalTime": {
+        "type": "string",
+        "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$",
+        "description": "Giờ lịch theo local time, HH:mm:ss.",
+        "example": "08:00:00"
+      },
+      "OffsetDateTime": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Thời điểm RFC3339 có offset; mốc server là nguồn quyết định.",
+        "example": "2026-10-11T09:30:00+07:00"
+      },
+      "MoneyVnd": {
+        "type": "string",
+        "pattern": "^(0|[1-9][0-9]{0,11})$",
+        "description": "VND nguyên, không dấu phân cách; miền tối đa 12 chữ số theo đề xuất.",
+        "example": "250000",
+        "x-contract-status": "proposed"
+      },
+      "TrangThaiDon": {
+        "type": "string",
+        "enum": [
+          "CHO_XU_LY",
+          "DA_XAC_NHAN",
+          "CHO_THANH_TOAN",
+          "DA_THANH_TOAN",
+          "DA_HUY",
+          "HET_HAN"
+        ],
+        "description": "States.TrangThaiDon; các giá trị được giữ đúng tên code hiện có.",
+        "x-source-enum": "States.java#TrangThaiDon",
+        "x-contract-status": "proposed"
+      },
+      "TrangThaiGiuCho": {
+        "type": "string",
+        "enum": [
+          "DANG_GIU",
+          "DA_XAC_NHAN",
+          "HET_HAN",
+          "DA_HUY"
+        ],
+        "description": "States.TrangThaiGiuCho; trạng thái của quyền giữ cho từng ghế.",
+        "x-source-enum": "States.java#TrangThaiGiuCho",
+        "x-contract-status": "proposed"
+      },
+      "TrangThaiThanhToan": {
+        "type": "string",
+        "enum": [
+          "CHO_XU_LY",
+          "THANH_CONG",
+          "THAT_BAI",
+          "DA_HOAN_TIEN",
+          "HOAN_TIEN_MOT_PHAN"
+        ],
+        "description": "States.TrangThaiThanhToan; không hàm ý đã phát hành vé.",
+        "x-source-enum": "States.java#TrangThaiThanhToan",
+        "x-contract-status": "proposed"
+      },
+      "TrangThaiVe": {
+        "type": "string",
+        "enum": [
+          "DA_XUAT_VE",
+          "DA_LEN_XE",
+          "DA_HOAN",
+          "DA_HUY"
+        ],
+        "description": "States.TrangThaiVe.",
+        "x-source-enum": "States.java#TrangThaiVe",
+        "x-contract-status": "proposed"
+      },
+      "TrangThaiGheVatLy": {
+        "type": "string",
+        "enum": [
+          "HOAT_DONG",
+          "BAO_TRI",
+          "NGUNG_SU_DUNG"
+        ],
+        "description": "States.TrangThaiGhe; khác trạng thái khả dụng theo chuyến.",
+        "x-source-enum": "States.java#TrangThaiGhe",
+        "x-contract-status": "proposed"
+      },
+      "TrangThaiKhaDungGhe": {
+        "type": "string",
+        "enum": [
+          "TRONG",
+          "DANG_GIU",
+          "DA_DAT"
+        ],
+        "description": "Trạng thái khả dụng theo chuyến; các tên này là đề xuất, chưa được States.java xác nhận.",
+        "x-decision-status": "proposed"
+      },
+      "TrangThaiPhuongThuc": {
+        "type": "string",
+        "enum": [
+          "HOAT_DONG",
+          "TAM_NGUNG",
+          "NGUNG_HOAT_DONG"
+        ],
+        "description": "States.TrangThaiPhuongThuc.",
+        "x-source-enum": "States.java#TrangThaiPhuongThuc",
+        "x-contract-status": "proposed"
+      },
+      "TrangThaiChuyen": {
+        "type": "string",
+        "enum": [
+          "CHUA_KHOI_HANH",
+          "DANG_CHAY",
+          "HOAN_TAT",
+          "DA_HUY"
+        ],
+        "description": "States.TrangThaiChuyen.",
+        "x-source-enum": "States.java#TrangThaiChuyen",
+        "x-contract-status": "proposed"
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Object lỗi phẳng của API ứng dụng; không bọc error hoặc data.",
+        "required": [
+          "code",
+          "message",
+          "details",
+          "timestamp",
+          "traceId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mã lỗi máy đọc được.",
+            "example": "VALIDATION_ERROR"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Thông điệp an toàn cho người dùng.",
+            "example": "Request không hợp lệ."
+          },
+          "details": {
+            "type": "object",
+            "description": "Chi tiết theo code; VALIDATION_ERROR có thể có fieldErrors. Không chứa stack, SQL, secret hoặc PII không cần thiết.",
+            "additionalProperties": true,
+            "properties": {
+              "fieldErrors": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FieldError"
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "traceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Mã đối chiếu log do server tạo/kiểm soát.",
+            "example": "req-example-001"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FieldError": {
+        "type": "object",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Tên query/header/body field."
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Lý do validation dạng máy đọc."
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Giải thích validation an toàn."
+          }
+        },
+        "additionalProperties": true
+      },
+      "TinhThanh": {
+        "type": "object",
+        "required": [
+          "maTinhThanh",
+          "tenTinhThanh",
+          "khuVuc"
+        ],
+        "properties": {
+          "maTinhThanh": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "tenTinhThanh": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Tên hiển thị."
+          },
+          "khuVuc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120,
+            "description": "Khu vực nếu có.",
+            "example": "Miền Nam"
+          }
+        },
+        "additionalProperties": true
+      },
+      "BenXe": {
+        "type": "object",
+        "required": [
+          "maBenXe",
+          "tenBenXe",
+          "diaChi",
+          "soDienThoai",
+          "maTinhThanh",
+          "trangThai"
+        ],
+        "properties": {
+          "maBenXe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "tenBenXe": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Tên bến xe."
+          },
+          "diaChi": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Địa chỉ bến."
+          },
+          "soDienThoai": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 30,
+            "description": "Số liên hệ công khai nếu có."
+          },
+          "maTinhThanh": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThai": {
+            "type": "string",
+            "enum": [
+              "HOAT_DONG",
+              "TAM_NGUNG",
+              "DONG_CUA",
+              "BAO_TRI"
+            ],
+            "description": "States.TrangThaiBenXe.",
+            "x-source-enum": "States.java#TrangThaiBenXe",
+            "x-contract-status": "proposed"
+          }
+        },
+        "additionalProperties": true
+      },
+      "PageResponse": {
+        "type": "object",
+        "description": "totalItems và totalPages là tổng toàn cục sau khi áp bộ lọc; page ngoài tổng trả items rỗng nhưng giữ nguyên các tổng.",
+        "required": [
+          "items",
+          "page",
+          "size",
+          "totalItems",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "description": "[] khi không có kết quả hoặc page vượt tổng."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Số trang bắt đầu từ 1."
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Kích thước trang."
+          },
+          "totalItems": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Tổng số bản ghi sau khi lọc trên toàn bộ kết quả",
+            "không chỉ trang hiện tại.": null
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "ceil(totalItems / size); bằng 0 chỉ khi totalItems bằng 0."
+          }
+        },
+        "additionalProperties": true
+      },
+      "TripSummary": {
+        "type": "object",
+        "required": [
+          "maChuyen",
+          "maTuyen",
+          "benDi",
+          "benDen",
+          "ngayKhoiHanh",
+          "gioKhoiHanh",
+          "giaThamKhao",
+          "soGheTrong"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maTuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "benDi": {
+            "$ref": "#/components/schemas/StopSummary"
+          },
+          "benDen": {
+            "$ref": "#/components/schemas/StopSummary"
+          },
+          "ngayKhoiHanh": {
+            "$ref": "#/components/schemas/LocalDate"
+          },
+          "gioKhoiHanh": {
+            "$ref": "#/components/schemas/LocalTime"
+          },
+          "giaThamKhao": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "soGheTrong": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Số ghế hiện khả dụng tại thời điểm trả kết quả."
+          }
+        },
+        "additionalProperties": true
+      },
+      "StopSummary": {
+        "type": "object",
+        "required": [
+          "maBenXe",
+          "tenBenXe"
+        ],
+        "properties": {
+          "maBenXe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "tenBenXe": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "additionalProperties": true
+      },
+      "TripDetail": {
+        "type": "object",
+        "required": [
+          "maChuyen",
+          "maTuyen",
+          "maXe",
+          "ngayKhoiHanh",
+          "gioKhoiHanh",
+          "trangThai",
+          "benDi",
+          "benDen",
+          "nhaXe",
+          "tienIch",
+          "giaThamKhao"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maTuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maXe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Thông tin hiển thị; null nếu chưa gán xe và không xác nhận khả năng đặt chỗ."
+          },
+          "ngayKhoiHanh": {
+            "$ref": "#/components/schemas/LocalDate"
+          },
+          "gioKhoiHanh": {
+            "$ref": "#/components/schemas/LocalTime"
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/TrangThaiChuyen"
+          },
+          "benDi": {
+            "$ref": "#/components/schemas/StopSummary"
+          },
+          "benDen": {
+            "$ref": "#/components/schemas/StopSummary"
+          },
+          "nhaXe": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "maNhaXe",
+              "tenNhaXe"
+            ],
+            "properties": {
+              "maNhaXe": {
+                "$ref": "#/components/schemas/Id"
+              },
+              "tenNhaXe": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "additionalProperties": true
+          },
+          "tienIch": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Danh sách tiện ích công khai; catalog/enum cần đối chiếu."
+          },
+          "giaThamKhao": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          }
+        },
+        "additionalProperties": true
+      },
+      "SeatMapResponse": {
+        "type": "object",
+        "required": [
+          "maChuyen",
+          "maXe",
+          "serverTime",
+          "danhSachGhe"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maXe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "serverTime": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "danhSachGhe": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "maGhe",
+                "viTri",
+                "trangThaiSuDung",
+                "tinhTrangKhaDung"
+              ],
+              "properties": {
+                "maGhe": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "viTri": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "description": "Cấu trúc vị trí đề xuất, cần đối chiếu sơ đồ xe trước khi đóng.",
+                  "properties": {
+                    "tang": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "hang": {
+                      "type": "string",
+                      "maxLength": 10
+                    },
+                    "cot": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "additionalProperties": true,
+                  "x-decision-status": "proposed"
+                },
+                "trangThaiSuDung": {
+                  "$ref": "#/components/schemas/TrangThaiGheVatLy"
+                },
+                "tinhTrangKhaDung": {
+                  "$ref": "#/components/schemas/TrangThaiKhaDungGhe"
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ReferencePriceResponse": {
+        "type": "object",
+        "required": [
+          "maChuyen",
+          "donViTienTe",
+          "giaThamKhao",
+          "danhSachGiaTheoLoaiGhe"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "giaThamKhao": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "danhSachGiaTheoLoaiGhe": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "loaiGhe",
+                "gia"
+              ],
+              "properties": {
+                "loaiGhe": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Loại ghế theo cấu hình xe."
+                },
+                "gia": {
+                  "$ref": "#/components/schemas/MoneyVnd"
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "HoldRequest": {
+        "type": "object",
+        "required": [
+          "maChuyen",
+          "danhSachMaGhe"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "danhSachMaGhe": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Ghế thuộc chuyến và còn khả dụng; điều kiện nhận giữ chỗ theo đề xuất đang chờ nhóm xác nhận.",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "x-business-unique-items": true,
+            "x-decision-status": "proposed"
+          }
+        },
+        "additionalProperties": false
+      },
+      "HoldResponse": {
+        "type": "object",
+        "required": [
+          "maDon",
+          "maChuyen",
+          "trangThaiDon",
+          "serverTime",
+          "thoiDiemBatDau",
+          "thoiDiemHetHan",
+          "danhSachGheGiu",
+          "danhSachGiuCho"
+        ],
+        "properties": {
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThaiDon": {
+            "$ref": "#/components/schemas/TrangThaiDon"
+          },
+          "serverTime": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "thoiDiemBatDau": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "thoiDiemHetHan": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "danhSachGheGiu": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          "danhSachGiuCho": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "maGiuCho",
+                "maGhe",
+                "trangThai",
+                "thoiDiemBatDau",
+                "thoiDiemHetHan"
+              ],
+              "properties": {
+                "maGiuCho": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "maGhe": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "trangThai": {
+                  "$ref": "#/components/schemas/TrangThaiGiuCho"
+                },
+                "thoiDiemBatDau": {
+                  "$ref": "#/components/schemas/OffsetDateTime"
+                },
+                "thoiDiemHetHan": {
+                  "$ref": "#/components/schemas/OffsetDateTime"
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "DraftContactPatch": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "khachDatTen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Bắt buộc khác rỗng nếu gửi."
+          },
+          "khachDatSoDienThoai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20,
+            "description": "Quy tắc số điện thoại cần được duyệt."
+          },
+          "ghiChu": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "null xóa ghi chú; giới hạn đề xuất."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PassengerUpdate": {
+        "type": "object",
+        "required": [
+          "hanhKhach"
+        ],
+        "properties": {
+          "hanhKhach": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Danh sách đầy đủ; tập maGhe phải khớp toàn bộ ghế đang giữ.",
+            "items": {
+              "type": "object",
+              "required": [
+                "maGhe",
+                "hoTen",
+                "soDienThoai"
+              ],
+              "properties": {
+                "maGhe": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "hoTen": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "soDienThoai": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20
+                },
+                "cccd": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 20
+                }
+              },
+              "additionalProperties": false
+            },
+            "x-business-unique-property": "maGhe"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Passenger": {
+        "type": "object",
+        "required": [
+          "maGhe",
+          "hoTen",
+          "soDienThoai"
+        ],
+        "properties": {
+          "maGhe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "hoTen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "soDienThoai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "cccd": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20
+          }
+        },
+        "additionalProperties": true
+      },
+      "OrderResponse": {
+        "type": "object",
+        "description": "Tên và số điện thoại người đặt bắt buộc, khác rỗng. Hành khách được lưu tạm trong HTTP session của chủ đơn; session mới vẫn đọc được đơn và ghế nhưng trả danh sách rỗng. T16 không tạo dữ liệu hành khách hoặc vé nháp trong database.",
+        "required": [
+          "maDon",
+          "maChuyen",
+          "trangThaiDon",
+          "khachDatTen",
+          "khachDatSoDienThoai",
+          "ghiChu",
+          "serverTime",
+          "thoiDiemBatDau",
+          "thoiDiemHetHan",
+          "danhSachGiuCho",
+          "hanhKhach",
+          "danhSachVe",
+          "giaTamTinh",
+          "coTheChotGia",
+          "giaDaChot",
+          "thongBao"
+        ],
+        "properties": {
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThaiDon": {
+            "$ref": "#/components/schemas/TrangThaiDon"
+          },
+          "khachDatTen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "khachDatSoDienThoai": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "ghiChu": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "serverTime": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "thoiDiemBatDau": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thoiDiemHetHan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "danhSachGiuCho": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "maGiuCho",
+                "maGhe",
+                "trangThai",
+                "thoiDiemBatDau",
+                "thoiDiemHetHan"
+              ],
+              "properties": {
+                "maGiuCho": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "maGhe": {
+                  "$ref": "#/components/schemas/Id"
+                },
+                "trangThai": {
+                  "$ref": "#/components/schemas/TrangThaiGiuCho"
+                },
+                "thoiDiemBatDau": {
+                  "$ref": "#/components/schemas/OffsetDateTime"
+                },
+                "thoiDiemHetHan": {
+                  "$ref": "#/components/schemas/OffsetDateTime"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "hanhKhach": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Passenger"
+            }
+          },
+          "danhSachVe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketSummary"
+            }
+          },
+          "giaTamTinh": {
+            "type": "object",
+            "description": "Tiền trong T16 preview là chuỗi thập phân chính xác; làm tròn chỉ khi chốt giá theo T17.",
+            "additionalProperties": true
+          },
+          "coTheChotGia": {
+            "type": "boolean"
+          },
+          "giaDaChot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrozenPrice"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null trước khi chốt hoặc sau khi đơn đóng; snapshot đọc từ B05 chỉ gồm tiền và phân bổ."
+          },
+          "thongBao": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chinhSachHoanVe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RefundPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snapshot chính sách dùng cho đơn; null nếu đơn không có chính sách."
+          }
+        },
+        "additionalProperties": true
+      },
+      "TicketSummary": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "maGhe",
+          "trangThai"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/TrangThaiVe"
+          }
+        },
+        "additionalProperties": true
+      },
+      "PriceLine": {
+        "type": "object",
+        "required": [
+          "maGhe",
+          "giaGoc",
+          "tienGiam",
+          "thanhTien"
+        ],
+        "properties": {
+          "maGhe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "giaGoc": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tienGiam": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "thanhTien": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          }
+        },
+        "additionalProperties": true
+      },
+      "FrozenPrice": {
+        "type": "object",
+        "description": "Frozen order totals with reconstructed allocation lines; no durable quote version or quote timestamp. T17 does not add per-ticket price columns. Original ticket rows and order aggregates remain available for history after a partial refund.",
+        "required": [
+          "donViTienTe",
+          "tongTienGoc",
+          "tongTienGiam",
+          "tongThanhToan",
+          "chiTietGia"
+        ],
+        "properties": {
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "tongTienGoc": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tongTienGiam": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tongThanhToan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "chiTietGia": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceLine"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "QuoteRequest": {
+        "type": "object",
+        "properties": {
+          "maKhuyenMai": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "null hoặc bỏ qua nghĩa là xem trước mà không áp mã."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FreezePriceRequest": {
+        "type": "object",
+        "required": [
+          "maBaoGia"
+        ],
+        "properties": {
+          "maBaoGia": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "additionalProperties": false
+      },
+      "QuoteResponse": {
+        "type": "object",
+        "required": [
+          "maBaoGia",
+          "maDon",
+          "donViTienTe",
+          "thoiDiemBaoGia",
+          "thoiDiemHetHan",
+          "tongTienGoc",
+          "tongTienGiam",
+          "tongThanhToan",
+          "chiTietGia",
+          "ketQuaKhuyenMai",
+          "chinhSachHoanVe"
+        ],
+        "properties": {
+          "maBaoGia": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "thoiDiemBaoGia": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "thoiDiemHetHan": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "tongTienGoc": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tongTienGiam": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tongThanhToan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "chiTietGia": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceLine"
+            }
+          },
+          "ketQuaKhuyenMai": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "null khi không áp khuyến mãi; không có nghĩa là quota đã reserve.",
+            "required": [
+              "hopLe",
+              "duocGiam"
+            ],
+            "properties": {
+              "hopLe": {
+                "type": "boolean"
+              },
+              "duocGiam": {
+                "$ref": "#/components/schemas/MoneyVnd"
+              }
+            },
+            "additionalProperties": true
+          },
+          "chinhSachHoanVe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RefundPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snapshot chính sách hoàn của đơn tại thời điểm báo giá; null nếu không có."
+          }
+        },
+        "additionalProperties": true
+      },
+      "FreezePriceResponse": {
+        "type": "object",
+        "required": [
+          "maBaoGia",
+          "maDon",
+          "trangThaiDon",
+          "donViTienTe",
+          "thoiDiemHetHan",
+          "tongTienGoc",
+          "tongTienGiam",
+          "tongThanhToan",
+          "chiTietGia",
+          "ketQuaKhuyenMai",
+          "chinhSachHoanVe"
+        ],
+        "properties": {
+          "maBaoGia": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThaiDon": {
+            "type": "string",
+            "const": "CHO_THANH_TOAN"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "thoiDiemHetHan": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "tongTienGoc": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tongTienGiam": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tongThanhToan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "chiTietGia": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceLine"
+            }
+          },
+          "ketQuaKhuyenMai": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "hopLe",
+              "duocGiam"
+            ],
+            "properties": {
+              "hopLe": {
+                "type": "boolean"
+              },
+              "duocGiam": {
+                "$ref": "#/components/schemas/MoneyVnd"
+              }
+            },
+            "additionalProperties": false
+          },
+          "chinhSachHoanVe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RefundPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Snapshot chính sách hoàn đã chốt; null nếu không có."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentMethodDto": {
+        "type": "object",
+        "required": [
+          "maPhuongThuc",
+          "tenPhuongThuc",
+          "moTa",
+          "trangThai"
+        ],
+        "properties": {
+          "maPhuongThuc": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "tenPhuongThuc": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "moTa": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/TrangThaiPhuongThuc"
+          }
+        },
+        "additionalProperties": true
+      },
+      "PaymentInitRequest": {
+        "type": "object",
+        "required": [
+          "maPhuongThuc"
+        ],
+        "properties": {
+          "maPhuongThuc": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "required": [
+          "maGiaoDich",
+          "maDon",
+          "maPhuongThuc",
+          "soTien",
+          "donViTienTe",
+          "trangThai",
+          "ketQuaCongDaXacDinh",
+          "thoiDiemTao",
+          "urlThanhToan",
+          "thoiDiemHetHan",
+          "thoiGianThanhToan",
+          "canDoiSoat"
+        ],
+        "properties": {
+          "maGiaoDich": {
+            "$ref": "#/components/schemas/TransactionId"
+          },
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maPhuongThuc": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "soTien": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/TrangThaiThanhToan"
+          },
+          "ketQuaCongDaXacDinh": {
+            "type": "boolean",
+            "description": "false nghĩa outcome cổng chưa xác định, không đồng nghĩa thất bại."
+          },
+          "thoiDiemTao": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OffsetDateTime"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Có thể null vì context tạo giao dịch chỉ giữ trong bộ nhớ và mất sau restart."
+          },
+          "urlThanhToan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "URL redirect đã được backend cấu hình/allowlist nếu có."
+          },
+          "thoiDiemHetHan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "thoiGianThanhToan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Thời điểm provider xác nhận thành công; null khi chưa có kết quả."
+          },
+          "canDoiSoat": {
+            "type": "boolean",
+            "description": "true khi provider xác minh tiền thành công nhưng đơn không còn đủ điều kiện phát hành; không tự thu hồi hoặc phát hành muộn."
+          }
+        },
+        "additionalProperties": true
+      },
+      "VnpayAck": {
+        "type": "object",
+        "required": [
+          "RspCode",
+          "Message"
+        ],
+        "properties": {
+          "RspCode": {
+            "type": "string",
+            "enum": [
+              "00",
+              "01",
+              "02",
+              "04",
+              "97",
+              "99"
+            ]
+          },
+          "Message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VnpayReturnResponse": {
+        "type": "object",
+        "required": [
+          "maGiaoDich",
+          "chuKyHopLe",
+          "responseCode",
+          "transactionStatus",
+          "message"
+        ],
+        "properties": {
+          "maGiaoDich": {
+            "$ref": "#/components/schemas/TransactionId"
+          },
+          "chuKyHopLe": {
+            "type": "boolean"
+          },
+          "responseCode": {
+            "type": "string",
+            "pattern": "^[0-9]{2}$"
+          },
+          "transactionStatus": {
+            "type": "string",
+            "pattern": "^[0-9]{2}$"
+          },
+          "message": {
+            "type": "string",
+            "description": "ReturnURL chỉ thông báo; không cập nhật trạng thái giao dịch."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundRequest": {
+        "type": "object",
+        "properties": {
+          "lyDo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "description": "Lý do tùy chọn. Có thể bỏ qua hoặc gửi null."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundBatchRequest": {
+        "type": "object",
+        "required": [
+          "danhSachMaVe"
+        ],
+        "properties": {
+          "danhSachMaVe": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          "lyDo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundLine": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "giaThucTra",
+          "tyLeHoan",
+          "phiHoan",
+          "soTienHoan"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "giaThucTra": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tyLeHoan": {
+            "type": "string",
+            "pattern": "^(100(\\.0{1,2})?|[0-9]{1,2}(\\.[0-9]{1,2})?)$",
+            "description": "Tỷ lệ phần trăm chính sách snapshot theo chuỗi chính xác trong từng dòng hoàn."
+          },
+          "phiHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "soTienHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundHistory": {
+        "type": "object",
+        "required": [
+          "thaoTac",
+          "maRequestCong",
+          "maKetQua",
+          "maGiaoDichCong",
+          "thoiDiem"
+        ],
+        "properties": {
+          "thaoTac": {
+            "type": "string"
+          },
+          "maRequestCong": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maKetQua": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maGiaoDichCong": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "thoiDiem": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundPreview": {
+        "type": "object",
+        "required": [
+          "maDon",
+          "maGiaoDichGoc",
+          "maChinhSach",
+          "soTienHoan",
+          "donViTienTe",
+          "chiTiet",
+          "thoiDiemTinh"
+        ],
+        "properties": {
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGiaoDichGoc": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maChinhSach": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "soTienHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "chiTiet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundLine"
+            }
+          },
+          "thoiDiemTinh": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundResponse": {
+        "type": "object",
+        "description": "202 trả snapshot tiếp nhận CHO_XU_LY giống nhau cho lần đầu và replay cùng key; GET trả trạng thái hiện tại. Chỉ kết quả provider khớp tương quan đã lưu mới chốt vé; thiếu tương quan giữ CAN_DOI_SOAT. maGiaoDichGoc là liên kết bản ghi, không chứng minh lần thanh toán nguồn đã thành công.",
+        "required": [
+          "maHoanTien",
+          "maDon",
+          "maGiaoDichGoc",
+          "maChinhSach",
+          "soTienHoan",
+          "donViTienTe",
+          "trangThai",
+          "chiTiet",
+          "thoiDiemTao",
+          "thoiDiemXacNhan",
+          "maGiaoDichCong",
+          "lyDoLoi",
+          "lichSu"
+        ],
+        "properties": {
+          "maHoanTien": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGiaoDichGoc": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransactionId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Giao dịch thành công ban đầu liên kết với đơn; trường này không chứng minh lần thanh toán gốc đã thành công."
+          },
+          "maChinhSach": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "soTienHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "trangThai": {
+            "type": "string",
+            "enum": [
+              "CHO_XU_LY",
+              "THANH_CONG",
+              "THAT_BAI",
+              "CAN_DOI_SOAT"
+            ]
+          },
+          "chiTiet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundLine"
+            }
+          },
+          "thoiDiemTao": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "thoiDiemXacNhan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "maGiaoDichCong": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lyDoLoi": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lichSu": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundHistory"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "TicketResponse": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "maTraCuu",
+          "maDon",
+          "maChuyen",
+          "maGhe",
+          "hoTenHanhKhach",
+          "soDienThoaiHanhKhach",
+          "cccdHanhKhach",
+          "trangThai",
+          "giaGoc",
+          "tienGiam",
+          "thanhTien",
+          "donViTienTe",
+          "qrToken",
+          "thoiDiemPhatHanh",
+          "dangHoan"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maTraCuu": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 5,
+            "description": "Public ticket reference for customer display"
+          },
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "hoTenHanhKhach": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "soDienThoaiHanhKhach": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20
+          },
+          "cccdHanhKhach": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/TrangThaiVe"
+          },
+          "giaGoc": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "tienGiam": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "thanhTien": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "qrToken": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Token do server cấp; null khi yêu cầu hoàn đang khóa vé, vé đã hoàn hoặc vé không còn hiệu lực. Không gửi qua URL hoặc log."
+          },
+          "thoiDiemPhatHanh": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "dangHoan": {
+            "type": "boolean",
+            "description": "True khi yêu cầu hoàn đang chờ xử lý hoặc cần đối soát; khi đó QR bị khóa."
+          }
+        },
+        "additionalProperties": true
+      },
+      "RefundPolicyResponse": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "chinhSach",
+          "duocYeuCauHoan",
+          "soTienDuKienHoan",
+          "donViTienTe",
+          "lyDoKhongDuocHoan",
+          "thoiDiemTinh"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "chinhSach": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RefundPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "x-contract-status": "implemented"
+          },
+          "duocYeuCauHoan": {
+            "type": "boolean"
+          },
+          "soTienDuKienHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "donViTienTe": {
+            "type": "string",
+            "const": "VND"
+          },
+          "lyDoKhongDuocHoan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "thoiDiemTinh": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          }
+        },
+        "additionalProperties": true
+      },
+      "RefundPolicy": {
+        "type": "object",
+        "required": [
+          "maChinhSach",
+          "tenChinhSach",
+          "soGioToiThieuTruocKhoiHanh",
+          "tyLeHoan",
+          "phiHoan",
+          "choPhepHoanVeKhuyenMai",
+          "trangThai"
+        ],
+        "properties": {
+          "maChinhSach": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "tenChinhSach": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "soGioToiThieuTruocKhoiHanh": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tyLeHoan": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "multipleOf": 0.01,
+            "description": "JSON number từ 0 đến 100",
+            "tối đa hai chữ số thập phân.": null
+          },
+          "phiHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "choPhepHoanVeKhuyenMai": {
+            "type": "boolean"
+          },
+          "trangThai": {
+            "type": "string",
+            "enum": [
+              "HOAT_DONG",
+              "TAM_NGUNG",
+              "NGUNG_AP_DUNG"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundPolicyCreateRequest": {
+        "type": "object",
+        "required": [
+          "maChinhSach",
+          "tenChinhSach",
+          "soGioToiThieuTruocKhoiHanh",
+          "tyLeHoan",
+          "phiHoan",
+          "choPhepHoanVeKhuyenMai"
+        ],
+        "properties": {
+          "maChinhSach": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "tenChinhSach": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "soGioToiThieuTruocKhoiHanh": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tyLeHoan": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "multipleOf": 0.01
+          },
+          "phiHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "choPhepHoanVeKhuyenMai": {
+            "type": "boolean"
+          },
+          "trangThai": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "HOAT_DONG",
+              "TAM_NGUNG",
+              "NGUNG_AP_DUNG",
+              null
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundPolicyUpdateRequest": {
+        "type": "object",
+        "required": [
+          "tenChinhSach",
+          "soGioToiThieuTruocKhoiHanh",
+          "tyLeHoan",
+          "phiHoan",
+          "choPhepHoanVeKhuyenMai"
+        ],
+        "properties": {
+          "tenChinhSach": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "soGioToiThieuTruocKhoiHanh": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "tyLeHoan": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "multipleOf": 0.01
+          },
+          "phiHoan": {
+            "$ref": "#/components/schemas/MoneyVnd"
+          },
+          "choPhepHoanVeKhuyenMai": {
+            "type": "boolean"
+          },
+          "trangThai": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "HOAT_DONG",
+              "TAM_NGUNG",
+              "NGUNG_AP_DUNG",
+              null
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundPolicyStatusRequest": {
+        "type": "object",
+        "required": [
+          "trangThai"
+        ],
+        "properties": {
+          "trangThai": {
+            "type": "string",
+            "enum": [
+              "HOAT_DONG",
+              "TAM_NGUNG",
+              "NGUNG_AP_DUNG"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundPolicyPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size",
+          "totalItems",
+          "totalPages"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundPolicy"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "totalItems": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "CancelTicketResponse": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "trangThai",
+          "thoiDiemHuy",
+          "canTaoYeuCauHoan"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/TrangThaiVe"
+          },
+          "thoiDiemHuy": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          },
+          "canTaoYeuCauHoan": {
+            "type": "boolean",
+            "description": "Cho biết có thể gửi E03 theo chính sách; không khẳng định số tiền sẽ được hoàn. Ví dụ false chỉ minh họa một chính sách giả định đang chờ nhóm xác nhận."
+          }
+        },
+        "additionalProperties": true
+      },
+      "CancelOrderResponse": {
+        "type": "object",
+        "required": [
+          "maDon",
+          "trangThaiDon",
+          "thoiDiemHuy"
+        ],
+        "properties": {
+          "maDon": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThaiDon": {
+            "$ref": "#/components/schemas/TrangThaiDon"
+          },
+          "thoiDiemHuy": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          }
+        },
+        "additionalProperties": true
+      },
+      "TicketVerifyRequest": {
+        "type": "object",
+        "required": [
+          "maChuyen"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "qrToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "Token do server cấp; không ghi log."
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "maVe"
+            ]
+          },
+          {
+            "required": [
+              "qrToken"
+            ]
+          }
+        ],
+        "additionalProperties": false
+      },
+      "TicketVerifyResponse": {
+        "type": "object",
+        "required": [
+          "hopLe",
+          "maVe",
+          "maChuyen",
+          "maGhe",
+          "maLyDo",
+          "lyDo"
+        ],
+        "properties": {
+          "hopLe": {
+            "type": "boolean"
+          },
+          "maVe": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGhe": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40
+          },
+          "maLyDo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Mã lý do chưa được duyệt; null khi hợp lệ."
+          },
+          "lyDo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "hopLe": {
+                  "const": true
+                }
+              },
+              "required": [
+                "hopLe"
+              ]
+            },
+            "then": {
+              "properties": {
+                "maLyDo": {
+                  "type": "null"
+                },
+                "lyDo": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "hopLe": {
+                  "const": false
+                }
+              },
+              "required": [
+                "hopLe"
+              ]
+            },
+            "then": {
+              "properties": {
+                "maLyDo": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "lyDo": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": true
+      },
+      "CheckInRequest": {
+        "type": "object",
+        "required": [
+          "maChuyen"
+        ],
+        "properties": {
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CheckInResponse": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "maChuyen",
+          "maGhe",
+          "trangThai",
+          "thoiDiemLenXe"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "trangThai": {
+            "$ref": "#/components/schemas/TrangThaiVe"
+          },
+          "thoiDiemLenXe": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          }
+        },
+        "additionalProperties": true
+      },
+      "TicketCheckLog": {
+        "type": "object",
+        "required": [
+          "maVe",
+          "maChuyen",
+          "maGhe",
+          "ketQua",
+          "thoiDiemKiem"
+        ],
+        "properties": {
+          "maVe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maChuyen": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "maGhe": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "ketQua": {
+            "type": "string",
+            "enum": [
+              "DA_LEN_XE"
+            ],
+            "description": "Trạng thái ghi nhận check-in thành công; log có thể bổ sung kết quả nghiệp vụ khác sau khi duyệt.",
+            "x-decision-status": "proposed"
+          },
+          "thoiDiemKiem": {
+            "$ref": "#/components/schemas/OffsetDateTime"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

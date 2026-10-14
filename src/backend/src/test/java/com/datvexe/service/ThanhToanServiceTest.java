@@ -49,6 +49,7 @@ class ThanhToanServiceTest {
                 "jakarta.persistence.jdbc.password", "",
                 "hibernate.hbm2ddl.auto", "create-drop"));
         contexts = new PaymentContextStore(Clock.fixed(instant(CREATED), ZONE));
+        inTransaction(RefundSchemaFixture::create);
         inTransaction(em -> em.createNativeQuery("CREATE SEQUENCE ticket_public_code_seq MINVALUE 1 MAXVALUE 33554431 NO CYCLE").executeUpdate());
         inTransaction(this::createFixture);
     }
@@ -99,6 +100,29 @@ class ThanhToanServiceTest {
             assertTrue(email.htmlContent.contains("96666") || email.htmlContent.contains("96.666"));
             assertEquals(1L, em.createQuery("select count(e) from EmailOutbox e", Long.class).getSingleResult());
         });
+    }
+
+    @Test
+    void latePaymentCallbackCannotReverseRefundStatesOrIssueTicketsAgain() {
+        seedPromotion();
+        contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
+        ThanhToanService service = serviceAt(CREATED.plusMinutes(5));
+        service.receive(success());
+        for (TrangThaiThanhToan refunded : List.of(TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN, TrangThaiThanhToan.DA_HOAN_TIEN)) {
+            inTransaction(em -> {
+                em.find(ThanhToan.class, PAYMENT_ID).trangThai = refunded;
+                em.createQuery("update VeXe v set v.trangThai=:state where v.donDatVe.maDon=:id")
+                        .setParameter("state", TrangThaiVe.DA_HOAN).setParameter("id", ORDER_ID).executeUpdate();
+            });
+            assertTrue(service.receive(success()).duplicate());
+            inTransaction(em -> {
+                assertEquals(refunded, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
+                assertEquals(TrangThaiDon.DA_THANH_TOAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
+                assertEquals(3L, em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon=:id and v.trangThai=:state", Long.class)
+                        .setParameter("id", ORDER_ID).setParameter("state", TrangThaiVe.DA_HOAN).getSingleResult());
+                assertEquals(1, em.find(KhuyenMai.class, "PROMO").soLuongDaDung);
+            });
+        }
     }
 
     @Test
@@ -248,8 +272,8 @@ class ThanhToanServiceTest {
         assertEquals("96666", response.thanhTien());
         assertEquals("3334", response.tienGiam());
         assertEquals(TrangThaiVe.DA_HOAN, response.trangThai());
-        assertNotNull(response.qrToken());
-        assertFalse(response.qrToken().isBlank());
+        assertNull(response.qrToken(), "Refunded tickets must not expose a usable QR token");
+        assertFalse(response.dangHoan());
     }
 
     @Test

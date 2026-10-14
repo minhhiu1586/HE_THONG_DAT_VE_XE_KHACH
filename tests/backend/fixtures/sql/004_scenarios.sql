@@ -24,7 +24,7 @@ so_luong,so_luong_da_dung,ngay_bat_dau,ngay_ket_thuc,trang_thai) VALUES
 'SO_TIEN_CO_DINH',10000,0,10,0,LOCALTIMESTAMP-INTERVAL '1 day',LOCALTIMESTAMP,'HOAT_DONG')
 ON CONFLICT (ma_khuyen_mai) DO NOTHING;
 INSERT INTO chinh_sach_hoan_ve(ma_chinh_sach,ten_chinh_sach,so_gio_toi_thieu_truoc_khoi_hanh,
-ty_le_hoan,phi_hoan,cho_phep_hoan_huy_ve,trang_thai)
+ty_le_hoan,phi_hoan,cho_phep_hoan_ve_khuyen_mai,trang_thai)
 SELECT 'T06_CS_'||h,'Fixture chưa áp dụng '||h||' giờ',h,0,0,false,'TAM_NGUNG'
 FROM (VALUES (0),(12),(24)) m(h) ON CONFLICT (ma_chinh_sach) DO NOTHING;
 INSERT INTO phuong_thuc_thanh_toan(ma_phuong_thuc,ten_phuong_thuc,mo_ta,trang_thai) VALUES

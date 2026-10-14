@@ -190,7 +190,7 @@ def quote_without_code_and_exact_allocation():
     assert_money_lines(quote, "200002")
     assert quote["tongTienGiam"] == "0" and quote["tongThanhToan"] == "200002", quote
     assert set(quote) == {"maBaoGia", "maDon", "donViTienTe", "thoiDiemBaoGia", "thoiDiemHetHan",
-                          "tongTienGoc", "tongTienGiam", "tongThanhToan", "chiTietGia", "ketQuaKhuyenMai"}, quote
+                          "tongTienGoc", "tongTienGiam", "tongThanhToan", "chiTietGia", "ketQuaKhuyenMai", "chinhSachHoanVe"}, quote
     call(CUSTOMER_A, "POST", order_path(order) + "/huy", {}, key=idem_key("cancel-quote"))
 
 
@@ -278,7 +278,7 @@ def freeze_replay_get_and_thaw_after_edit():
     assert frozen["trangThaiDon"] == "CHO_THANH_TOAN" and "thoiDiemBaoGia" not in frozen, frozen
     assert "phienBanGia" not in frozen and set(frozen) == {"maBaoGia", "maDon", "trangThaiDon", "donViTienTe",
                                                              "thoiDiemHetHan", "tongTienGoc", "tongTienGiam",
-                                                             "tongThanhToan", "chiTietGia", "ketQuaKhuyenMai"}, frozen
+                                                             "tongThanhToan", "chiTietGia", "ketQuaKhuyenMai", "chinhSachHoanVe"}, frozen
     assert_money_lines(frozen)
     replay_status, replay = freeze(CUSTOMER_A, order, quote["maBaoGia"], key=key)
     assert replay_status == 200 and replay == frozen, (replay, frozen)

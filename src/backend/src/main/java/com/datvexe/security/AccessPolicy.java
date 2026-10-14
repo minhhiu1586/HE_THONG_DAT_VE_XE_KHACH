@@ -18,6 +18,19 @@ public final class AccessPolicy {
     }
     public static void role(CurrentUser user, String path) { role(user, path, "POST"); }
     public static void role(CurrentUser user, String path, String method) {
+        if (path.equals("/api/hoan-tien") || path.startsWith("/api/hoan-tien/")) {
+            if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG && user.loaiTaiKhoan() != LoaiTaiKhoan.NHA_XE
+                    && user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN) throw AccessControl.denied();
+            if (path.endsWith("/thu-lai") && user.loaiTaiKhoan() == LoaiTaiKhoan.KHACH_HANG) throw AccessControl.denied();
+            return;
+        }
+        if (path.matches("/api/ve-xe/[^/]+/(chinh-sach-hoan|hoan-tien)")) {
+            if (method.equals("POST") || path.endsWith("/chinh-sach-hoan")) {
+                if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG) throw AccessControl.denied();
+            } else if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG && user.loaiTaiKhoan() != LoaiTaiKhoan.NHA_XE
+                    && user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN) throw AccessControl.denied();
+            return;
+        }
         if (path.equals("/api/thanh-toan") || path.startsWith("/api/thanh-toan/")) {
             if (method.equals("POST")) {
                 if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG) throw AccessControl.denied();

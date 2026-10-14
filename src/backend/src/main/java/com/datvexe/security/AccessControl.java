@@ -77,6 +77,11 @@ public final class AccessControl {
         VeXe ticket = resource(em, VeXe.class, id);
         if (!ticket.donDatVe.nguoiDat.maNguoiDung.equals(caller.maNguoiDung)) throw denied();
     }
+    /** Call under the normal trip/order/ticket locks before committing a boarding action. */
+    public static void ticketNotRefunding(EntityManager em, String id) {
+        if (new com.datvexe.repository.HoanVeRepository(em).ticketBlocked(id))
+            throw new AccountException(409,"REFUND_IN_PROGRESS","Vé đang khóa hoàn tiền, không được kiểm vé/lên xe.");
+    }
     public static void assigned(EntityManager em, NguoiDung caller, String tripId) {
         role(caller, LoaiTaiKhoan.NHAN_VIEN);
         if (caller.nhanVien == null) throw denied();

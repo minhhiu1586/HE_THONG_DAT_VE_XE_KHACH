@@ -420,6 +420,7 @@ def cleanup():
     # Cleanup must also cover a payment whose response assertion failed before tracking its ID.
     users = ",".join(t16.sql_literal(client.user_id) for client in CLIENTS if client.user_id)
     if users:
+        db("DELETE FROM payment_gateway_metadata WHERE ma_giao_dich IN (SELECT ma_giao_dich FROM thanh_toan WHERE ma_don IN (SELECT ma_don FROM don_dat_ve WHERE ma_nguoi_dung IN (" + users + ")))")
         db("DELETE FROM thanh_toan WHERE ma_don IN (SELECT ma_don FROM don_dat_ve WHERE ma_nguoi_dung IN (" + users + "))")
     t16.cleanup_owned_data()
     if PAYMENT_METHODS_CREATED:

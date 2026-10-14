@@ -42,6 +42,10 @@ public final class VNPayClient {
             "vnp_TxnRef", "vnp_Amount", "vnp_BankCode", "vnp_PayDate", "vnp_TransactionNo",
             "vnp_TransactionType", "vnp_TransactionStatus", "vnp_OrderInfo", "vnp_PromotionCode",
             "vnp_PromotionAmount");
+    private static final List<String> REFUND_RESPONSE_CHECK_FIELDS = List.of(
+            "vnp_ResponseId", "vnp_Command", "vnp_ResponseCode", "vnp_Message", "vnp_TmnCode",
+            "vnp_TxnRef", "vnp_Amount", "vnp_BankCode", "vnp_PayDate", "vnp_TransactionNo",
+            "vnp_TransactionType", "vnp_TransactionStatus", "vnp_OrderInfo");
 
     private final VNPayConfig config;
     private final HttpClient httpClient;
@@ -60,6 +64,106 @@ public final class VNPayClient {
         this.config = Objects.requireNonNull(config, "config");
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /** Sends a signed refund request. requestId must be persisted by the caller before this call. */
+    public RefundResult refund(RefundCommand command) {
+        requireConfigured();
+        RefundValues values = validateRefundCommand(command);
+        String transactionType = command.fullRefund() ? "02" : "03";
+        String orderInfo = "Hoan tien don hang " + command.originalReference();
+        String createDate = formatDate(clock.instant());
+        String transactionDate = formatDate(command.originalCreatedAt());
+
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("vnp_RequestId", command.requestId());
+        fields.put("vnp_Version", "2.1.0");
+        fields.put("vnp_Command", "refund");
+        fields.put("vnp_TmnCode", config.tmnCode());
+        fields.put("vnp_TransactionType", transactionType);
+        fields.put("vnp_TxnRef", command.originalReference());
+        fields.put("vnp_Amount", providerAmount(values.amountVnd()));
+        fields.put("vnp_TransactionNo", nullToEmpty(command.originalTransactionNo()));
+        fields.put("vnp_TransactionDate", transactionDate);
+        fields.put("vnp_CreateBy", command.requestedBy().trim());
+        fields.put("vnp_CreateDate", createDate);
+        fields.put("vnp_IpAddr", command.clientIp());
+        fields.put("vnp_OrderInfo", orderInfo);
+        fields.put("vnp_SecureHash", hmac(String.join("|",
+                command.requestId(), "2.1.0", "refund", config.tmnCode(), transactionType,
+                command.originalReference(), fields.get("vnp_Amount"), fields.get("vnp_TransactionNo"),
+                transactionDate, fields.get("vnp_CreateBy"), createDate, command.clientIp(), orderInfo)));
+
+        Map<String, String> responseFields = postTransaction(fields);
+        verifyRefundResponse(responseFields, command, values.amountVnd(), transactionType);
+        String transactionNo = blankToNull(responseFields.get("vnp_TransactionNo"));
+        if (transactionNo != null && !transactionNo.matches("[0-9]{1,15}")) throw providerInvalidResponse();
+        Instant paidAt;
+        try {
+            paidAt = parseOptionalProviderDate(responseFields.get("vnp_PayDate"));
+        } catch (AccountException error) {
+            throw providerInvalidResponse();
+        }
+        return new RefundResult(command.requestId(), command.originalReference(),
+                BigDecimal.valueOf(values.amountVnd()), responseFields.get("vnp_ResponseCode"),
+                responseFields.get("vnp_TransactionStatus"), transactionNo, paidAt, true);
+    }
+
+    /**
+     * Queries the original merchant transaction reference. A QueryDR payment result alone is
+     * never proof of a refund; correlation requires the exact refund transaction number supplied
+     * by the caller, the expected refund type, and the requested refund amount.
+     */
+    public RefundResult queryRefund(RefundCommand command, String expectedRefundTransactionNo) {
+        requireConfigured();
+        RefundValues values = validateRefundCommand(command);
+        String requestId = UUID.randomUUID().toString().replace("-", "");
+        String orderInfo = "Truy van hoan tien don hang " + command.originalReference();
+        String transactionDate = formatDate(command.originalCreatedAt());
+        String createDate = formatDate(clock.instant());
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("vnp_RequestId", requestId);
+        fields.put("vnp_Version", "2.1.0");
+        fields.put("vnp_Command", "querydr");
+        fields.put("vnp_TmnCode", config.tmnCode());
+        fields.put("vnp_TxnRef", command.originalReference());
+        fields.put("vnp_OrderInfo", orderInfo);
+        fields.put("vnp_TransactionDate", transactionDate);
+        fields.put("vnp_CreateDate", createDate);
+        fields.put("vnp_IpAddr", command.clientIp());
+        fields.put("vnp_SecureHash", hmac(String.join("|", requestId, "2.1.0", "querydr",
+                config.tmnCode(), command.originalReference(), transactionDate, createDate,
+                command.clientIp(), orderInfo)));
+
+        Map<String, String> responseFields = postTransaction(fields);
+        verifyQueryResponseIdentity(responseFields, command.originalReference());
+        if (!"00".equals(responseFields.get("vnp_ResponseCode"))) throw providerUnavailable();
+
+        final long responseAmount;
+        final Instant paidAt;
+        try {
+            responseAmount = parseProviderAmount(responseFields.get("vnp_Amount"));
+            paidAt = parseOptionalProviderDate(responseFields.get("vnp_PayDate"));
+        } catch (AccountException error) {
+            throw providerInvalidResponse();
+        }
+        String transactionType = responseFields.get("vnp_TransactionType");
+        String transactionStatus = responseFields.get("vnp_TransactionStatus");
+        String transactionNo = blankToNull(responseFields.get("vnp_TransactionNo"));
+        if (transactionType == null || !transactionType.matches("0[123]")
+                || transactionStatus == null || !transactionStatus.matches("[0-9]{2}")
+                || (transactionNo != null && !transactionNo.matches("[0-9]{1,15}"))) {
+            throw providerInvalidResponse();
+        }
+
+        String expectedType = command.fullRefund() ? "02" : "03";
+        boolean correlated = expectedRefundTransactionNo != null && !expectedRefundTransactionNo.isBlank()
+                && expectedRefundTransactionNo.equals(transactionNo)
+                && expectedType.equals(transactionType)
+                && responseAmount == values.amountVnd();
+        return new RefundResult(command.requestId(), command.originalReference(),
+                BigDecimal.valueOf(responseAmount), responseFields.get("vnp_ResponseCode"),
+                transactionStatus, transactionNo, paidAt, correlated);
     }
 
     /**
@@ -213,6 +317,17 @@ public final class VNPayClient {
     }
 
     private void verifyQueryResponse(Map<String, String> fields, String expectedReference, long expectedAmount) {
+        verifyQueryResponseIdentity(fields, expectedReference);
+        long amount;
+        try {
+            amount = parseProviderAmount(fields.get("vnp_Amount"));
+        } catch (AccountException error) {
+            throw providerInvalidResponse();
+        }
+        if (amount != expectedAmount) throw providerInvalidResponse();
+    }
+
+    private void verifyQueryResponseIdentity(Map<String, String> fields, String expectedReference) {
         String suppliedHash = fields.get("vnp_SecureHash");
         if (suppliedHash == null || !suppliedHash.matches("(?i)[0-9a-f]{128}")) {
             throw providerInvalidResponse();
@@ -227,13 +342,97 @@ public final class VNPayClient {
         if (fields.get("vnp_ResponseCode") == null || fields.get("vnp_ResponseCode").isBlank()) {
             throw providerInvalidResponse();
         }
-        long amount;
+    }
+
+    private void verifyRefundResponse(Map<String, String> fields, RefundCommand command, long expectedAmount,
+            String expectedType) {
+        String suppliedHash = fields.get("vnp_SecureHash");
+        if (suppliedHash == null || !suppliedHash.matches("(?i)[0-9a-f]{128}")) throw providerInvalidResponse();
+        String hashData = String.join("|", REFUND_RESPONSE_CHECK_FIELDS.stream()
+                .map(field -> nullToEmpty(fields.get(field))).toList());
+        if (!constantTimeHexEquals(hmac(hashData), suppliedHash)) throw providerInvalidResponse();
+
+        String commandName = fields.get("vnp_Command");
+        if (commandName != null && !commandName.isBlank() && !"refund".equals(commandName)) {
+            throw providerInvalidResponse();
+        }
+        if (!config.tmnCode().equals(fields.get("vnp_TmnCode"))
+                || !command.originalReference().equals(fields.get("vnp_TxnRef"))
+                || !expectedType.equals(fields.get("vnp_TransactionType"))) {
+            throw providerInvalidResponse();
+        }
+        String responseId = fields.get("vnp_ResponseId");
+        String responseCode = fields.get("vnp_ResponseCode");
+        String transactionStatus = fields.get("vnp_TransactionStatus");
+        if (responseId == null || !responseId.matches("[A-Za-z0-9]{1,32}")
+                || responseCode == null || !responseCode.matches("[0-9]{2}")
+                || transactionStatus == null || !transactionStatus.matches("[0-9]{2}")) {
+            throw providerInvalidResponse();
+        }
+        final long amount;
         try {
             amount = parseProviderAmount(fields.get("vnp_Amount"));
         } catch (AccountException error) {
             throw providerInvalidResponse();
         }
         if (amount != expectedAmount) throw providerInvalidResponse();
+        String transactionNo = blankToNull(fields.get("vnp_TransactionNo"));
+        boolean confirmedSuccess = "00".equals(responseCode) && "00".equals(transactionStatus);
+        if ((confirmedSuccess && transactionNo == null)
+                || (transactionNo != null && !transactionNo.matches("[0-9]{1,15}"))) {
+            throw providerInvalidResponse();
+        }
+    }
+
+    private Map<String, String> postTransaction(Map<String, String> fields) {
+        HttpRequest request;
+        try {
+            request = HttpRequest.newBuilder(URI.create(config.queryUrl()))
+                    .timeout(config.requestTimeout())
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(fields), StandardCharsets.UTF_8))
+                    .build();
+        } catch (IllegalArgumentException | JsonProcessingException error) {
+            throw new AccountException(503, "PAYMENT_NOT_CONFIGURED", "Cấu hình VNPay chưa hợp lệ.");
+        }
+
+        final HttpResponse<String> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw providerUnavailable();
+        } catch (IOException | RuntimeException error) {
+            throw providerUnavailable();
+        }
+        if (response.statusCode() < 200 || response.statusCode() >= 300) throw providerUnavailable();
+        return readProviderObject(response.body());
+    }
+
+    private RefundValues validateRefundCommand(RefundCommand command) {
+        if (command == null) throw invalid("refund", "Yêu cầu hoàn tiền VNPay không hợp lệ.");
+        if (command.requestId() == null || !command.requestId().matches("[A-Za-z0-9]{32}")) {
+            throw invalid("requestId", "Mã yêu cầu hoàn tiền cần gồm 32 ký tự chữ hoặc số.");
+        }
+        requireReference(command.originalReference());
+        requireIp(command.clientIp());
+        if (command.originalCreatedAt() == null) {
+            throw invalid("originalCreatedAt", "Thiếu thời điểm tạo giao dịch VNPay.");
+        }
+        if (command.requestedBy() == null || command.requestedBy().isBlank()
+                || command.requestedBy().trim().length() > 245) {
+            throw invalid("requestedBy", "Người khởi tạo yêu cầu hoàn tiền không hợp lệ.");
+        }
+        if (command.originalTransactionNo() != null && !command.originalTransactionNo().isBlank()
+                && !command.originalTransactionNo().matches("[0-9]{1,15}")) {
+            throw invalid("originalTransactionNo", "Mã giao dịch VNPay không hợp lệ.");
+        }
+        long amount = toWholeVnd(command.amountVnd());
+        long originalAmount = toWholeVnd(command.originalAmountVnd());
+        if (amount > originalAmount || (command.fullRefund() && amount != originalAmount)) {
+            throw invalid("amountVnd", "Số tiền hoàn không được vượt quá số tiền giao dịch gốc.");
+        }
+        return new RefundValues(amount, originalAmount);
     }
 
     private VerifiedPayment paymentFromFields(Map<String, String> fields) {
@@ -412,4 +611,27 @@ public final class VNPayClient {
         public String txnStatus() { return transactionStatus; }
         public String providerTxn() { return providerTransaction; }
     }
+
+    public record RefundCommand(
+            String requestId,
+            String originalReference,
+            BigDecimal amountVnd,
+            BigDecimal originalAmountVnd,
+            Instant originalCreatedAt,
+            String originalTransactionNo,
+            boolean fullRefund,
+            String requestedBy,
+            String clientIp) {}
+
+    public record RefundResult(
+            String requestId,
+            String originalReference,
+            BigDecimal amountVnd,
+            String responseCode,
+            String transactionStatus,
+            String transactionNo,
+            Instant paidAt,
+            boolean correlated) {}
+
+    private record RefundValues(long amountVnd, long originalAmountVnd) {}
 }
