@@ -14,6 +14,7 @@ import java.util.Set;
 /** Pure T17 price allocation; it has no HTTP, persistence or promotion concerns. */
 public final class PriceCalculator {
     private static final BigDecimal MAX_VND = new BigDecimal("999999999999");
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final BigDecimal ONE = BigDecimal.ONE;
 
     private PriceCalculator() {}
@@ -54,6 +55,31 @@ public final class PriceCalculator {
                 amount(discount),
                 amount(total.subtract(discount)),
                 lines);
+    }
+
+    /**
+     * Calculates the amount returned for an issued ticket cancellation.
+     * The caller owns ticket state, policy selection, persistence and provider calls.
+     */
+    public static BigDecimal calculateRefund(
+            BigDecimal paidAmount,
+            BigDecimal refundPercent,
+            BigDecimal cancellationFee) {
+        validateVnd(paidAmount, "Tiền đã thanh toán");
+        validateVnd(cancellationFee, "Phí hủy");
+        if (refundPercent == null || refundPercent.signum() < 0
+                || refundPercent.compareTo(HUNDRED) > 0
+                || refundPercent.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("Tỷ lệ hoàn phải từ 0 đến 100 và có tối đa 2 chữ số thập phân.");
+        }
+
+        BigDecimal refund = paidAmount.multiply(refundPercent)
+                .divide(HUNDRED)
+                .subtract(cancellationFee)
+                .setScale(0, RoundingMode.HALF_UP)
+                .max(BigDecimal.ZERO)
+                .min(paidAmount);
+        return refund;
     }
 
     private static List<BigDecimal> allocate(

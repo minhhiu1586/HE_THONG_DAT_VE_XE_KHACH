@@ -570,9 +570,12 @@ def cleanup_owned_data():
     users = ",".join(sql_literal(user_id) for user_id in user_ids)
     # Customers are newly registered for this run. Their generated order IDs are UUIDs, not PREFIX IDs.
     owned_orders = "SELECT ma_don FROM don_dat_ve WHERE ma_nguoi_dung IN (" + users + ")"
+    db(f"DELETE FROM refund_request WHERE ma_don IN ({owned_orders})")
+    db(f"DELETE FROM payment_gateway_metadata WHERE ma_giao_dich IN (SELECT ma_giao_dich FROM thanh_toan WHERE ma_don IN ({owned_orders}))")
     db(f"DELETE FROM api_idempotency WHERE user_id IN ({users})")
     db(f"DELETE FROM ve_xe WHERE ma_don IN ({owned_orders})")
     db(f"DELETE FROM giu_cho WHERE ma_don IN ({owned_orders})")
+    db(f"DELETE FROM thanh_toan WHERE ma_don IN ({owned_orders})")
     db(f"DELETE FROM don_dat_ve WHERE ma_don IN ({owned_orders})")
     if PROMO_ID:
         db(f"DELETE FROM khuyen_mai WHERE ma_khuyen_mai={sql_literal(PROMO_ID)}")

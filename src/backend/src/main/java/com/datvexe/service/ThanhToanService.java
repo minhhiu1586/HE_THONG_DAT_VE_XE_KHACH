@@ -14,6 +14,8 @@ import com.datvexe.repository.IdempotencyRepository;
 import com.datvexe.repository.DonDatVeRepository;
 import com.datvexe.repository.GiuChoRepository;
 import com.datvexe.repository.ThanhToanRepository;
+import com.datvexe.repository.PaymentGatewayMetadataRepository;
+import com.datvexe.repository.HoanVeRepository;
 import com.datvexe.security.AccessControl;
 import com.datvexe.security.AccountException;
 import com.datvexe.security.CurrentUser;
@@ -65,6 +67,7 @@ public final class ThanhToanService {
 
     /** Provider abstraction keeps the service independent from the VNPay HTTP client. */
     public interface Gateway {
+        default String merchantCode() { return VNPayConfig.fromEnvironment().tmnCode(); }
         String payUrl(String reference, BigDecimal amount, Instant created, Instant expiry, String ip);
         VNPayClient.VerifiedPayment queryDr(String reference, BigDecimal expectedAmount, Instant originalCreateDate, String ip);
         VNPayClient.VerifiedPayment verifyCallback(Map<String, String> parameters);
@@ -105,8 +108,9 @@ public final class ThanhToanService {
             OrderTrip pair = lockOrderTrip(em, orderId, caller);
             DonDatVe order = pair.order();
             ensurePayable(order, pair.holds());
-            if (!em.createQuery("select t.maGiaoDich from ThanhToan t where t.donDatVe = :order and t.trangThai = :state", String.class)
-                    .setParameter("order", order).setParameter("state", TrangThaiThanhToan.THANH_CONG).getResultList().isEmpty())
+            if (!em.createQuery("select t.maGiaoDich from ThanhToan t where t.donDatVe = :order and t.trangThai in :states", String.class)
+                    .setParameter("order", order).setParameter("states", List.of(TrangThaiThanhToan.THANH_CONG,
+                            TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN,TrangThaiThanhToan.DA_HOAN_TIEN)).getResultList().isEmpty())
                 throw new AccountException(409, "PAYMENT_PROCESSING", "Đơn đã có giao dịch thành công cần xử lý, không tạo lần thu tiền mới.");
 
             ThanhToanRepository payments = new ThanhToanRepository(em);
@@ -152,6 +156,9 @@ public final class ThanhToanService {
                     copy, frozenLines(order, pair.holds()));
             ensurePayable(order, pair.holds());
             em.persist(payment);
+            em.flush();
+            if ("VNPAY".equals(method.maPhuongThuc))
+                new PaymentGatewayMetadataRepository(em).save(reference,gateway.merchantCode(),created);
             if ("MIEN_PHI".equalsIgnoreCase(method.maPhuongThuc)) {
                 BookingDto.Result done = finish(em, payment, new VNPayClient.VerifiedPayment(reference, 0, "00", "00", created, "FREE"), attempt);
                 if (((ThanhToanDto.PaymentResponse) done.body()).canDoiSoat()) {
@@ -257,10 +264,12 @@ public final class ThanhToanService {
                     .setParameter("order", ticket.donDatVe).getSingleResult();
             BigDecimal gross = ticket.donDatVe.tongTien.divide(BigDecimal.valueOf(originalCount), 0, RoundingMode.UNNECESSARY);
             BigDecimal net = ticket.giaVe == null ? BigDecimal.ZERO : ticket.giaVe;
+            boolean refundPending = new HoanVeRepository(em).ticketBlocked(ticket.maVe);
+            boolean showQr = !refundPending && (ticket.trangThai == TrangThaiVe.DA_XUAT_VE || ticket.trangThai == TrangThaiVe.DA_LEN_XE);
             return new ThanhToanDto.TicketResponse(ticket.maVe, ticket.maTraCuu, ticket.donDatVe.maDon, ticket.chuyenXe.maChuyen,
                     ticket.ghe.maGhe, ticket.hoTenKhachHang, ticket.soDienThoaiKhachHang, ticket.cccdHanhKhach,
                     money(gross), money(gross.subtract(net).max(BigDecimal.ZERO)), money(net), VND,
-                    ticket.maQR, offset(ticket.ngayXuatVe), ticket.trangThai);
+                    showQr ? ticket.maQR : null, offset(ticket.ngayXuatVe), ticket.trangThai,refundPending);
         });
     }
 
@@ -273,6 +282,8 @@ public final class ThanhToanService {
         boolean expired = order.trangThai == TrangThaiDon.HET_HAN || holds.stream().anyMatch(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU && !serverNow.isBefore(h.thoiDiemHetHan));
         payment.trangThai = TrangThaiThanhToan.THANH_CONG;
         payment.thoiGianThanhToan = paidAt;
+        if ("VNPAY".equals(payment.phuongThucThanhToan.maPhuongThuc))
+            new PaymentGatewayMetadataRepository(em).confirmed(payment.maGiaoDich,verified.providerTransaction());
         if (expired && order.trangThai != TrangThaiDon.DA_THANH_TOAN) {
             order.trangThai = TrangThaiDon.HET_HAN;
             holds.stream().filter(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU)
@@ -368,7 +379,7 @@ public final class ThanhToanService {
                 payment.trangThai == TrangThaiThanhToan.CHO_XU_LY ? false : true,
                 context == null ? null : offset(context.createdAt()), actualUrl,
                 context == null ? null : offset(context.expiresAt()), offset(payment.thoiGianThanhToan),
-                reconcile || (payment.trangThai == TrangThaiThanhToan.THANH_CONG
+                reconcile || (Set.of(TrangThaiThanhToan.THANH_CONG,TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN,TrangThaiThanhToan.DA_HOAN_TIEN).contains(payment.trangThai)
                         && payment.donDatVe.trangThai != TrangThaiDon.DA_THANH_TOAN));
     }
 

@@ -113,8 +113,8 @@ public final class OperatorService {
         long tickets = count(em, "select count(v) from VeXe v where v.chuyenXe.tuyenXe.nhaXe = :operator and v.trangThai = :state",
             operator, "state", TrangThaiVe.DA_XUAT_VE);
         long paid = count(em, "select count(distinct v) from VeXe v join v.donDatVe d join d.danhSachThanhToan t "
-            + "where v.chuyenXe.tuyenXe.nhaXe = :operator and t.trangThai = :state",
-            operator, "state", TrangThaiThanhToan.THANH_CONG);
+            + "where v.chuyenXe.tuyenXe.nhaXe = :operator and t.trangThai in :states",
+            operator, "states", java.util.List.of(TrangThaiThanhToan.THANH_CONG,TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN,TrangThaiThanhToan.DA_HOAN_TIEN));
         return new Impact(upcoming, running, holds, tickets, paid);
     }
     public Impact impact(CurrentUser user, String operatorId) {

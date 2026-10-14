@@ -41,7 +41,7 @@ Bên cạnh đó, hệ thống cung cấp các chức năng quản lý nhà xe, 
 - Hỗ trợ hoàn vé, kiểm vé và quản lý chuyến xe.
 - Cung cấp công cụ quản trị và thống kê cho nhà xe.
 
-> **Trạng thái dự án:** Đang phát triển. Các chức năng được liệt kê bên dưới là phạm vi thiết kế, chưa phải danh sách chức năng đã hoàn thành. Hiện repo có giao diện và API tài khoản, tìm chuyến, quản lý một phần tuyến/xe; một số màn hình còn dùng dữ liệu mẫu. Luồng đặt vé, thanh toán và hoàn tiền chưa được tích hợp đầu cuối. Xem kết quả kiểm thử để biết phần đã được xác minh.
+> **Trạng thái dự án:** Đang phát triển. Một số API đặt vé, báo giá, thanh toán VNPay và yêu cầu hoàn tiền đã có trong mã nguồn Backend; việc tích hợp đầu cuối và môi trường triển khai cần được đánh giá theo kết quả kiểm thử. Một số màn hình Frontend vẫn dùng dữ liệu mẫu. Tài liệu mô tả cả API đã triển khai trong mã nguồn và phần còn đề xuất.
 
 ---
 
@@ -287,7 +287,7 @@ Các biến môi trường được khai báo trong [`.env.example`](.env.exampl
 
 Hệ thống hiện sử dụng **Session Cookie** để quản lý phiên đăng nhập.
 
-**Thanh toán trực tuyến:** [Bổ sung tên cổng thanh toán, hướng dẫn sandbox và biến môi trường sau khi tích hợp.]
+**Thanh toán trực tuyến:** VNPay sandbox và cấu hình Backend được mô tả trong [payment-vnpay.md](docs/api/payment-vnpay.md). Kết quả hoàn tiền cần được tra cứu/đối soát; HTTP `202` chưa xác nhận tiền đã hoàn.
 
 ---
 
@@ -325,6 +325,8 @@ Backend cung cấp các nhóm API:
 
 - [API Documentation](docs/api/README.md)
 - [OpenAPI Specification](docs/api/openapi.yaml)
+- [Ticket refund API](docs/api/ticket-refund.md)
+- [Ticket refund OpenAPI subset](docs/api/ticket-refund-openapi.json)
 
 > Tài liệu API có thể bao gồm cả endpoint đang thiết kế. Cần đối chiếu với Servlet mapping để xác định các API đã triển khai.
 

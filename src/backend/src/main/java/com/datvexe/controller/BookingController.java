@@ -1,7 +1,6 @@
 package com.datvexe.controller;
 
 import com.datvexe.config.Jpa;
-import com.datvexe.domain.Entities.DonDatVe;
 import com.datvexe.domain.States.TrangThaiDon;
 import com.datvexe.dto.BookingDto;
 import com.datvexe.dto.BookingDto.OrderResponse;
@@ -10,6 +9,8 @@ import com.datvexe.dto.HoldSeatRequest;
 import com.datvexe.dto.HoldSeatResponse;
 import com.datvexe.dto.PricingDto;
 import com.datvexe.dto.ThanhToanDto;
+import com.datvexe.dto.HoanVeDto;
+import com.datvexe.service.HoanVeService;
 import com.datvexe.security.AccountException;
 import com.datvexe.security.RequestIdentity;
 import com.datvexe.service.BookingService;
@@ -21,8 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -32,19 +31,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
-@WebServlet(urlPatterns = { "/api/booking", "/api/booking/*" })
+@WebServlet(urlPatterns = {"/api/booking", "/api/booking/*"})
 public class BookingController extends HttpServlet {
     private static final String ROOT = "/api/booking";
     private static final String SESSION_REQUEST_ATTRIBUTE = BookingController.class.getName() + ".session";
     private static final String USER_REQUEST_ATTRIBUTE = BookingController.class.getName() + ".userId";
     private static final Set<String> HOLD_FIELDS = Set.of("maChuyen", "danhSachMaGhe");
     private static final Set<String> PASSENGER_FIELDS = Set.of("maGhe", "hoTen", "soDienThoai", "cccd");
-    private static final Set<String> PATCH_FIELDS = Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail",
-            "ghiChu");
+    private static final Set<String> PATCH_FIELDS = Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail", "ghiChu");
 
     private final ObjectMapper json = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -56,17 +53,16 @@ public class BookingController extends HttpServlet {
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private BookingService service;
     private ThanhToanService payments;
+    private HoanVeService refunds;
 
     @Override
     public void init() {
         service = new BookingService(Jpa.factory());
         payments = new ThanhToanService(Jpa.factory());
+        refunds = new HoanVeService(Jpa.factory());
     }
 
-    /**
-     * HttpServlet has no PATCH hook, so route and dispatch the supported verbs
-     * here.
-     */
+    /** HttpServlet has no PATCH hook, so route and dispatch the supported verbs here. */
     @Override
     protected void service(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -79,14 +75,11 @@ public class BookingController extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             return;
         }
-        if (!route.allows(method))
-            throw methodNotAllowed(response, route);
-        if (route.kind() != Kind.PAYMENT)
-            requireNoQuery(request);
+        if (!route.allows(method)) throw methodNotAllowed(response, route);
+        if (route.kind() != Kind.PAYMENT) requireNoQuery(request);
 
-        // Holding seats has its own idempotency lock. Do not serialize these requests
-        // on the session.
-        if (route.kind() == Kind.HOLD) {
+        // Holding seats has its own idempotency lock. Do not serialize these requests on the session.
+        if (route.kind() == Kind.HOLD || route.kind() == Kind.REFUND || route.kind() == Kind.REFUND_PREVIEW) {
             doPost(request, response);
             return;
         }
@@ -123,9 +116,8 @@ public class BookingController extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Route route = route(request);
         if (route.kind() == Kind.HISTORY) {
-            requireNoQuery(request); // Không yêu cầu tham số
-            BookingDto.Result result = service.getMyOrders(); // Gọi sang service
-            write(response, result); // Trả JSON
+            requireNoQuery(request);
+            write(response, service.getMyOrders());
             return;
         }
         if (route.kind() == Kind.PAYMENT) {
@@ -147,6 +139,17 @@ public class BookingController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Route route = route(request);
+        if (route.kind() == Kind.REFUND || route.kind() == Kind.REFUND_PREVIEW) {
+            HoanVeDto.Request body = RefundHttp.body(request,HoanVeDto.Request.class);
+            if (route.kind() == Kind.REFUND_PREVIEW) writeJson(response,200,refunds.preview(route.maDon(),body));
+            else {
+                var result = refunds.create(route.maDon(),body,request.getHeader("Idempotency-Key"),request.getRemoteAddr());
+                JsonNode output = json.valueToTree(result.body());
+                response.setHeader("Location",request.getContextPath()+"/api/hoan-tien/"+output.path("maHoanTien").asText());
+                write(response,result);
+            }
+            return;
+        }
         if (route.kind() == Kind.PAYMENT) {
             requireNoQuery(request);
             JsonNode body = readObject(request, Set.of("maPhuongThuc"));
@@ -167,11 +170,9 @@ public class BookingController extends HttpServlet {
             checkStrings(body, "maChuyen");
             JsonNode seats = body.get("danhSachMaGhe");
             if (seats != null && !seats.isNull()) {
-                if (!seats.isArray())
-                    throw invalid("danhSachMaGhe", "Danh sách ghế phải là một mảng.");
+                if (!seats.isArray()) throw invalid("danhSachMaGhe", "Danh sách ghế phải là một mảng.");
                 for (JsonNode seat : seats) {
-                    if (!seat.isTextual())
-                        throw invalid("danhSachMaGhe", "Mỗi mã ghế phải là chuỗi.");
+                    if (!seat.isTextual()) throw invalid("danhSachMaGhe", "Mỗi mã ghế phải là chuỗi.");
                 }
             }
             HoldSeatRequest input = convert(body, HoldSeatRequest.class);
@@ -231,11 +232,9 @@ public class BookingController extends HttpServlet {
                 JsonNode body = readObject(request, Set.of("hanhKhach"));
                 JsonNode passengers = body.get("hanhKhach");
                 if (passengers != null && !passengers.isNull()) {
-                    if (!passengers.isArray())
-                        throw invalid("hanhKhach", "Danh sách hành khách phải là một mảng.");
+                    if (!passengers.isArray()) throw invalid("hanhKhach", "Danh sách hành khách phải là một mảng.");
                     for (JsonNode passenger : passengers) {
-                        if (!passenger.isObject())
-                            throw invalid("hanhKhach", "Mỗi hành khách phải là một object.");
+                        if (!passenger.isObject()) throw invalid("hanhKhach", "Mỗi hành khách phải là một object.");
                         requireAllowed(passenger, PASSENGER_FIELDS);
                         checkStrings(passenger, "maGhe", "hoTen", "soDienThoai", "cccd");
                     }
@@ -276,19 +275,14 @@ public class BookingController extends HttpServlet {
 
     private Route route(HttpServletRequest request) {
         String path = request.getServletPath();
-        if (!ROOT.equals(path))
-            throw notFound();
+        if (!ROOT.equals(path)) throw notFound();
         String info = request.getPathInfo();
-        if (info == null || info.isEmpty() || info.equals("/"))
-            throw notFound();
+        if (info == null || info.isEmpty() || info.equals("/")) throw notFound();
         String[] part = info.substring(1).split("/", -1);
 
-        if (part.length == 1 && part[0].equals("hold"))
-            return new Route(Kind.HOLD, null, null);
-        if (part.length == 1 && part[0].equals("me"))
-            return new Route(Kind.HISTORY, null, null);
-        if (part.length == 1 && resourceCode(part[0]))
-            return new Route(Kind.ORDER, part[0], null);
+        if (part.length == 1 && part[0].equals("hold")) return new Route(Kind.HOLD, null, null);
+        if (part.length == 1 && part[0].equals("me")) return new Route(Kind.HISTORY, null, null);
+        if (part.length == 1 && resourceCode(part[0])) return new Route(Kind.ORDER, part[0], null);
         if (part.length == 2 && resourceCode(part[0])) {
             Kind kind = switch (part[1]) {
                 case "hanh-khach" -> Kind.PASSENGERS;
@@ -298,10 +292,13 @@ public class BookingController extends HttpServlet {
                 case "bao-gia" -> Kind.QUOTE;
                 case "chot-gia" -> Kind.FREEZE;
                 case "thanh-toan" -> Kind.PAYMENT;
+                case "hoan-tien" -> Kind.REFUND;
                 default -> null;
             };
-            if (kind != null)
-                return new Route(kind, part[0], null);
+            if (kind != null) return new Route(kind, part[0], null);
+        }
+        if (part.length == 3 && resourceCode(part[0]) && part[1].equals("hoan-tien") && part[2].equals("du-kien")) {
+            return new Route(Kind.REFUND_PREVIEW,part[0],null);
         }
         if (part.length == 3 && resourceCode(part[0]) && part[1].equals("ghe") && resourceCode(part[2])) {
             return new Route(Kind.SEAT, part[0], part[2]);
@@ -314,32 +311,25 @@ public class BookingController extends HttpServlet {
     }
 
     private void requireNoQuery(HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty())
-            throw invalid("query", "Đường dẫn này không hỗ trợ tham số query.");
+        if (!request.getParameterMap().isEmpty()) throw invalid("query", "Đường dẫn này không hỗ trợ tham số query.");
     }
 
     private int integerQuery(HttpServletRequest request, String name, int fallback) {
         String value = request.getParameter(name);
-        if (value == null)
-            return fallback;
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException error) {
-            throw invalid(name, "Tham số phải là số nguyên.");
-        }
+        if (value == null) return fallback;
+        try { return Integer.parseInt(value); }
+        catch (NumberFormatException error) { throw invalid(name, "Tham số phải là số nguyên."); }
     }
 
     private void requireAllowed(JsonNode body, Set<String> allowed) {
         body.fieldNames().forEachRemaining(field -> {
-            if (!allowed.contains(field))
-                throw invalid(field, "Trường này không được hỗ trợ.");
+            if (!allowed.contains(field)) throw invalid(field, "Trường này không được hỗ trợ.");
         });
     }
 
     private JsonNode readObject(HttpServletRequest request, Set<String> allowed) throws IOException {
         JsonNode body = readTree(request);
-        if (body == null || !body.isObject())
-            throw invalid("body", "Body phải là một JSON object.");
+        if (body == null || !body.isObject()) throw invalid("body", "Body phải là một JSON object.");
         requireAllowed(body, allowed);
         return body;
     }
@@ -355,8 +345,7 @@ public class BookingController extends HttpServlet {
 
     private void requireEmptyBody(HttpServletRequest request, String message) throws IOException {
         JsonNode body = readTree(request);
-        if (body != null && (!body.isObject() || body.size() != 0))
-            throw invalid("body", message);
+        if (body != null && (!body.isObject() || body.size() != 0)) throw invalid("body", message);
     }
 
     private void checkStrings(JsonNode body, String... fields) {
@@ -382,8 +371,7 @@ public class BookingController extends HttpServlet {
 
     private HttpSession session(HttpServletRequest request) {
         Object value = request.getAttribute(SESSION_REQUEST_ATTRIBUTE);
-        if (value instanceof HttpSession session)
-            return session;
+        if (value instanceof HttpSession session) return session;
         throw new IllegalStateException("Booking session was not initialized for this request.");
     }
 
@@ -444,15 +432,11 @@ public class BookingController extends HttpServlet {
     private void storePassengers(HttpServletRequest request, Route route, OrderResponse order) {
         List<PassengerRequest> passengers = Set.of(TrangThaiDon.CHO_XU_LY, TrangThaiDon.CHO_THANH_TOAN)
                 .contains(order.trangThaiDon())
-                        ? order.hanhKhach()
-                        : List.of();
+                ? order.hanhKhach() : List.of();
         BookingSession.update(session(request), userId(request), route.maDon(), passengers);
     }
 
-    /**
-     * A successful real mutation invalidates the volatile quote after its
-     * transaction commits.
-     */
+    /** A successful real mutation invalidates the volatile quote after its transaction commits. */
     private void clearQuoteAfterMutation(HttpServletRequest request, Route route) {
         if (route.kind() == Kind.PASSENGERS
                 || route.kind() == Kind.CHANGE_SEAT
@@ -464,15 +448,13 @@ public class BookingController extends HttpServlet {
     }
 
     private void setHoldLocation(HttpServletRequest request, HttpServletResponse response, BookingDto.Result result) {
-        if (result.status() != HttpServletResponse.SC_CREATED)
-            return;
+        if (result.status() != HttpServletResponse.SC_CREATED) return;
         String orderId = null;
         if (result.body() instanceof HoldSeatResponse hold) {
             orderId = hold.maDon();
         } else if (result.body() instanceof JsonNode body && body.isObject()) {
             JsonNode value = body.get("maDon");
-            if (value != null && value.isTextual())
-                orderId = value.asText();
+            if (value != null && value.isTextual()) orderId = value.asText();
         }
         if (resourceCode(orderId)) {
             response.setHeader("Location", request.getContextPath() + ROOT + "/" + orderId);
@@ -481,15 +463,13 @@ public class BookingController extends HttpServlet {
 
     private void write(HttpServletResponse response, BookingDto.Result result) throws IOException {
         response.setStatus(result.status());
-        if (result.status() == HttpServletResponse.SC_NO_CONTENT || result.body() == null)
-            return;
+        if (result.status() == HttpServletResponse.SC_NO_CONTENT || result.body() == null) return;
         writeJson(response, result.status(), result.body());
     }
 
     private void writeJson(HttpServletResponse response, int status, Object body) throws IOException {
         response.setStatus(status);
-        if (status == HttpServletResponse.SC_NO_CONTENT || body == null)
-            return;
+        if (status == HttpServletResponse.SC_NO_CONTENT || body == null) return;
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
         json.writeValue(response.getOutputStream(), body);
@@ -497,8 +477,7 @@ public class BookingController extends HttpServlet {
 
     private void writeSerializedJson(HttpServletResponse response, int status, String body) throws IOException {
         response.setStatus(status);
-        if (status == HttpServletResponse.SC_NO_CONTENT || body == null)
-            return;
+        if (status == HttpServletResponse.SC_NO_CONTENT || body == null) return;
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
         response.getWriter().write(body);
@@ -517,9 +496,7 @@ public class BookingController extends HttpServlet {
         return AccountException.invalid(field, message);
     }
 
-    private enum Kind {
-        HOLD, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL, QUOTE, FREEZE, PAYMENT, HISTORY
-    }
+    private enum Kind { HOLD, HISTORY, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL, QUOTE, FREEZE, PAYMENT, REFUND, REFUND_PREVIEW }
 
     private record Route(Kind kind, String maDon, String maGhe) {
         boolean allows(String method) {
@@ -530,7 +507,7 @@ public class BookingController extends HttpServlet {
                 case PASSENGERS, CHANGE_SEAT -> method.equals("PUT");
                 case SEAT -> method.equals("DELETE");
                 case PROMOTION -> Set.of("PUT", "DELETE").contains(method);
-                case CANCEL, QUOTE, FREEZE -> method.equals("POST");
+                case CANCEL, QUOTE, FREEZE, REFUND, REFUND_PREVIEW -> method.equals("POST");
                 case PAYMENT -> Set.of("GET", "HEAD", "POST").contains(method);
             };
         }
@@ -543,7 +520,7 @@ public class BookingController extends HttpServlet {
                 case PASSENGERS, CHANGE_SEAT -> "PUT, OPTIONS";
                 case SEAT -> "DELETE, OPTIONS";
                 case PROMOTION -> "PUT, DELETE, OPTIONS";
-                case CANCEL, QUOTE, FREEZE -> "POST, OPTIONS";
+                case CANCEL, QUOTE, FREEZE, REFUND, REFUND_PREVIEW -> "POST, OPTIONS";
                 case PAYMENT -> "GET, HEAD, POST, OPTIONS";
             };
         }

@@ -356,7 +356,7 @@ public final class Entities {
         @Column(name = "so_gio_toi_thieu_truoc_khoi_hanh", nullable = false) public int soGioToiThieuTruocKhoiHanh;
         @Column(name = "ty_le_hoan", nullable = false, precision = 5, scale = 2) public BigDecimal tyLeHoan;
         @Column(name = "phi_hoan", nullable = false, precision = 14, scale = 2) public BigDecimal phiHoan = BigDecimal.ZERO;
-        @Column(name = "cho_phep_hoan_huy_ve", nullable = false) public boolean choPhepHoanHuyVe;
+        @Column(name = "cho_phep_hoan_ve_khuyen_mai", nullable = false) public boolean choPhepHoanVeKhuyenMai;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
         public TrangThaiChinhSach trangThai = TrangThaiChinhSach.HOAT_DONG;
         @OneToMany(mappedBy = "chinhSachHoanVe") public List<DonDatVe> danhSachDonDat = new ArrayList<>();

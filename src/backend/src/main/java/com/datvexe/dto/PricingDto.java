@@ -1,6 +1,7 @@
 package com.datvexe.dto;
 
 import com.datvexe.domain.States.TrangThaiDon;
+import com.datvexe.dto.ChinhSachHoanVeDto;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -55,9 +56,26 @@ public final class PricingDto {
             String tongTienGiam,
             String tongThanhToan,
             List<PriceLine> chiTietGia,
-            PromotionResult ketQuaKhuyenMai) implements Serializable {
+            PromotionResult ketQuaKhuyenMai,
+            ChinhSachHoanVeDto.Response chinhSachHoanVe) implements Serializable {
         @Serial
         private static final long serialVersionUID = 1L;
+
+        public QuoteResponse(
+                String maBaoGia,
+                String maDon,
+                String donViTienTe,
+                OffsetDateTime thoiDiemBaoGia,
+                OffsetDateTime thoiDiemHetHan,
+                String tongTienGoc,
+                String tongTienGiam,
+                String tongThanhToan,
+                List<PriceLine> chiTietGia,
+                PromotionResult ketQuaKhuyenMai) {
+            this(maBaoGia, maDon, donViTienTe, thoiDiemBaoGia, thoiDiemHetHan,
+                    tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia,
+                    ketQuaKhuyenMai, null);
+        }
 
         public QuoteResponse {
             chiTietGia = List.copyOf(chiTietGia);
@@ -84,9 +102,26 @@ public final class PricingDto {
             String tongTienGiam,
             String tongThanhToan,
             List<PriceLine> chiTietGia,
-            PromotionResult ketQuaKhuyenMai) implements Serializable {
+            PromotionResult ketQuaKhuyenMai,
+            ChinhSachHoanVeDto.Response chinhSachHoanVe) implements Serializable {
         @Serial
         private static final long serialVersionUID = 1L;
+
+        public FreezePriceResponse(
+                String maBaoGia,
+                String maDon,
+                TrangThaiDon trangThaiDon,
+                String donViTienTe,
+                OffsetDateTime thoiDiemHetHan,
+                String tongTienGoc,
+                String tongTienGiam,
+                String tongThanhToan,
+                List<PriceLine> chiTietGia,
+                PromotionResult ketQuaKhuyenMai) {
+            this(maBaoGia, maDon, trangThaiDon, donViTienTe, thoiDiemHetHan,
+                    tongTienGoc, tongTienGiam, tongThanhToan, chiTietGia,
+                    ketQuaKhuyenMai, null);
+        }
 
         public FreezePriceResponse {
             chiTietGia = List.copyOf(chiTietGia);
