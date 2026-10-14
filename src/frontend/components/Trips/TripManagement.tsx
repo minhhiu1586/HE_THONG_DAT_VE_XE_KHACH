@@ -5,6 +5,7 @@ import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
 import { useManagementFocus } from '@/lib/use-management-focus';
+import TripPassengerModal from './TripPassengerModal';
 import styles from './TripManagement.module.css';
 
 type Route={maTuyen:string;tenTuyen:string;maNhaXe:string|null;giaCoBan:number;thoiGianDuKien:number;trangThai:string};
@@ -34,6 +35,7 @@ export default function TripManagement(){
   const [form,setForm]=useState(empty),[editing,setEditing]=useState(false);
   const [filters,setFilters]=useState({maTuyen:'',maXe:'',trangThai:'',tuNgay:'',denNgay:''});
   const [selected,setSelected]=useState<Trip|null>(null),[report,setReport]=useState<Report|null>(null);
+  const [viewingPassengersTrip, setViewingPassengersTrip] = useState<string | null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
   const [initialLoading,setInitialLoading]=useState(true);const waiting=busy||initialLoading;
   const sending=useRef(false),revision=useRef(0);
@@ -101,7 +103,9 @@ export default function TripManagement(){
       </form>
       <div className={styles.scroll}><table><thead><tr><th>Mã chuyến / tuyến</th><th>Khởi hành → đến</th><th>Xe</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{page.items.map(trip=><tr key={trip.maChuyen}>
         <td>{trip.maChuyen}<small>{trip.tenTuyen}</small><small>{trip.tenNhaXe}</small></td><td>{trip.ngayKhoiHanh} {trip.gioKhoiHanh.slice(0,5)}<small>→ {dateTime(trip.gioDenDuKien)}</small></td><td>{trip.bienSo??'Chưa gán'}</td><td>{stateLabel(trip)}</td><td className={styles.buttons}>
-          <button disabled={waiting} onClick={()=>void action(()=>detail(trip.maChuyen))}>Chi tiết / mở bán</button><button disabled={waiting||!trip.coTheSua} onClick={()=>edit(trip)}>Sửa</button>
+          <button disabled={waiting} onClick={()=>void action(()=>detail(trip.maChuyen))}>Chi tiết / mở bán</button>
+          <button disabled={waiting} onClick={()=>setViewingPassengersTrip(trip.maChuyen)}>Hành khách & Vé</button>
+          <button disabled={waiting||!trip.coTheSua} onClick={()=>edit(trip)}>Sửa</button>
           <button disabled={waiting||!trip.coTheXoa} onClick={()=>{if(window.confirm(`Xóa chuyến nháp ${trip.maChuyen}?`))void action(async()=>{await request(`${API}/${encodeURIComponent(trip.maChuyen)}`,'DELETE');await load();if(selected?.maChuyen===trip.maChuyen){setSelected(null);setReport(null);}},'Đã xóa chuyến nháp.');}}>Xóa</button>
         </td></tr>)}{page.items.length===0&&<tr><td colSpan={5}>Không có chuyến phù hợp.</td></tr>}</tbody></table></div>
       <div className={styles.buttons}><button disabled={waiting||page.page<=1} onClick={()=>void action(()=>load(page.page-1))}>Trang trước</button><span>Trang {page.page} · {page.totalItems} chuyến</span><button disabled={waiting||page.page>=page.totalPages} onClick={()=>void action(()=>load(page.page+1))}>Trang sau</button></div>
@@ -112,11 +116,18 @@ export default function TripManagement(){
       <h3>Nhân viên đã phân công</h3><div className={styles.scroll}><table><thead><tr><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th>Hạn bằng lái</th></tr></thead><tbody>{selected.nhanVienPhanCong.map(c=><tr key={c.maPhanCong}><td>{c.hoTen}</td><td>{crewRoles[c.vaiTro]??c.vaiTro}</td><td>{c.trangThai==='DANG_LAM_VIEC'?'Đang làm việc':c.trangThai}</td><td>{c.ngayHetHanBangLai??'Không áp dụng'}</td></tr>)}{selected.nhanVienPhanCong.length===0&&<tr><td colSpan={4}>Chưa có nhân viên được phân công. Cần hoàn tất phân công trước khi mở bán.</td></tr>}</tbody></table></div>
       <h3>Điều kiện mở bán</h3>{report&&<ul className={styles.checks}>{report.dieuKien.map(check=><li key={check.maDieuKien} className={check.dat?styles.passed:styles.failed}><span aria-hidden="true">{check.dat?'✓':'✕'}</span><div><strong>{check.tenDieuKien}</strong><small>{check.dat?'Đạt':check.lyDo}</small></div></li>)}</ul>}
       <div className={styles.buttons}><button disabled={waiting} onClick={()=>void action(()=>detail(selected.maChuyen,false))}>Kiểm tra lại điều kiện</button>
+        <button disabled={waiting} onClick={()=>setViewingPassengersTrip(selected.maChuyen)}>Xem danh sách hành khách</button>
         <button disabled={waiting||!report?.duDieuKien||selected.trangThai==='DANG_MO_BAN'} onClick={()=>{if(window.confirm(`Xác nhận mở bán chuyến ${selected.maChuyen}?`))void action(async()=>{
           try{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/mo-ban`,'POST');}catch(failure){await detail(selected.maChuyen);throw failure;}
           await detail(selected.maChuyen,false);await load(page.page);
         },'Đã mở bán chuyến.');}}>Mở bán chuyến</button>
         <button disabled={waiting||!selected.coTheHuy} onClick={()=>{if(window.confirm(`Hủy chuyến ${selected.maChuyen}?`))void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/huy`,'POST');await detail(selected.maChuyen,false);await load(page.page);},'Đã hủy chuyến.');}}>Hủy chuyến</button></div>
     </section>}
+    {viewingPassengersTrip && (
+      <TripPassengerModal
+        maChuyen={viewingPassengersTrip}
+        onClose={() => setViewingPassengersTrip(null)}
+      />
+    )}
   </div>;
 }

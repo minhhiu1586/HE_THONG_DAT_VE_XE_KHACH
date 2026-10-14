@@ -1,0 +1,226 @@
+.panel {
+  margin-top: 56px;
+}
+
+.heading {
+  border-top: 1px solid #e0eaf6;
+  padding-top: 32px;
+}
+
+.heading h2 {
+  margin: 0 0 8px;
+  color: #0f1f3d;
+  font-size: clamp(22px, 2.5vw, 28px);
+}
+
+.heading p {
+  margin: 0;
+  color: #5a728a;
+  font-size: 14px;
+}
+
+.historyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.orderCard {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  box-shadow: 0 4px 20px #172b4d0a;
+}
+
+.orderHeader {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.orderCode {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.label {
+  color: #5a728a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statusBadge {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.statusProcessing {
+  background: #f5f8ff;
+  color: #3d5280;
+}
+
+.statusPending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.statusPaid {
+  background: #edfaf4;
+  color: #186039;
+}
+
+.statusEnded {
+  background: #fff0f0;
+  color: #962020;
+}
+
+.tripInfo {
+  min-height: 46px;
+  overflow-wrap: anywhere;
+}
+
+.divider {
+  border-top: 1px dashed #c8d8f0;
+}
+
+.priceBlock {
+  display: grid;
+  gap: 5px;
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: #5a728a;
+  font-size: 14px;
+}
+
+.priceRow strong {
+  color: #1a56e8;
+  font-size: 16px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.discountNote {
+  margin: 0;
+  color: #186039;
+  font-size: 12px;
+  text-align: right;
+}
+
+.timer {
+  margin: 0;
+  color: #a23a32;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.endNote {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #fff7f7;
+  color: #7e2525;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.action {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.errorBox,
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+.errorBox {
+  border: 1px solid #fecdd3;
+  border-left: 3px solid #f43f5e;
+  border-radius: 10px;
+  background: #fff0f0;
+  color: #962020;
+}
+
+.errorBox p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.empty a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+@media (max-width: 760px) {
+  .historyGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .panel {
+    margin-top: 40px;
+  }
+
+  .heading {
+    padding-top: 24px;
+  }
+
+  .orderCard {
+    padding: 18px;
+  }
+
+  .orderHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .priceRow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .priceRow strong,
+  .discountNote {
+    text-align: left;
+  }
+}

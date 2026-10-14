@@ -1,14 +1,17 @@
+import type { RefundPolicy } from './refund-api';
+
 export type BookingRequest = <T>(path: string, method?: string, body?: unknown, headers?: Record<string, string>) => Promise<T>;
 export type BookingPassenger = { maGhe: string; hoTen: string; soDienThoai: string; cccd?: string | null };
 export type PriceSummary = { donViTienTe: string; tongTienGoc: string; tongTienGiam: string; tongThanhToan: string };
-export type BookingQuote = PriceSummary & { maBaoGia: string; maDon: string; thoiDiemHetHan: string };
+export type BookingQuote = PriceSummary & { maBaoGia: string; maDon: string; thoiDiemHetHan: string; chinhSachHoanVe?: RefundPolicy | null };
 export type BookingOrder = {
  maDon: string; maChuyen: string; trangThaiDon: string; khachDatTen: string | null; khachDatSoDienThoai: string | null; khachDatEmail: string | null; emailXacNhan: { trangThai: string; diaChi: string; thoiDiemGui: string | null } | null; ghiChu: string | null;
  serverTime: string; thoiDiemHetHan: string | null; hanhKhach: BookingPassenger[];
  danhSachGiuCho: { maGhe: string; trangThai: string }[];
- danhSachVe: { maVe: string; maTraCuu?: string; qrImage?: string | null; maGhe: string; hoTen: string; giaVe: string; trangThai: string }[];
+ danhSachVe: { maVe: string; maTraCuu?: string; qrImage?: string | null; maGhe: string; hoTen: string; giaVe: string; trangThai: string; dangHoan?: boolean }[];
  giaTamTinh: { tongTienGoc: string; tienGiam: string; tongThanhToan: string } | null;
  giaDaChot: PriceSummary | null; coTheChotGia: boolean;
+ chinhSachHoanVe?: RefundPolicy | null;
 };
 export type Payment = { maGiaoDich: string; maDon: string; maPhuongThuc: string; trangThai: string; soTien: string; thoiDiemTao: string | null; donViTienTe: string; urlThanhToan: string | null; canDoiSoat: boolean; ketQuaCongDaXacDinh: boolean };
 export type PaymentMethod = { maPhuongThuc: string; tenPhuongThuc: string };

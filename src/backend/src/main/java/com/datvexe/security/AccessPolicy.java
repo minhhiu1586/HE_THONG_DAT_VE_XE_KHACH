@@ -43,6 +43,17 @@ public final class AccessPolicy {
             if (user.loaiTaiKhoan() != LoaiTaiKhoan.KHACH_HANG) throw AccessControl.denied();
             return;
         }
+        if (method.equals("POST") && path.matches("/api/ve-xe/[^/]+/len-xe")) {
+            if (user.loaiTaiKhoan() != LoaiTaiKhoan.NHAN_VIEN) throw AccessControl.denied();
+            return;
+        }
+        if (method.equals("GET") && path.matches("/api/chuyen-xe/[^/]+/(?:hanh-khach|kiem-ve)")) {
+            if (user.loaiTaiKhoan() != LoaiTaiKhoan.NHAN_VIEN
+                    && user.loaiTaiKhoan() != LoaiTaiKhoan.NHA_XE
+                    && user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN) throw AccessControl.denied();
+            if (user.loaiTaiKhoan() == LoaiTaiKhoan.NHA_XE && user.maNhaXe() == null) throw AccessControl.denied();
+            return;
+        }
         if(path.equals("/api/quan-ly/chuyen-xe") || path.startsWith("/api/quan-ly/chuyen-xe/")) {
             if(user.loaiTaiKhoan()!=LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan()!=LoaiTaiKhoan.NHA_XE) throw AccessControl.denied();
             if(user.loaiTaiKhoan()==LoaiTaiKhoan.NHA_XE && user.maNhaXe()==null) throw AccessControl.denied();

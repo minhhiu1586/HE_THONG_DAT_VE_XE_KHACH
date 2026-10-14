@@ -20,12 +20,36 @@ public class VeXeController extends HttpServlet {
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private ThanhToanService service;
     private HoanVeService refunds;
+    private com.datvexe.service.KiemVeService kiemVe;
 
-    @Override public void init() { service = new ThanhToanService(Jpa.factory()); refunds = new HoanVeService(Jpa.factory()); }
+    @Override public void init() {
+        service = new ThanhToanService(Jpa.factory());
+        refunds = new HoanVeService(Jpa.factory());
+        kiemVe = new com.datvexe.service.KiemVeService(Jpa.factory());
+    }
 
     @Override protected void service(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         String info = request.getPathInfo();
+        if (info != null && info.matches("/[A-Za-z0-9_-]{1,40}/len-xe")) {
+            String maVe = info.substring(1).split("/")[0];
+            if (request.getMethod().equals("OPTIONS")) {
+                response.setHeader("Allow", "POST, OPTIONS");
+                response.setStatus(204);
+                return;
+            }
+            if (request.getMethod().equals("POST")) {
+                var body = RefundHttp.body(request, com.datvexe.dto.KiemVeDto.CheckInRequest.class);
+                var result = kiemVe.checkIn(maVe, body, request.getHeader("Idempotency-Key"));
+                response.setStatus(200);
+                response.setCharacterEncoding("UTF-8");
+                response.setContentType("application/json; charset=UTF-8");
+                json.writeValue(response.getOutputStream(), result);
+                return;
+            }
+            response.setHeader("Allow", "POST, OPTIONS");
+            throw new DomainException(405, "Phương thức không được hỗ trợ.");
+        }
         if (info != null && info.matches("/[A-Za-z0-9_-]{1,40}/(chinh-sach-hoan|hoan-tien)")) {
             String[] parts = info.substring(1).split("/");
             boolean policy = parts[1].equals("chinh-sach-hoan");

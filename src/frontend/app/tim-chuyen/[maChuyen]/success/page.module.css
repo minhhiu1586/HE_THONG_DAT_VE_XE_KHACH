@@ -1,0 +1,11 @@
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.heading > a { min-height: 44px; flex-shrink: 0; text-align: center; }
+.ticketHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.badge { display: inline-flex; padding: 5px 10px; border: 1px solid #d7e3f3; border-radius: 999px; font-size: 12px; font-weight: 650; color: #3d5280; background: #fff; }
+.ended { max-width: 760px; margin: 24px auto; padding: 32px; border: 1px solid #dce6f4; border-radius: 16px; background: #fff; }
+.ended h2 { margin: 16px 0 8px; font-size: 24px; }
+.ended p { color: #526586; max-width: 600px; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
+.actions a { min-height: 44px; }
+.refundArea { margin-top: 28px; scroll-margin-top: 100px; }
+@media (max-width: 600px) { .heading { align-items: stretch; flex-direction: column; } .ended { padding: 24px; } .actions { flex-direction: column; } .actions a { text-align: center; } }

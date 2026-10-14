@@ -58,7 +58,7 @@ Mỗi giao dịch thu chỉ có một yêu cầu đang chờ/cần đối soát.
 | `THAT_BAI` | Đã xác định thất bại; vé vẫn có hiệu lực, được thử lại có kiểm tra |
 | `CAN_DOI_SOAT` | Chưa chắc chắn; giữ khóa/hạn mức, không tự gửi lại |
 
-Trong lúc chờ/cần đối soát, vé vẫn `DA_XUAT_VE` nhưng response có `dangHoan: true`, QR là `null`. Vé đã hoàn cũng không trả QR. Guard `AccessControl.ticketNotRefunding` được chuẩn bị cho module kiểm vé gọi dưới khóa; chưa có luồng kiểm vé hoàn chỉnh để nghiệm thu tích hợp phần này.
+Trong lúc chờ/cần đối soát, vé vẫn `DA_XUAT_VE` nhưng response có `dangHoan: true`, QR là `null`. Vé đã hoàn cũng không trả QR. Module T20 gọi guard `AccessControl.ticketNotRefunding` dưới khóa trước khi xác nhận lên xe; kết quả kiểm thử nằm trong [ticket-inspection.md](../ticket-inspection.md).
 
 Đơn giữ `DA_THANH_TOAN`. Thanh toán gốc chuyển theo số tiền thực hoàn: hoàn hết vé ở mức 80% vẫn là `HOAN_TIEN_MOT_PHAN`. Sau hoàn thành công, vé mới ngừng chiếm ghế; đặt lại phải qua điều kiện chuyến đang bán. Guard booking/thanh toán chặn sửa đơn, thu lại hoặc phát hành lại khi đã thanh toán/hoàn.
 
@@ -69,6 +69,12 @@ Gửi hoàn bằng đúng merchant, mã và thời điểm tạo giao dịch g�
 Giao dịch thu thành công không chứng minh đã hoàn. Timeout, phản hồi không xác minh được hoặc crash sau lúc gửi giữ `CAN_DOI_SOAT`. Nếu đã lưu bằng chứng hoàn, xác minh có thể hoàn tất cập nhật vé mà không gửi lại. Nếu mất phản hồi trước khi lưu mã hoàn, giữ khóa và bàn giao T23 đối chiếu yêu cầu, giao dịch, tiền và lịch sử với cổng. T19 chưa có API chốt đối soát thủ công hoặc scheduler hoàn tiền.
 
 Khoản hoàn 0 đồng xử lý nội bộ, không gọi cổng. Kiểm thử tự động dùng gateway giả lập; fixture không phải giao dịch sandbox thật.
+
+### Giới hạn của bản demo sandbox hiện tại
+
+Theo thông tin từ người dùng, môi trường sandbox đang dùng chưa mở API refund. Theo phương án demo đã được người dùng chọn, `HoanVeService` chấp nhận kết quả `00/05` và `00/06` như thành công, bên cạnh `00/00`. Đây là cách mô phỏng hoàn tất trong đồ án; theo đặc tả VNPay, `05/06` vẫn là đang xử lý hoàn hoặc đã gửi yêu cầu tới ngân hàng, chưa chứng minh tiền đã hoàn. Chưa nghiệm thu hoàn tiền thực tế qua cổng; không sử dụng kết quả demo để kết luận đối soát thực tế.
+
+Giao diện hoàn tiền đã nối backend; người dùng đã tự kiểm thử. Đợt cập nhật này chỉ chạy kiểm thử T20 theo yêu cầu, không chạy lại bộ kiểm thử refund. Các kết quả T19 bên dưới thuộc bản backend trước khi bổ sung cách xử lý `05/06`.
 
 ## Triển khai và kiểm thử
 
@@ -92,6 +98,6 @@ Lần chạy Maven đã bật `REFUND_TEST_JDBC_URL`, `REFUND_TEST_JDBC_USER`, `
 
 Log trong `src/backend/target/`: `t19-sync-verify.log`, `t19-sync-smoke.log`, `t19-sync-t16.log`, `t19-sync-t17.log`, `t19-sync-t18.log`. Schema test và fixture được dọn sau khi chạy. Migration 010/011 đã áp dụng; giữ dữ liệu hiện có. Khi smoke, email worker được tắt và dùng khóa VNPay giả để ký fixture cục bộ; sau đó khôi phục cấu hình Docker ban đầu.
 
-**Chưa thực hiện hoàn tiền sandbox thật.** Smoke HTTP chỉ thực thi khoản hoàn 0 đồng; hoàn có tiền được kiểm tra bằng gateway giả lập trên PostgreSQL. Chưa nghiệm thu FE và module kiểm vé.
+**Chưa thực hiện hoàn tiền sandbox thật.** Smoke HTTP T19 chỉ thực thi khoản hoàn 0 đồng; hoàn có tiền được kiểm tra bằng gateway giả lập trên PostgreSQL.
 
 Đã đồng bộ develop `a2f02d1` (T30) trước khi commit T19: giữ API lịch sử `GET /api/booking/me` cùng các route hoàn tiền, snapshot chính sách và cơ chế ẩn QR của T19. Lịch sử chỉ trả đơn của khách đang đăng nhập; đơn cũ không có giữ chỗ vẫn tra cứu chuyến từ vé. Smoke và test dịch vụ đã kiểm tra các trường hợp này.
