@@ -11,4 +11,5 @@ public final class TripInputs {
     public record Draft(String maChuyen, String maTuyen, String maXe,
         LocalDate ngayKhoiHanh, LocalTime gioKhoiHanh, LocalDateTime gioDenDuKien,
         BigDecimal giaVeDuKien) {}
+    public record Cancellation(String lyDo) {}
 }

@@ -11,6 +11,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.Set;
 
 @WebServlet(urlPatterns={"/api/quan-ly/chuyen-xe","/api/quan-ly/chuyen-xe/*"})
 public class TripController extends HttpServlet {
@@ -43,8 +44,16 @@ public class TripController extends HttpServlet {
             else if(p.length==1 && method.equals("PUT"))result=service.update(p[0],body(req));
             else if(p.length==1 && method.equals("DELETE")){service.delete(p[0]);result=null;status=204;}
             else if(p.length==2 && p[1].equals("dieu-kien-mo-ban") && method.equals("GET"))result=service.eligibility(p[0]);
+            else if(p.length==2 && p[1].equals("vong-doi") && method.equals("GET"))result=service.lifecycleReport(p[0]);
+            else if(p.length==2 && p[1].equals("xu-ly-hoan") && method.equals("POST"))result=service.retryCancellationWork(p[0]);
             else if(p.length==2 && p[1].equals("mo-ban") && method.equals("POST"))result=service.open(p[0]);
-            else if(p.length==2 && p[1].equals("huy") && method.equals("POST"))result=service.cancel(p[0]);
+            else if(p.length==2 && Set.of("bat-dau","hoan-thanh").contains(p[1]) && method.equals("POST"))
+                result=service.transition(p[0],p[1].equals("bat-dau")?com.datvexe.domain.States.TrangThaiChuyen.DANG_CHAY:com.datvexe.domain.States.TrangThaiChuyen.HOAN_TAT,null);
+            else if(p.length==2 && p[1].equals("huy") && method.equals("POST")){
+                var input=json.readValue(req.getInputStream(),TripInputs.Cancellation.class);
+                if(input==null)throw new DomainException(400,"Thiếu lý do hủy chuyến.");
+                result=service.cancel(p[0],input.lyDo());
+            }
             else throw new DomainException(404,"API không tồn tại.");
             res.setStatus(status);if(result!=null)json.writeValue(res.getOutputStream(),result);
         } catch(DomainException error){ApiErrors.write(res,error);}

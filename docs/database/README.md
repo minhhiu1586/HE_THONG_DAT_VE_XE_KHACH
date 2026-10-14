@@ -34,13 +34,23 @@ Các quan hệ ngược dạng `List<>` được khai báo trong entity cha; kh�
 
 - `schema/001_route_trip.sql` tạo schema 20 entity nghiệp vụ khi database mới; đồng thời bổ sung các bảng/cột thiếu cho database đã dùng schema route-trip cũ. Các câu lệnh lặp lại an toàn với `IF NOT EXISTS`.
 - `schema/002_vehicle_alignment.sql` bổ sung cấu trúc xe/phân công; `schema/003_account_auth.sql` thêm liên kết phạm vi của NguoiDung và bảng `phien_dang_nhap` (entity thứ 21).
-- Docker Compose chạy 001 → 002 → 003 → seed khi tạo volume mới. Với volume cũ, chạy `docker compose up -d postgres` rồi `docker compose run --rm migrate` trước khi khởi động backend. Runner lưu `schema_migrations` và checksum, chỉ áp dụng phiên bản còn thiếu, dừng nếu file cũ bị sửa. Sao lưu dữ liệu trước lần nâng cấp đầu tiên; không xóa volume để chạy lại init scripts. Seed chỉ tự nạp khi tạo volume mới.
+- Docker Compose chạy schema 001 → 013 và seed khi tạo volume mới. Với volume cũ, chạy `docker compose up -d postgres` rồi `docker compose run --rm migrate` trước khi khởi động backend. Runner lưu `schema_migrations` và checksum, chỉ áp dụng phiên bản còn thiếu, dừng nếu file cũ bị sửa. Sao lưu dữ liệu trước lần nâng cấp đầu tiên; không xóa volume để chạy lại init scripts. Seed chỉ tự nạp khi tạo volume mới.
 - Nếu volume đã tồn tại, từ thư mục gốc repository áp dụng file một lần:
 
 ```bash
 docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/001_route_trip.sql
 docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/002_vehicle_alignment.sql
 docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/003_account_auth.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/004_booking_order.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/005_booking_session.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/006_payment_vnpay.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/007_booking_email.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/008_ticket_public_code.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/009_ticket_qr_email.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/010_refund_policy.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/011_refund_tracking.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/012_ticket_checkin.sql
+docker exec -i datvexe-postgres psql -U datvexe_user -d datvexe -v ON_ERROR_STOP=1 < docs/database/schema/013_trip_lifecycle.sql
 ```
 
 Hibernate dùng `hibernate.hbm2ddl.auto=validate`: nó kiểm tra schema khớp mapping khi khởi động, không tự tạo hoặc sửa bảng. Các module khác có thể dùng entity và quan hệ JPA làm nền; controller/service nghiệp vụ của những module đó vẫn do thành viên phụ trách triển khai.

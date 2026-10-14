@@ -19,6 +19,9 @@ export interface OrderHistoryItem {
   tuyenXe?: string;
   ngayKhoiHanh?: string;
   gioKhoiHanh?: string;
+  trangThaiChuyen?: string;
+  trangThaiXuLyHuyChuyen?: string;
+  lyDoHuyChuyen?: string;
 }
 
 type HistoryState =
@@ -188,6 +191,14 @@ function OrderCard({ order }: { order: OrderHistoryItem }) {
         {order.gioKhoiHanh ? `${order.gioKhoiHanh.slice(0, 5)} · ` : ''}
         {order.ngayKhoiHanh ?? 'Chưa có thông tin'}
       </p>
+
+      {order.trangThaiChuyen === 'DA_HUY' && (
+        <p className={styles.endNote} role="status">
+          Chuyến xe đã bị hủy{order.lyDoHuyChuyen ? `: ${order.lyDoHuyChuyen}` : '.'}
+          {order.trangThaiXuLyHuyChuyen && ` Trạng thái xử lý vé/hoàn: ${order.trangThaiXuLyHuyChuyen === 'HOAN_TAT' ? 'đã xử lý' : order.trangThaiXuLyHuyChuyen === 'CAN_DOI_SOAT' ? 'đang đối soát' : 'đang chờ xử lý'}.`}
+          {' '}Thông báo này không xác nhận hoàn tiền thành công.
+        </p>
+      )}
 
       <div className={styles.divider} />
 

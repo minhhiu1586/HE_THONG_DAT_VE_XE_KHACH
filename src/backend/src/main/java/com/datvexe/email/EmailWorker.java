@@ -13,9 +13,10 @@ public final class EmailWorker implements ServletContextListener {
         BrevoClient client = new BrevoClient(BrevoClient.Config.fromEnvironment());
         if (!client.ready()) { event.getServletContext().log("Receipt email delivery is disabled or not configured."); return; }
         EmailDispatcher dispatcher = new EmailDispatcher(Jpa.factory(), client::send, Clock.systemUTC());
+        TripCancellationEmailDispatcher cancellationDispatcher = new TripCancellationEmailDispatcher(Jpa.factory(), client::send, Clock.systemUTC());
         executor = Executors.newSingleThreadScheduledExecutor(task -> { Thread thread = new Thread(task, "booking-receipt-email"); thread.setDaemon(true); return thread; });
         executor.scheduleWithFixedDelay(() -> {
-            try { dispatcher.runOnce(); }
+            try { dispatcher.runOnce(); cancellationDispatcher.runOnce(); }
             catch (RuntimeException e) { event.getServletContext().log("Receipt email worker failed: " + e.getClass().getSimpleName()); }
         }, 3, 5, TimeUnit.SECONDS);
     }

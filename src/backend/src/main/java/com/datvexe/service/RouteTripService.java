@@ -530,20 +530,8 @@ public class RouteTripService {
         });
     }
     public Map<String, Object> transition(String id, TrangThaiChuyen target) {
-        if(target==TrangThaiChuyen.DA_HUY)return new TripService(factory).cancel(id);
-        return write(em -> {
-            ChuyenXe x = found(em, ChuyenXe.class, id);
-            if (target == TrangThaiChuyen.DANG_CHAY && x.xe != null) assignVehicle(em, x, x.xe.maXe);
-            boolean allowed = switch (target) {
-                case DA_HUY -> x.trangThai == TrangThaiChuyen.CHUA_KHOI_HANH;
-                case DANG_CHAY -> x.trangThai == TrangThaiChuyen.DANG_MO_BAN && x.xe != null;
-                case HOAN_TAT -> x.trangThai == TrangThaiChuyen.DANG_CHAY;
-                default -> false;
-            };
-            if (!allowed) throw new DomainException(409, "Chuyển trạng thái chuyến không hợp lệ");
-            x.trangThai = target;
-            return view(x);
-        });
+        if(target==TrangThaiChuyen.DA_HUY) return new TripService(factory).cancel(id);
+        return new TripService(factory).transition(id,target,null);
     }
     public Map<String, Object> getChuyenXe(String id) { return read(em -> {
         var trip = found(em, ChuyenXe.class, id);

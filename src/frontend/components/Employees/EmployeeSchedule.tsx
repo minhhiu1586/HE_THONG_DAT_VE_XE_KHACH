@@ -22,6 +22,8 @@ export default function EmployeeSchedule() {
   const [section, setSection] = useState<Section>('overview');
   const [page, setPage] = useState(1);
   const [date, setDate] = useState('');
+  const [transitioning,setTransitioning]=useState('');
+  const [notice,setNotice]=useState('');
   useEffect(() => {
     if (!loading && !user) router.replace('/dang-nhap?next=/nhan-vien');
     if (user?.loaiTaiKhoan !== 'NHAN_VIEN') return;
@@ -45,6 +47,16 @@ export default function EmployeeSchedule() {
   const nextTrip = working[0];
   const title = employee?.loaiNhanVien === 'TAI_XE' ? 'Không gian tài xế' : employee?.loaiNhanVien === 'PHU_XE' ? 'Không gian phụ xe' : 'Không gian nhân viên';
 
+  async function changeTripState(item:Schedule,target:'bat-dau'|'hoan-thanh') {
+    if(transitioning)return;setTransitioning(item.maChuyen);setNotice('');setError('');
+    try {
+      await request(`/chuyen-xe/${encodeURIComponent(item.maChuyen)}/${target}`,'POST',{});
+      const updated=await request<Schedule[]>(`/nhan-vien/${encodeURIComponent(employee!.maNhanVien)}/phan-cong`);
+      setSchedule(updated);setNotice(target==='bat-dau'?'Đã bắt đầu chuyến.':'Đã hoàn tất chuyến.');
+    } catch(cause) {setError(errorMessage(cause));}
+    finally {setTransitioning('');}
+  }
+
   function journey(item: Schedule) {
     return <article className={styles.schedule} key={item.maPhanCong}>
       <strong>{item.tenTuyen}</strong>
@@ -52,6 +64,10 @@ export default function EmployeeSchedule() {
       <span className={styles.badge}>{tripRoles[item.vaiTro]}</span>
       <p>{tripStates[item.trangThai] ?? item.trangThai} · {item.maChuyen}</p>
       {noteText(item.ghiChu) && <p>{noteText(item.ghiChu)}</p>}
+      <div className={styles.actions}>
+        {['TAI_XE_CHINH','TAI_XE_PHU','TAI_XE'].includes(item.vaiTro)&&item.trangThai==='DANG_MO_BAN'&&<button className={styles.primary} disabled={!!transitioning} onClick={()=>void changeTripState(item,'bat-dau')}>{transitioning===item.maChuyen?'Đang cập nhật…':'Bắt đầu chuyến'}</button>}
+        {['TAI_XE_CHINH','TAI_XE_PHU','TAI_XE'].includes(item.vaiTro)&&item.trangThai==='DANG_CHAY'&&<button className={styles.primary} disabled={!!transitioning} onClick={()=>void changeTripState(item,'hoan-thanh')}>{transitioning===item.maChuyen?'Đang cập nhật…':'Hoàn tất chuyến'}</button>}
+      </div>
     </article>;
   }
 
@@ -61,6 +77,7 @@ export default function EmployeeSchedule() {
       <Link className={styles.scope} href="/tai-khoan">Tài khoản và bảo mật →</Link>
     </header>
     {error && <p className={styles.error} role="alert">{error}</p>}
+    {notice && <p className={styles.success} role="status">{notice}</p>}
     {fetching ? <p role="status">Đang tải hồ sơ và lịch…</p> : !employee ? <section className={styles.panel}><h2>Hồ sơ nhân viên</h2><p>Tài khoản chưa được liên kết hồ sơ. Liên hệ quản lý nhà xe để cập nhật.</p></section> : <>
       <nav className={styles.workspaceNav} aria-label="Không gian nhân viên">
         {Object.entries(sections).map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id as Section)}>{label}</button>)}
