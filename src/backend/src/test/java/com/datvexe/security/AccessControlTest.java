@@ -138,6 +138,20 @@ class AccessControlTest {
         tx(em -> em.find(NhanVien.class, "E").trangThai = TrangThaiNhanVien.TAM_NGHI);
         tx(em -> forbidden(() -> AccessControl.assigned(em, user(em, "NV"), "CA")));
     }
+    @Test void systemInspectorCanCheckAcrossOperatorsWithoutAssignments() {
+        tx(em -> {
+            var employee=em.find(NhanVien.class,"E"); employee.nhaXe=null; employee.loaiNhanVien=LoaiNhanVien.KIEM_VE;
+            em.find(PhanCongChuyenXe.class,"P").vaiTro=VaiTroChuyen.KIEM_VE;
+            var assignment=new PhanCongChuyenXe(); assignment.maPhanCong="SYSTEM_B";
+            assignment.nhanVien=employee; assignment.chuyenXe=em.find(ChuyenXe.class,"CB");
+            assignment.vaiTro=VaiTroChuyen.KIEM_VE; em.persist(assignment);
+        });
+        tx(em -> { AccessControl.assigned(em,user(em,"NV"),"CA"); AccessControl.assigned(em,user(em,"NV"),"CB"); });
+        tx(em -> em.remove(em.find(PhanCongChuyenXe.class,"SYSTEM_B")));
+        tx(em -> AccessControl.assigned(em,user(em,"NV"),"CB"));
+        tx(em -> em.find(NhanVien.class,"E").trangThai=TrangThaiNhanVien.TAM_NGHI);
+        tx(em -> forbidden(() -> AccessControl.assigned(em,user(em,"NV"),"CA")));
+    }
     @Test void changingRoleScopeOrRevokingSessionIsEffectiveImmediately() {
         tx(em -> em.find(NguoiDung.class, "NX").nhaXe = em.find(NhaXe.class, "B"));
         tx(em -> { forbidden(() -> AccessControl.trip(em, user(em, "NX"), "CA")); AccessControl.trip(em, user(em, "NX"), "CB"); });

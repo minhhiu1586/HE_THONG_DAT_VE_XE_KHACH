@@ -61,7 +61,7 @@ public final class VehicleService {
     public List<Map<String,Object>> list(String kind) { return tx(em -> switch(kind) {
         case "loai-xe" -> new LoaiXeRepository(em).list().stream().map(VehicleService::view).toList();
         case "xe" -> new XeRepository(em).list().stream().filter(x -> RequestIdentity.operatorId() == null || (x.nhaXe != null && x.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()))).map(VehicleService::view).toList();
-        case "phan-cong" -> new PhanCongChuyenXeRepository(em).list().stream().filter(x -> RequestIdentity.operatorId() == null || (x.chuyenXe.tuyenXe.nhaXe != null && x.chuyenXe.tuyenXe.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()) && x.nhanVien.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()))).map(VehicleService::view).toList();
+        case "phan-cong" -> new PhanCongChuyenXeRepository(em).list().stream().filter(x -> RequestIdentity.operatorId() == null || (x.chuyenXe.tuyenXe.nhaXe != null && x.chuyenXe.tuyenXe.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()) && (AccessControl.systemInspector(x.nhanVien) || x.nhanVien.nhaXe != null && x.nhanVien.nhaXe.maNhaXe.equals(RequestIdentity.operatorId())))).map(VehicleService::view).toList();
         default -> throw new DomainException(404,"API không tồn tại");
     }); }
     public Map<String,Object> get(String kind, String id) { return tx(em -> switch(kind) {
@@ -195,7 +195,7 @@ public final class VehicleService {
                 if (!kind.equals("phan-cong")) throw new DomainException(404,"API không tồn tại");
                 return new PhanCongChuyenXeRepository(em).list().stream()
                     .filter(x -> RequestIdentity.operatorId()==null || (x.chuyenXe.tuyenXe.nhaXe!=null
-                        && x.chuyenXe.tuyenXe.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()) && x.nhanVien.nhaXe.maNhaXe.equals(RequestIdentity.operatorId())))
+                        && x.chuyenXe.tuyenXe.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()) && (AccessControl.systemInspector(x.nhanVien) || x.nhanVien.nhaXe != null && x.nhanVien.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()))))
                     .map(VehicleService::view).toList();
             }
             TrangThaiXe status=state==null || state.isBlank()?null:TrangThaiXe.valueOf(state);

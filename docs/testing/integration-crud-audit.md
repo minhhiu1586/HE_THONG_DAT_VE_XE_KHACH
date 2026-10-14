@@ -4,6 +4,10 @@ Nhánh: `feature/integration-crud-audit`. Nền code: `develop`, commit `5180226
 
 ## Chạy ứng dụng và kiểm tra tự động
 
+Dữ liệu hiện tại bổ sung hai nhân viên kiểm vé chung: `NV_KV01` (Nguyễn Hoàng Phúc) và `NV_KV02` (Trần Minh Châu). Tổng khởi tạo: 37 nhân viên, 49 tài khoản; vẫn 20 tài xế. Hai hồ sơ không thuộc nhà xe và không có phân công theo hãng. Đăng nhập bằng `kiemve1@datvexe.test` hoặc `kiemve2@datvexe.test`, mật khẩu khởi tạo trong [accounts.md](../database/seed/accounts.md). Trang `/nhan-vien` mở mục kiểm vé, cho chọn chuyến đang mở bán/đang chạy của các nhà xe hoạt động rồi nhập mã vé hoặc chuỗi QR theo giao diện nhóm đã làm.
+
+Nhân viên kiểm vé chung có quyền kiểm vé toàn hệ thống; tài xế/phụ xe vẫn chỉ kiểm chuyến được giao. Admin quản lý hồ sơ kiểm vé chung, điều hành chỉ quản lý nhân viên thuộc hãng. Migration 015/016 và loader chuyển mã cũ, giữ thông tin/mật khẩu, đồng thời bỏ lịch kiểm vé theo hãng. Nạp dữ liệu bằng `python scripts/load_project_data.py`; không cần xóa volume.
+
 ```powershell
 docker compose --profile ops run --rm migrate
 # Maven đã cài trên máy hiện tại qua NetBeans.
@@ -29,7 +33,7 @@ Chạy lại riêng một bộ sau khi sửa bài kiểm thử: `python tests/ba
 
 ## Kết quả xác minh ngày 14/10/2026
 
-Backend Maven package trên `5180226` thành công: 267 test, 0 lỗi, 63 test bỏ qua theo điều kiện cấu hình (204 thực thi đạt). Frontend production build và TypeScript đạt. Ứng dụng chạy tại `http://localhost:3000`; backend `/api/health` trả 200. Migration 001–014 đã áp dụng.
+Backend Maven package trên nền `5180226` và bổ sung kiểm vé chung thành công: 268 test, 0 lỗi, 63 test bỏ qua theo điều kiện cấu hình (205 thực thi đạt). Frontend production build và TypeScript đạt. Ứng dụng chạy tại `http://localhost:3000`; backend `/api/health` trả 200. Migration 001–016 đã áp dụng.
 
 T22 chạy riêng trên container PostgreSQL tạm: 36 test đạt, 0 lỗi, 0 bỏ qua; container được dọn sau kiểm thử. API đánh giá công khai trả 200. Frontend lint: 0 lỗi, 2 cảnh báo `<img>` có sẵn tại `BusStations.tsx` và `PopularRoutes.tsx`.
 
@@ -44,10 +48,10 @@ T22 chạy riêng trên container PostgreSQL tạm: 36 test đạt, 0 lỗi, 0 b
 | Báo giá và giá cố định | Đạt | 116 |
 | Khuyến mãi, phương thức thanh toán | Đạt | 101 |
 | Thanh toán nội bộ / IPN có chữ ký | Đạt các ca thực thi; 9 ca chưa chạy | 20 |
-| Kiểm vé, QR, chống xác nhận lặp | Đạt | 26 |
+| Kiểm vé, QR, chống xác nhận lặp, kiểm vé chung không cần phân công | Đạt | 33 |
 | Chính sách, preview, hoàn vé giá trị 0 | Đạt | 34 |
 
-Tổng 770 kiểm tra HTTP của 11 bộ, không bao gồm request dựng fixture. `results.json` và log từng bộ nằm trong `src/backend/target/integration-audit/`. Đối chiếu trước/sau: 5 nhà xe, 35 nhân viên (20 tài xế), 47 tài khoản, 10 xe, 320 ghế, 20 tuyến, 10 bến; dấu vân tay dữ liệu lõi phải khớp.
+Tổng 777 kiểm tra HTTP theo kết quả mới nhất của 11 bộ, không bao gồm request dựng fixture. Lượt tổng hợp đạt 775 kiểm tra; lượt bổ sung kiểm vé đạt 33 kiểm tra, tăng thêm 2 kiểm tra xác minh và lên xe không cần phân công. `results.json` và log từng bộ nằm trong `src/backend/target/integration-audit/`. Bộ dữ liệu nền sau dọn fixture và kiểm tra lại: 5 nhà xe, 37 nhân viên (20 tài xế), 49 tài khoản, 10 xe, 320 ghế, 20 tuyến, 10 bến; dấu vân tay dữ liệu lõi phải khớp.
 
 Đã kiểm trực tiếp trên web: đăng nhập quản trị; tìm NV_FUTA_01 và hiển thị lịch; điều hành FUTA thấy 7 nhân viên/4 tài xế và chỉ nhà xe FUTA; thêm tài xế `KC_AUD_UI_1014`, sửa tên, reload rồi tìm lại đúng tên; sửa email thành email đã có (khác hoa/thường) bị chặn; xóa hồ sơ thử chưa có phân công thành công, tìm lại không còn, tổng FUTA trở về 7. Hồ sơ thử này đã dọn.
 
@@ -65,7 +69,7 @@ Mở `http://localhost:3000/dang-nhap`. Mật khẩu khởi tạo `DatVeXe2026!`
 
 | Tài khoản | Trang / quyền cần kiểm |
 | --- | --- |
-| admin1@datvexe.test | `/quan-tri/nhan-vien`, toàn bộ 35 hồ sơ |
+| admin1@datvexe.test | `/quan-tri/nhan-vien`, toàn bộ 37 hồ sơ |
 | dieuhanh.futa@datvexe.test | Cùng trang, chỉ 7 nhân viên FUTA |
 | tx1.futa@datvexe.test | `/nhan-vien`, hồ sơ/lịch riêng NV_FUTA_01 |
 | px1.futa@datvexe.test | `/nhan-vien`, hồ sơ/lịch riêng NV_FUTA_05 và kiểm vé theo quyền |

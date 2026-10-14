@@ -18,7 +18,7 @@ type Page={items:Trip[];page:number;totalPages:number;totalItems:number};
 type Report={duDieuKien:boolean;ngungNhanDatVeLuc:string;dieuKien:{maDieuKien:string;tenDieuKien:string;dat:boolean;lyDo:string|null}[]};
 type Lifecycle={maChuyen:string;trangThai:string;tongQuanHoan:{tongSoVeBiAnhHuong:number;soVeCanHoan:number;soVeDaHoan:number;tongTienDuKien:string;tongTienDaHoan:string;soYeuCauThanhCong:number;soYeuCauCanTheoDoi:number};lyLich:{trangThaiCu:string;trangThaiMoi:string;maNguoiThaoTac:string;vaiTro:string;lyDo:string;thoiDiem:string}[];khachBiAnhHuong:{veBiAnhHuong:{maVe:string;trangThai:string;giaThucTra:string}[];maDon:string;trangThaiXuLy:string;lyDoXuLy:string;lyDo:string;soVeConHieuLuc:number;yeuCauHoan:{maHoanTien:string;trangThai:string;soTienHoan:string;lyDoLoi:string}[]}[];thongBao:{trangThai:string;soLuong:number}[]};
 const states:Record<string,string>={NHAP:'Nháp',CHUA_KHOI_HANH:'Chưa mở bán (dữ liệu cũ)',DANG_MO_BAN:'Đang mở bán',DANG_CHAY:'Đang chạy',HOAN_TAT:'Hoàn tất',DA_HUY:'Đã hủy'};
-const crewRoles:Record<string,string>={TAI_XE_CHINH:'Tài xế chính',TAI_XE_PHU:'Tài xế phụ',PHU_XE:'Phụ xe',TAI_XE:'Tài xế'};
+const crewRoles:Record<string,string>={TAI_XE_CHINH:'Tài xế chính',TAI_XE_PHU:'Tài xế phụ',PHU_XE:'Phụ xe',KIEM_VE:'Kiểm vé',TAI_XE:'Tài xế'};
 const empty={maChuyen:'',maTuyen:'',maXe:'',ngayKhoiHanh:'',gioKhoiHanh:'',gioDenDuKien:''};
 const API='/quan-ly/chuyen-xe';
 function estimated(date:string,time:string,hours:number|undefined) {

@@ -61,7 +61,7 @@ export default function EmployeeShell({ children }: { children: React.ReactNode 
 
         <nav aria-label="Điều hướng nhân viên" style={{ display: 'flex', gap: '24px', flex: 1 }}>
           <Link href="/nhan-vien" style={{ color: 'rgba(255,255,255,.85)', fontSize: '14px', fontWeight: 600 }}>
-            📋 Lịch chuyến của tôi
+            📋 Không gian nhân viên
           </Link>
         </nav>
 

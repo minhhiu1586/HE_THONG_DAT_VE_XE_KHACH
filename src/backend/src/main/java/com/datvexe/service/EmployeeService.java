@@ -41,7 +41,7 @@ public final class EmployeeService {
         Map<String,Object> result=new LinkedHashMap<>();
         result.put("maNhanVien",employee.maNhanVien); result.put("hoTen",employee.hoTen);
         result.put("soDienThoai",employee.soDienThoai); result.put("email",employee.email);
-        result.put("ngaySinh",employee.ngaySinh); result.put("maNhaXe",employee.nhaXe.maNhaXe);
+        result.put("ngaySinh",employee.ngaySinh); result.put("maNhaXe",employee.nhaXe==null?null:employee.nhaXe.maNhaXe);
         result.put("loaiNhanVien",employee.loaiNhanVien); result.put("trangThai",employee.trangThai);
         result.put("soBangLai",employee.soBangLai); result.put("ngayHetHanBangLai",employee.ngayHetHanBangLai);
         return result;
@@ -56,9 +56,9 @@ public final class EmployeeService {
         String needle=query==null?"":query.strip().toLowerCase(Locale.ROOT);
         return new com.datvexe.repository.NhanVienRepository(em).list().stream()
             .filter(n -> user==null || user.loaiTaiKhoan==LoaiTaiKhoan.ADMIN
-                || user.loaiTaiKhoan==LoaiTaiKhoan.NHA_XE && user.nhaXe!=null && n.nhaXe.maNhaXe.equals(user.nhaXe.maNhaXe)
+                || user.loaiTaiKhoan==LoaiTaiKhoan.NHA_XE && user.nhaXe!=null && n.nhaXe!=null && n.nhaXe.maNhaXe.equals(user.nhaXe.maNhaXe)
                 || user.loaiTaiKhoan==LoaiTaiKhoan.NHAN_VIEN && user.nhanVien!=null && n.maNhanVien.equals(user.nhanVien.maNhanVien))
-            .filter(n -> owner==null || n.nhaXe.maNhaXe.equals(owner))
+            .filter(n -> owner==null || n.nhaXe!=null && n.nhaXe.maNhaXe.equals(owner))
             .filter(n -> kind==null || n.loaiNhanVien==kind).filter(n -> status==null || n.trangThai==status)
             .filter(n -> (n.hoTen+" "+n.maNhanVien+" "+n.email+" "+n.soDienThoai).toLowerCase(Locale.ROOT).contains(needle))
             .map(EmployeeService::view).toList();
@@ -99,14 +99,15 @@ public final class EmployeeService {
         if(user!=null) { AccessControl.role(user,LoaiTaiKhoan.ADMIN,LoaiTaiKhoan.NHA_XE); AccessControl.activeOperator(em,user); }
         NhanVien employee=id==null?new NhanVien():AccessControl.resource(em,NhanVien.class,text(id,40));
         if(id!=null) scope(user,employee,true);
-        NhaXe owner=AccessControl.resource(em,NhaXe.class,text(input.maNhaXe(),40));
+        boolean system=input.loaiNhanVien()==LoaiNhanVien.KIEM_VE && optional(input.maNhaXe(),40)==null;
+        NhaXe owner=system?null:AccessControl.resource(em,NhaXe.class,text(input.maNhaXe(),40));
         if(user!=null) AccessControl.operator(user,owner);
         if(id==null) {
             employee.maNhanVien=text(input.maNhanVien(),40);
             if(em.find(NhanVien.class,employee.maNhanVien)!=null) throw new DomainException(409,"Mã nhân viên đã tồn tại.");
         } else {
             if(input.maNhanVien()!=null && !id.equals(input.maNhanVien())) throw new DomainException(400,"Không đổi mã nhân viên.");
-            if(!employee.nhaXe.maNhaXe.equals(owner.maNhaXe)) throw new DomainException(409,"Không chuyển hồ sơ sang nhà xe khác.");
+            if(!Objects.equals(employee.nhaXe==null?null:employee.nhaXe.maNhaXe,owner==null?null:owner.maNhaXe)) throw new DomainException(409,"Không chuyển phạm vi nhà xe của hồ sơ.");
         }
         if(input.loaiNhanVien()==null || input.trangThai()==null) throw new DomainException(400,"Thiếu vai trò hoặc trạng thái.");
         String phone=text(input.soDienThoai(),30),email=text(input.email(),254).toLowerCase(Locale.ROOT);
@@ -120,7 +121,7 @@ public final class EmployeeService {
         for(PhanCongChuyenXe p:employee.danhSachPhanCong) if(TripSaleRules.scheduled(p.chuyenXe) || p.chuyenXe.trangThai==TrangThaiChuyen.DANG_CHAY) {
             if(input.trangThai()!=TrangThaiNhanVien.DANG_LAM_VIEC || input.loaiNhanVien()!=employee.loaiNhanVien)
                 throw new DomainException(409,"Cần xử lý phân công đang hoạt động trước khi đổi vai trò/trạng thái.");
-            if(p.vaiTro!=VaiTroChuyen.PHU_XE && (license==null || input.ngayHetHanBangLai()==null || input.ngayHetHanBangLai().isBefore(p.chuyenXe.gioDenDuKien.toLocalDate())))
+            if(input.loaiNhanVien()==LoaiNhanVien.TAI_XE && (license==null || input.ngayHetHanBangLai()==null || input.ngayHetHanBangLai().isBefore(p.chuyenXe.gioDenDuKien.toLocalDate())))
                 throw new DomainException(409,"Bằng lái không bao phủ chuyến đã phân công.");
         }
         employee.hoTen=text(input.hoTen(),160); employee.soDienThoai=phone; employee.email=email;

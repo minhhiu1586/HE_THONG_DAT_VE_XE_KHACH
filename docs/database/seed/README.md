@@ -3,7 +3,7 @@
 | File | Nội dung |
 | --- | --- |
 | `001_catalog.sql` | 5 nhà xe, 7 tỉnh/thành, 10 bến, loại xe 22/29/40, danh mục VNPAY |
-| `002_accounts_staff_fleet.sql` | 35 nhân viên, 47 tài khoản, 10 xe và 320 ghế |
+| `002_accounts_staff_fleet.sql` | 37 nhân viên, 49 tài khoản, 10 xe và 320 ghế |
 | `003_routes_trips.sql` | 20 tuyến, 40 điểm đón/trả, lịch 14 ngày và 490 phân công |
 
 Database chạy dự án: **datvexe**. Database cũ không bị xóa. Seed cũ chuyển sang `tests/backend/fixtures/sql` để giữ hợp đồng test; Docker không nạp chúng vào database dự án.
@@ -16,11 +16,11 @@ python scripts/load_project_data.py --activate
 python tests/backend/project_data_check.py --check-reload
 ```
 
-Loader nạp trong transaction, giữ bản ghi đã có, cấu hình `.env` và mở bán bằng API T12. Docker mới tạo chuyến nháp; vẫn cần chạy loader để kiểm tra/mở bán. Chạy lại bổ sung lịch 14 ngày tiếp theo theo mã ngày, không dời chuyến hoặc ghi đè mật khẩu/hồ sơ.
+Loader kiểm tra lịch sử/checksum migration rồi nạp phần còn thiếu và seed trong transaction, giữ bản ghi đã có, cấu hình `.env` khi dùng `--activate` và mở bán bằng API T12. Docker mới tạo chuyến nháp; vẫn cần chạy loader để kiểm tra/mở bán. Chạy lại bổ sung lịch 14 ngày tiếp theo theo mã ngày, không dời chuyến hoặc ghi đè mật khẩu/hồ sơ.
 
 ## Tài khoản đăng nhập
 
-Danh sách đầy đủ tên, email và mật khẩu khởi tạo của 47 tài khoản: [accounts.md](accounts.md).
+Danh sách đầy đủ tên, email và mật khẩu khởi tạo của 49 tài khoản: [accounts.md](accounts.md).
 
 Mật khẩu khởi tạo: **DatVeXe2026!**. Database lưu hash PBKDF2 đúng backend. Tài khoản dùng ổn định, không cần tạo file tài khoản tạm hoặc cleanup sau sử dụng. Nếu đã đổi mật khẩu admin, đặt `PROJECT_ADMIN_PASSWORD` khi chạy loader.
 
@@ -30,9 +30,12 @@ Mật khẩu khởi tạo: **DatVeXe2026!**. Database lưu hash PBKDF2 đúng ba
 | 5 quản lý | `dieuhanh.futa@datvexe.test`, `dieuhanh.tb@datvexe.test`, `dieuhanh.kumho@datvexe.test`, `dieuhanh.hl@datvexe.test`, `dieuhanh.ct@datvexe.test` |
 | 20 tài xế | `tx1.futa@datvexe.test` … `tx4.futa@datvexe.test`; tương tự tb/kumho/hl/ct |
 | 10 phụ xe | `px1.futa@datvexe.test`, `px2.futa@datvexe.test`; tương tự tb/kumho/hl/ct |
+| 2 kiểm vé | `kiemve1@datvexe.test`, `kiemve2@datvexe.test` |
 | 10 khách | `khach1@datvexe.test` … `khach10@datvexe.test` |
 
-Điều hành có quyền NHA_XE và liên kết hồ sơ đúng nhà xe. Tài xế/phụ xe chỉ đọc hồ sơ/lịch riêng. Admin và khách không có hồ sơ nhân viên.
+Điều hành có quyền NHA_XE và liên kết hồ sơ đúng nhà xe. Tài xế/phụ xe/kiểm vé chỉ đọc hồ sơ/lịch riêng; kiểm vé theo chuyến được phân công. Admin và khách không có hồ sơ nhân viên.
+
+T20 bổ sung 2 nhân viên kiểm vé chung của hệ thống, nâng tổng lên 37 nhân viên (20 tài xế, 10 phụ xe, 5 điều hành, 2 kiểm vé) và 49 tài khoản. Hai người kiểm vé chung toàn hệ thống, không tạo phân công theo nhà xe. Nhân viên kiểm vé không cần bằng lái, không thay thế tổ tài xế/phụ xe bắt buộc. Nạp lại seed không sửa hồ sơ, mật khẩu hoặc phân công đã tồn tại.
 
 ## Lịch và khả năng sử dụng
 
@@ -44,7 +47,7 @@ Code sau merge có API giữ ghế và đơn nháp tại `/api/booking/...`, xem
 
 ## Ghi chú riêng database: đã có và còn thiếu
 
-Dữ liệu nền đã có đủ cho hồ sơ/lịch/phân công T11 và đọc tuyến/chuyến/ghế: 5 nhà xe, 35 nhân viên, 47 tài khoản, 10 xe, 320 ghế, 20 tuyến, 210 chuyến mở bán và 490 phân công trong đợt khởi tạo. Nạp lại theo ngày sẽ bổ sung chuyến mới; tổng lịch tích lũy có thể tăng.
+Dữ liệu nền đã có đủ cho hồ sơ/lịch/phân công T11 và đọc tuyến/chuyến/ghế: 5 nhà xe, 37 nhân viên, 49 tài khoản, 10 xe, 320 ghế, 20 tuyến, 210 chuyến mở bán và 490 phân công trong đợt khởi tạo. Nạp lại theo ngày sẽ bổ sung chuyến mới; tổng lịch tích lũy có thể tăng.
 
 Các bảng sau hiện chưa có bản ghi khởi tạo; chưa thể gọi toàn bộ dữ liệu của mọi nghiệp vụ là hoàn tất:
 

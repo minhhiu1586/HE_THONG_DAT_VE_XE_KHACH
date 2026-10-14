@@ -225,7 +225,7 @@ export default function AccountActions() {
                   onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = ''; }}
                 >
-                  Lịch chuyến của tôi
+                  Không gian nhân viên
                 </Link>
               )}
 

@@ -1,4 +1,4 @@
--- 35 hồ sơ nhân viên, 47 tài khoản và 10 xe; giữ nguyên bản ghi đã có.
+-- 37 hồ sơ nhân viên, 49 tài khoản và 10 xe; giữ nguyên bản ghi đã có.
 BEGIN;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 CREATE TEMP TABLE project_operators ON COMMIT DROP AS
@@ -25,6 +25,13 @@ CASE WHEN r<=4 THEN 'TAI_XE' WHEN r<=6 THEN 'PHU_XE' ELSE 'DIEU_HANH' END,
 FROM project_operators o CROSS JOIN generate_series(1,7) r
 ON CONFLICT(ma_nhan_vien) DO NOTHING;
 
+-- T20: kiểm vé có hồ sơ riêng, không yêu cầu bằng lái.
+INSERT INTO nhan_vien(ma_nhan_vien,ho_ten,so_dien_thoai,email,ngay_sinh,loai_nhan_vien,trang_thai,ma_nha_xe)
+VALUES
+('NV_KV01','Nguyễn Hoàng Phúc','0916000081','kiemve1@datvexe.test',DATE '1993-06-15','KIEM_VE','DANG_LAM_VIEC',NULL),
+('NV_KV02','Trần Minh Châu','0916000082','kiemve2@datvexe.test',DATE '1995-09-20','KIEM_VE','DANG_LAM_VIEC',NULL)
+ON CONFLICT(ma_nhan_vien) DO NOTHING;
+
 -- Hash PBKDF2 đúng định dạng Passwords.java. Mật khẩu khởi tạo ghi trong README.
 CREATE TEMP TABLE project_password ON COMMIT DROP AS
 SELECT 'pbkdf2-sha256$600000$8MXbJEq0IAAztwPNXV0eBw==$9I3uM7l3WCitmTOmyEOWJns3cxO09psqo8VRm4nWuRo='::text AS hash;
@@ -34,7 +41,9 @@ SELECT 'USR_'||n.ma_nhan_vien,n.ho_ten,n.so_dien_thoai,n.email,p.hash,
 CASE WHEN n.loai_nhan_vien='DIEU_HANH' THEN 'NHA_XE' ELSE 'NHAN_VIEN' END,
 'HOAT_DONG',CASE WHEN n.loai_nhan_vien='DIEU_HANH' THEN n.ma_nha_xe END,n.ma_nhan_vien
 FROM nhan_vien n CROSS JOIN project_password p
-WHERE n.ma_nhan_vien IN (SELECT 'NV_'||code||'_'||lpad(r::text,2,'0') FROM project_operators CROSS JOIN generate_series(1,7) r)
+WHERE (n.ma_nhan_vien IN (SELECT 'NV_'||code||'_'||lpad(r::text,2,'0') FROM project_operators CROSS JOIN generate_series(1,7) r)
+OR n.ma_nhan_vien IN ('NV_KV01','NV_KV02'))
+AND NOT EXISTS (SELECT 1 FROM nguoi_dung u WHERE u.ma_nhan_vien=n.ma_nhan_vien)
 ON CONFLICT(ma_nguoi_dung) DO NOTHING;
 
 INSERT INTO nguoi_dung(ma_nguoi_dung,ho_ten,so_dien_thoai,email,mat_khau,loai_tai_khoan,trang_thai)

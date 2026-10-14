@@ -61,16 +61,20 @@ public class KiemVeService {
 
         String employeeId = user.nhanVien.maNhanVien;
         NhanVien initialEmployee = em.find(NhanVien.class, employeeId);
-        if (initialEmployee == null || initialEmployee.nhaXe == null) throw AccessControl.denied();
-        NhaXe company = AccessControl.resource(em, NhaXe.class, initialEmployee.nhaXe.maNhaXe);
+        if (initialEmployee == null) throw AccessControl.denied();
+        ChuyenXe initialTrip = em.find(ChuyenXe.class, tripId);
+        if (initialTrip == null || initialTrip.tuyenXe.nhaXe == null) throw AccessControl.denied();
+        NhaXe company = AccessControl.resource(em, NhaXe.class, initialTrip.tuyenXe.nhaXe.maNhaXe);
         ChuyenXe trip = AccessControl.resource(em, ChuyenXe.class, tripId);
         NhanVien employee = AccessControl.resource(em, NhanVien.class, employeeId);
 
         if (employee.trangThai != TrangThaiNhanVien.DANG_LAM_VIEC
-                || employee.nhaXe == null || company.trangThai != TrangThaiNhaXe.HOAT_DONG
+                || company.trangThai != TrangThaiNhaXe.HOAT_DONG
                 || trip.tuyenXe.nhaXe == null
-                || !employee.nhaXe.maNhaXe.equals(company.maNhaXe)
+                || !AccessControl.systemInspector(employee) && (employee.nhaXe == null || !employee.nhaXe.maNhaXe.equals(company.maNhaXe))
                 || !trip.tuyenXe.nhaXe.maNhaXe.equals(company.maNhaXe)) throw AccessControl.denied();
+
+        if (AccessControl.systemInspector(employee)) return trip;
 
         List<PhanCongChuyenXe> assignments = em.createQuery(
                         "select p from PhanCongChuyenXe p where p.nhanVien = :employee and p.chuyenXe = :trip",
@@ -90,6 +94,29 @@ public class KiemVeService {
             throw AccessControl.denied();
         }
         return trip;
+    }
+
+    public List<Map<String,Object>> inspectionTrips() {
+        try (EntityManager em=emf.createEntityManager()) {
+            var tx=em.getTransaction(); tx.begin();
+            try {
+                NguoiDung user=caller(em);
+                AccessControl.role(user,LoaiTaiKhoan.NHAN_VIEN);
+                if(user.nhanVien==null) throw AccessControl.denied();
+                NhanVien employee=AccessControl.resource(em,NhanVien.class,user.nhanVien.maNhanVien);
+                if(!AccessControl.systemInspector(employee) || employee.trangThai!=TrangThaiNhanVien.DANG_LAM_VIEC)
+                    throw AccessControl.denied();
+                var trips=em.createQuery("select c from ChuyenXe c join fetch c.tuyenXe t join fetch t.nhaXe n "
+                    + "where c.trangThai in (:sale,:running) and n.trangThai=:active "
+                    + "order by c.ngayKhoiHanh,c.gioKhoiHanh,c.maChuyen",ChuyenXe.class)
+                    .setParameter("sale",TrangThaiChuyen.DANG_MO_BAN).setParameter("running",TrangThaiChuyen.DANG_CHAY)
+                    .setParameter("active",TrangThaiNhaXe.HOAT_DONG).getResultList();
+                List<Map<String,Object>> result=trips.stream().map(c -> Map.<String,Object>of(
+                    "maChuyen",c.maChuyen,"tenTuyen",c.tuyenXe.tenTuyen,"ngayKhoiHanh",c.ngayKhoiHanh,
+                    "gioKhoiHanh",c.gioKhoiHanh,"gioDenDuKien",c.gioDenDuKien,"trangThai",c.trangThai)).toList();
+                tx.commit(); return result;
+            } catch(RuntimeException error) { if(tx.isActive()) tx.rollback(); throw error; }
+        }
     }
 
     private static void validateIdempotencyKey(String key) {

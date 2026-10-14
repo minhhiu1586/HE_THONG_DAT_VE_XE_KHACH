@@ -98,7 +98,7 @@ def seed_private_staff():
     t16.STAFF_IDS.append(PRIVATE_STAFF_ID)
     db("INSERT INTO nhan_vien(ma_nhan_vien,ho_ten,so_dien_thoai,email,loai_nhan_vien,"
        "trang_thai,ma_nha_xe) VALUES ("
-       + ",".join((sql_literal(PRIVATE_STAFF_ID), sql_literal("T20 fixture assistant"),
+       + ",".join((sql_literal(PRIVATE_STAFF_ID), sql_literal("T20 fixture inspector"),
                    sql_literal(t16.staff_phone()),
                    sql_literal(PRIVATE_STAFF_ID.lower() + "@example.test"),
                    "'PHU_XE'", "'DANG_LAM_VIEC'", sql_literal(company))) + ")")
@@ -321,6 +321,26 @@ def f03_staff_history_and_passenger_list(fixtures):
         assert denied["code"] == "FORBIDDEN", denied
 
 
+def f04_system_inspector_without_operator_assignment():
+    db("UPDATE nhan_vien SET ma_nha_xe=NULL,loai_nhan_vien='KIEM_VE' WHERE ma_nhan_vien=" + sql_literal(PRIVATE_STAFF_ID))
+    db("DELETE FROM phan_cong_chuyen_xe WHERE ma_nhan_vien=" + sql_literal(PRIVATE_STAFF_ID))
+    trips = call(t16.CUSTOMER_C, "GET", "/kiem-ve/chuyen-xe")
+    assert any(item["maChuyen"] == t16.TRIP_IDS[0] for item in trips), trips
+    passengers = call(t16.CUSTOMER_C, "GET", "/chuyen-xe/" + t16.TRIP_IDS[2] + "/hanh-khach")
+    assert passengers["maChuyen"] == t16.TRIP_IDS[2], passengers
+    ticket = seed_ticket("SYSTEM", 2, 0)
+    verified = verify(ticket)
+    assert verified["hopLe"] is True, verified
+    boarded = check_in(ticket, key=t16.idem_key("system-check-in"))
+    assert boarded["trangThai"] == "DA_LEN_XE", boarded
+    assert int(db_value("SELECT count(*) FROM nhat_ky_kiem_ve WHERE ma_ve=" + sql_literal(ticket["ticket"])
+                        + " AND ma_nhan_vien=" + sql_literal(PRIVATE_STAFF_ID))) == 1
+    call(t16.CUSTOMER_A, "GET", "/kiem-ve/chuyen-xe", expected=403)
+    db("UPDATE nhan_vien SET trang_thai='TAM_NGHI' WHERE ma_nhan_vien=" + sql_literal(PRIVATE_STAFF_ID))
+    call(t16.CUSTOMER_C, "GET", "/kiem-ve/chuyen-xe", expected=403)
+    call(t16.CUSTOMER_C, "GET", "/chuyen-xe/" + t16.TRIP_IDS[0] + "/hanh-khach", expected=403)
+
+
 def cleanup():
     global STAFF_ACCOUNT_LINKED
     errors = []
@@ -369,6 +389,8 @@ def main():
                      lambda: f02_idempotent_check_in_and_state_guards(fixtures))
             scenario("F03 assigned-staff logs, passenger state/history and scope",
                      lambda: f03_staff_history_and_passenger_list(fixtures))
+            scenario("F04 system inspector without operator assignment and inactive-role guards",
+                     f04_system_inspector_without_operator_assignment)
     except Exception as error_value:
         error = error_value
     finally:

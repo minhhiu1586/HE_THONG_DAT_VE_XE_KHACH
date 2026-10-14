@@ -15,9 +15,9 @@ public final class States {
     public enum GioiTinh { NAM, NU, KHAC }
     public enum TrangThaiTaiKhoan { HOAT_DONG, KHOA, CHO_XAC_THUC }
     public enum TrangThaiNhanVien { DANG_LAM_VIEC, TAM_NGHI, DA_NGHI_VIEC }
-    public enum LoaiNhanVien { TAI_XE, PHU_XE, DIEU_HANH }
+    public enum LoaiNhanVien { TAI_XE, PHU_XE, DIEU_HANH, KIEM_VE }
     public enum VaiTroChuyen {
-        TAI_XE_CHINH, TAI_XE_PHU, PHU_XE,
+        TAI_XE_CHINH, TAI_XE_PHU, PHU_XE, KIEM_VE,
         /** Legacy value retained so existing Java clients and stored assignments still work. */
         @Deprecated TAI_XE
     }

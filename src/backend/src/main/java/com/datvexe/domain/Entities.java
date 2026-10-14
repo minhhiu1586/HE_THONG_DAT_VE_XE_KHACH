@@ -71,7 +71,7 @@ public final class Entities {
         public LoaiNhanVien loaiNhanVien;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
         public TrangThaiNhanVien trangThai = TrangThaiNhanVien.DANG_LAM_VIEC;
-        @ManyToOne(optional = false, fetch = FetchType.EAGER) @JoinColumn(name = "ma_nha_xe", nullable = false)
+        @ManyToOne(fetch = FetchType.EAGER) @JoinColumn(name = "ma_nha_xe")
         public NhaXe nhaXe;
         @OneToMany(mappedBy = "nhanVien") public List<PhanCongChuyenXe> danhSachPhanCong = new ArrayList<>();
         public NhanVien() {}
