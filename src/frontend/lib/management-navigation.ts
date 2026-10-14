@@ -7,6 +7,7 @@ export const managementItems = [
   { href: '/quan-tri/tuyen-duong', label: 'Tuyến đường và bến xe', icon: '🗺️', description: 'Tỉnh thành, bến xe, tuyến xe và điểm dừng.', adminOnly: false },
   { href: '/quan-tri/xe', label: 'Xe và sơ đồ ghế', icon: '🚌', description: 'Loại xe, phương tiện, đăng kiểm và bảo trì ghế.', adminOnly: false },
   { href: '/quan-tri/chuyen-xe', label: 'Chuyến xe và mở bán', icon: '📅', description: 'Tạo chuyến nháp, kiểm tra vận hành và xác nhận mở bán.', adminOnly: false },
+  { href: '/quan-tri/danh-gia', label: 'Kiểm duyệt đánh giá', icon: '⭐', description: 'Duyệt và quản lý nhận xét chuyến xe.', adminOnly: false },
 ];
 export function canManage(role?: Profile['loaiTaiKhoan']) { return role === 'ADMIN' || role === 'NHA_XE'; }
 export function navigationFor(role: Profile['loaiTaiKhoan']) {

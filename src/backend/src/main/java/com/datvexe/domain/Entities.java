@@ -307,6 +307,7 @@ public final class Entities {
         @Column(name = "ngay_danh_gia", nullable = false) public LocalDateTime ngayDanhGia;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
         public TrangThaiDanhGia trangThai = TrangThaiDanhGia.CHO_DUYET;
+        @Column(name = "da_xoa", nullable = false) public boolean daXoa;
         public DanhGia() {}
     }
 

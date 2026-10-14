@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { getTrip, getTripSeats, type SearchTrip, type TripSeat } from '@/lib/api';
 import styles from './TripDetails.module.css';
+import PublicReviews from '@/components/Reviews/PublicReviews';
 import BusFront from './BusFront';
 import { getSeatLayout, getSeatPlacement } from './seat-layout';
 
@@ -135,5 +136,6 @@ export default function TripDetails({ trip: initial }: { trip: SearchTrip }) {
       })}
       {seats.length === 0 && <p>Chuyến này chưa có sơ đồ ghế.</p>}
     </section>}
+    <PublicReviews maChuyen={trip.maChuyen}/>
   </main>;
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { errorMessage, type Profile } from '@/lib/account-api';
+import ReviewEditor from '@/components/Reviews/ReviewEditor';
 import OrderCode from '@/components/booking/OrderCode';
 import { useAuth } from './AuthProvider';
 import accountStyles from './Account.module.css';
@@ -93,6 +94,7 @@ export default function OrderHistoryPanel() {
           ))}
         </div>
       )}
+      {visibleHistory?.status==='success'&&Array.from(new Map(visibleHistory.orders.filter(o=>o.maChuyen&&o.trangThaiChuyen==='HOAN_TAT').map(o=>[o.maChuyen!,o])).values()).map(order=><ReviewEditor key={order.maChuyen} maChuyen={order.maChuyen!} tenTuyen={order.tuyenXe??order.maChuyen!}/>)}
     </section>
   );
 }
