@@ -87,7 +87,13 @@ public class RouteTripController extends HttpServlet {
                     result = Map.of("trangThai", service.getChuyenXe(p[1]).get("trangThai"));
                 else if (p.length == 3 && p[2].equals("xe") && method.equals("PUT"))
                     result = service.assignVehicle(p[1], body(request, Inputs.GanXe.class).maXe());
-                else if (p.length == 3 && method.equals("POST")) {
+                else if (p.length == 3 && p[2].equals("kiem-ve") && method.equals("GET")) {
+                    int page = request.getParameter("page") == null ? 1 : Integer.parseInt(request.getParameter("page"));
+                    int size = request.getParameter("size") == null ? 20 : Integer.parseInt(request.getParameter("size"));
+                    result = new com.datvexe.service.KiemVeService(Jpa.factory()).checkLogs(p[1], page, size, request.getParameter("maGhe"), request.getParameter("sort"));
+                } else if (p.length == 3 && p[2].equals("hanh-khach") && method.equals("GET")) {
+                    result = new com.datvexe.service.KiemVeService(Jpa.factory()).passengerList(p[1]);
+                } else if (p.length == 3 && method.equals("POST")) {
                     TrangThaiChuyen target = switch (p[2]) {
                         case "huy" -> TrangThaiChuyen.DA_HUY;
                         case "bat-dau" -> TrangThaiChuyen.DANG_CHAY;

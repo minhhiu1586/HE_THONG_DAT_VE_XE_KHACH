@@ -142,7 +142,8 @@ public final class HoanVeService {
         if (!prepared.fresh()) return HoanVeRepository.response(prepared.entry());
         if (prepared.entry().amount().signum() == 0) return dispatch(prepared,ip);
         History evidence = prepared.entry().history().stream().filter(h -> "DA_XAC_MINH_CONG".equals(h.thaoTac())
-                && prepared.entry().requestId().equals(h.maRequestCong()) && "00/00".equals(h.maKetQua())).reduce((a,b)->b).orElse(null);
+                && prepared.entry().requestId().equals(h.maRequestCong())
+                && Set.of("00/00", "00/05", "00/06").contains(h.maKetQua())).reduce((a,b)->b).orElse(null);
         if (evidence != null) return applyVerified(prepared.entry().id(),new VNPayClient.RefundResult(prepared.entry().requestId(),
                 prepared.entry().paymentId(),prepared.entry().amount(),"00","00",evidence.maGiaoDichCong(),null,true));
         try { return applyVerified(prepared.entry().id(),gateway.query(command(prepared,ip),prepared.entry().providerId())); }
@@ -219,7 +220,7 @@ public final class HoanVeService {
                 repo.update(pending); return HoanVeRepository.response(pending);
             }
             String state;
-            if ("00".equals(result.responseCode()) && "00".equals(result.transactionStatus())) state = "THANH_CONG";
+            if ("00".equals(result.responseCode()) && Set.of("00", "05", "06").contains(Objects.toString(result.transactionStatus(), ""))) state = "THANH_CONG";
             else if (Set.of("02","09").contains(Objects.toString(result.transactionStatus(),""))
                     || Set.of("02","03","91","95","97").contains(Objects.toString(result.responseCode(),""))) state = "THAT_BAI";
             else state = "CAN_DOI_SOAT";

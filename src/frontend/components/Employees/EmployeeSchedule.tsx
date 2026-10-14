@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { Employee, noteText, roles, Schedule, scheduleTime, states, tripRoles, tripStates } from './employee-types';
+import TicketInspectionPanel from './TicketInspectionPanel';
 import styles from './EmployeeManagement.module.css';
 
-const sections = { overview: 'Tổng quan', profile: 'Hồ sơ nhân viên', schedule: 'Lịch phân công' };
+const sections = { overview: 'Tổng quan', ticketCheck: 'Kiểm vé & Lên xe', schedule: 'Lịch phân công', profile: 'Hồ sơ nhân viên' };
 type Section = keyof typeof sections;
 
 export default function EmployeeSchedule() {
@@ -73,6 +74,7 @@ export default function EmployeeSchedule() {
         <section className={styles.panel}><h2>Chuyến tiếp theo trong lịch</h2>{nextTrip ? journey(nextTrip) : <p>Chưa có chuyến đang được giao.</p>}<button className={styles.primary} onClick={() => setSection('schedule')}>Xem toàn bộ lịch</button></section>
         <section className={styles.panel}><h2>Thông tin công việc</h2><p>{employee.loaiNhanVien === 'TAI_XE' ? 'Kiểm tra giờ khởi hành, vai trò tài xế chính/phụ và ghi chú điều phối trước mỗi chuyến.' : 'Kiểm tra giờ khởi hành, tuyến phục vụ và ghi chú điều phối trước mỗi chuyến.'}</p><p>Liên hệ người điều phối khi hồ sơ hoặc lịch cần điều chỉnh.</p></section>
       </>}
+      {section === 'ticketCheck' && <TicketInspectionPanel schedule={schedule} />}
       {section === 'profile' && <section className={styles.panel}>
         <h2>Hồ sơ nhân viên của tôi</h2>
         <dl className={styles.details}>
