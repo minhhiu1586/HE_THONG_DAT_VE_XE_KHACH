@@ -67,9 +67,9 @@ def route(name="R"):
             "giaCoBan": 250000, "trangThai": "DANG_KHAI_THAC", "maNhaXe": ident("NX")}
 
 
-def search(date="2030-01-01", origin="A", destination="B"):
+def search(date="2030-01-01", origin="A", destination="B", expected=200):
     params = urllib.parse.urlencode({"from": ident(origin), "to": ident(destination), "date": date})
-    return call("GET", "/chuyen-xe?" + params)
+    return call("GET", "/chuyen-xe?" + params, expected=expected)
 
 
 def setup():
@@ -178,18 +178,19 @@ def search_and_status():
     assert [x["maChuyen"] for x in search()] == [ident("C1")]
     assert [x["maChuyen"] for x in search(origin="CITY_A", destination="CITY_B")] == [ident("C1")]
     assert search("2030-01-03") == [] and search(origin="B", destination="A") == []
-    assert search(origin="UNKNOWN") == []
+    assert search(origin="UNKNOWN", expected=400)["code"]
     call("POST", "/chuyen-xe/" + ident("NIGHT") + "/bat-dau", expected=409)
-    call("POST", "/chuyen-xe/" + ident("NIGHT") + "/huy")
+    call("POST", "/chuyen-xe/" + ident("NIGHT") + "/huy", expected=400)
+    call("POST", "/quan-ly/chuyen-xe/" + ident("NIGHT") + "/huy", {"lyDo": "Kiểm thử hủy chuyến"})
     assert call("GET", "/chuyen-xe/" + ident("NIGHT") + "/trang-thai")["trangThai"] == "DA_HUY"
     call("PUT", "/chuyen-xe/" + ident("NIGHT"), {"ngayKhoiHanh": "2030-01-01", "gioKhoiHanh": "12:00:00"}, 409)
     assert [x["maChuyen"] for x in search()] == [ident("C1")]
     call("POST", "/chuyen-xe/" + ident("C1") + "/bat-dau")
-    call("POST", "/chuyen-xe/" + ident("C1") + "/huy", expected=409)
+    call("POST", "/quan-ly/chuyen-xe/" + ident("C1") + "/huy", {"lyDo": "Kiểm thử trạng thái"}, expected=409)
     call("POST", "/chuyen-xe/" + ident("C1") + "/hoan-thanh")
     assert search() == []
     assert call("GET", "/chuyen-xe/" + ident("C1") + "/trang-thai")["trangThai"] == "HOAN_TAT"
-    call("POST", "/chuyen-xe/" + ident("C2") + "/huy")
+    call("POST", "/quan-ly/chuyen-xe/" + ident("C2") + "/huy", {"lyDo": "Kiểm thử hủy chuyến"})
     assert search("2030-01-02") == []
     print("PASS: search by station/city/date, no trips, cancelled/completed and lifecycle")
 
@@ -213,6 +214,7 @@ def validation():
 
 
 def cleanup():
+    sql(f"DELETE FROM trip_lifecycle_history WHERE left(ma_chuyen, {len(PREFIX)}) = '{PREFIX}'")
     for table, key in (("phan_cong_chuyen_xe","ma_phan_cong"), ("chuyen_xe", "ma_chuyen"), ("diem_dung", "ma_diem_dung"),
                        ("tuyen_xe", "ma_tuyen"), ("ghe", "ma_ghe"), ("xe", "ma_xe"), ("loai_xe", "ma_loai_xe"), ("nhan_vien","ma_nhan_vien"), ("nha_xe", "ma_nha_xe"), ("ben_xe", "ma_ben_xe"),
                        ("tinh_thanh", "ma_tinh_thanh")):
@@ -228,5 +230,7 @@ if __name__ == "__main__":
             scenario()
         print(f"PASS: 5 API scenarios, {requests_checked} HTTP responses checked")
     finally:
-        cleanup()
-        AUTH.close()
+        try:
+            cleanup()
+        finally:
+            AUTH.close()

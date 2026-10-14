@@ -46,6 +46,48 @@ def employee(name, owner='A', role='TAI_XE'):
                 ngayHetHanBangLai='2040-01-01' if role == 'TAI_XE' else None)
 
 
+def profile_audit():
+    """Actual profile rules: duplicate names are allowed; contact details must be unique."""
+    def profile(code, slot, role='TAI_XE', **changes):
+        base = employee('TEMP', role=role)
+        return base | dict(maNhanVien=ident(code), hoTen='Nguyen Thanh D',
+                           soDienThoai=base['soDienThoai'][:-2] + str(slot),
+                           email=ident(code).lower() + '@example.test') | changes
+
+    driver = profile('AUD_D', 61)
+    assistant = profile('AUD_P', 62, 'PHU_XE')
+    assert call('POST', '/nhan-vien', driver, 201)['trangThai'] == 'DANG_LAM_VIEC'
+    call('POST', '/nhan-vien', assistant, 201)  # Same name, different IDs and contacts.
+    call('POST', '/nhan-vien', driver, 409)
+    call('POST', '/nhan-vien', profile('AUD_DUPMAIL', 63, email=driver['email'].upper()), 409)
+    call('POST', '/nhan-vien', profile('AUD_DUPPHONE', 63, soDienThoai=driver['soDienThoai']), 409)
+    call('POST', '/nhan-vien', profile('AUD_BADMAIL', 63, email='invalid'), 400)
+    call('POST', '/nhan-vien', profile('AUD_LICENSE', 63, soBangLai=None), 400)
+    call('POST', '/nhan-vien', profile('AUD_EXPIRY', 63, ngayHetHanBangLai=None), 400)
+    call('POST', '/nhan-vien', profile('AUD_DOB', 63, ngaySinh=str(date.today() + timedelta(days=1))), 400)
+    call('POST', '/nhan-vien', profile('AUD_OWNER', 63, maNhaXe=ident('MISSING')), 404)
+    call('PUT', '/nhan-vien/' + driver['maNhanVien'], driver | dict(email=assistant['email']), 409)
+    assert call('GET', '/nhan-vien/' + driver['maNhanVien'])['email'] == driver['email']
+    call('PUT', '/nhan-vien/' + driver['maNhanVien'], driver | dict(maNhanVien=ident('NEW_ID')), 400)
+    call('PUT', '/nhan-vien/' + driver['maNhanVien'], driver | dict(maNhaXe=ident('B')), 409)
+    updated = call('PUT', '/nhan-vien/' + driver['maNhanVien'], driver | dict(hoTen='Nguyen Van Audit'))
+    assert updated['hoTen'] == call('GET', '/nhan-vien/' + driver['maNhanVien'])['hoTen']
+    call('PUT', '/nhan-vien/' + driver['maNhanVien'], driver | dict(trangThai='TAM_NGHI'))
+    call('PUT', '/nhan-vien/' + driver['maNhanVien'], driver)  # Back to active.
+    # Active by itself does not forbid deletion: assignments/account links do.
+    call('DELETE', '/nhan-vien/' + driver['maNhanVien'], expected=204)
+    call('DELETE', '/nhan-vien/' + assistant['maNhanVien'], expected=204)
+    call('GET', '/nhan-vien/' + driver['maNhanVien'], expected=404)
+    linked = profile('AUD_LINKED', 64, 'PHU_XE')
+    call('POST', '/nhan-vien', linked, 201)
+    other_auth.sql(f"UPDATE nguoi_dung SET ma_nhan_vien='{linked['maNhanVien']}' WHERE ma_nguoi_dung='{other_auth.user_id}'")
+    try:
+        call('DELETE', '/nhan-vien/' + linked['maNhanVien'], expected=409)
+    finally:
+        other_auth.sql(f"UPDATE nguoi_dung SET ma_nhan_vien=NULL WHERE ma_nguoi_dung='{other_auth.user_id}'")
+    call('DELETE', '/nhan-vien/' + linked['maNhanVien'], expected=204)
+
+
 def main():
     auth.start(); other_auth.start()
     call('GET', '/nhan-vien', expected=401, anonymous=True)
@@ -59,6 +101,7 @@ def main():
     call('DELETE', '/nhan-vien/' + ident('TEMP'), expected=204)
     call('GET', '/nhan-vien/' + ident('TEMP'), expected=404)
     assert len(call('GET', '/nhan-vien?q=' + ident('D2'))) == 1
+    profile_audit()
     auth.sql(f"INSERT INTO tinh_thanh(ma_tinh_thanh,ten_tinh_thanh) VALUES ('{ident('CITY')}','City');"
              f"INSERT INTO ben_xe(ma_ben_xe,ten_ben_xe,dia_chi,ma_tinh_thanh,trang_thai) VALUES"
              f"('{ident('S1')}','First','First','{ident('CITY')}','HOAT_DONG'),('{ident('S2')}','Second','Second','{ident('CITY')}','HOAT_DONG');")

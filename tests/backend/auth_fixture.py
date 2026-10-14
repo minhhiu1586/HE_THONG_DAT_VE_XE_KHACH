@@ -5,6 +5,8 @@ import secrets
 import subprocess
 import urllib.request
 import os
+import time
+import urllib.error
 
 class AdminFixture:
     def __init__(self, base):
@@ -22,9 +24,20 @@ class AdminFixture:
     def send(self, method, path, body=None):
         req = urllib.request.Request(self.base + path, method=method,
             data=None if body is None else json.dumps(body).encode(), headers=self.headers())
-        with self.opener.open(req, timeout=30) as response:
-            raw = response.read()
-            return json.loads(raw) if raw else None
+        for attempt in range(4):
+            try:
+                with self.opener.open(req, timeout=30) as response:
+                    raw = response.read()
+                    return json.loads(raw) if raw else None
+            except urllib.error.HTTPError as error:
+                if error.code != 429 or path not in ('/auth/dang-ky', '/auth/dang-nhap') or attempt == 3:
+                    raise
+                delay = int(error.headers.get('Retry-After', '60'))
+                print(f'Authentication fixture rate limited; retry after {delay}s.', flush=True)
+                while delay > 0:
+                    pause = min(delay, 60)
+                    time.sleep(pause)
+                    delay -= pause
     def headers(self):
         return {'Content-Type': 'application/json', 'X-Requested-With': 'datvexe',
                 **({'X-CSRF-Token': self.csrf} if self.csrf else {})}
