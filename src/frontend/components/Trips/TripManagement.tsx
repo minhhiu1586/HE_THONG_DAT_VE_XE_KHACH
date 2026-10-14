@@ -5,6 +5,7 @@ import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
 import { useManagementFocus } from '@/lib/use-management-focus';
+import { routeChoices, routeFilterChoices, sortedUnique } from '@/lib/management-options';
 import TripPassengerModal from './TripPassengerModal';
 import styles from './TripManagement.module.css';
 
@@ -58,7 +59,7 @@ export default function TripManagement(){
   useEffect(()=>{
     let active=true;
     Promise.all([request<Route[]>('/tuyen-xe'),request<Vehicle[]>('/xe'),request<Page>(`${API}?page=1&size=20`),request<Operator[]>('/xe/pham-vi')])
-      .then(([r,v,p,o])=>{if(active){setRoutes(r);setVehicles(v);setPage(p);setOperators(o);}})
+      .then(([r,v,p,o])=>{if(active){setRoutes(sortedUnique(r,item=>item.maTuyen,item=>item.tenTuyen));setVehicles(sortedUnique(v,item=>item.maXe,item=>item.bienSo));setPage(p);setOperators(sortedUnique(o,item=>item.maNhaXe,item=>item.tenNhaXe));}})
       .catch(failure=>{if(active)setError(errorMessage(failure));})
       .finally(()=>{if(active)setInitialLoading(false);});
     return()=>{active=false;};
@@ -69,6 +70,8 @@ export default function TripManagement(){
     if(navigate)focusDetail();
   }
   const route=routes.find(r=>r.maTuyen===form.maTuyen);
+  const choices=routeChoices(routes,operators);
+  const filterChoices=routeFilterChoices(routes);
   const arrival=form.gioDenDuKien || estimated(form.ngayKhoiHanh,form.gioKhoiHanh,route?.thoiGianDuKien);
   function edit(trip:Trip){setEditing(true);setForm({maChuyen:trip.maChuyen,maTuyen:trip.maTuyen,maXe:trip.maXe??'',ngayKhoiHanh:trip.ngayKhoiHanh,gioKhoiHanh:trip.gioKhoiHanh.slice(0,5),gioDenDuKien:trip.gioDenDuKien.slice(0,16)});focusForm('input:not(:disabled):not([readonly]),select:not(:disabled),textarea:not(:disabled)');}
   function submit(event:FormEvent<HTMLFormElement>){
@@ -84,7 +87,7 @@ export default function TripManagement(){
     <section ref={formTarget} className={styles.panel}><h2 data-management-focus tabIndex={-1}>{editing?'Sửa chuyến nháp':'Tạo chuyến nháp'}</h2>
       <form className={styles.form} onSubmit={submit} onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation}>
         <label>Mã chuyến<input data-validation-label="mã chuyến" required maxLength={40} pattern="[A-Za-z0-9_-]+" disabled={editing} value={form.maChuyen} onChange={e=>setForm({...form,maChuyen:e.target.value})}/></label>
-        <label>Tuyến xe<select aria-label="Tuyến xe" data-validation-label="tuyến xe" required value={form.maTuyen} onChange={e=>setForm({...form,maTuyen:e.target.value,maXe:'',gioDenDuKien:''})}><option value="">Chọn tuyến</option>{routes.map(r=><option key={r.maTuyen} value={r.maTuyen} disabled={!r.maNhaXe}>{r.tenTuyen} · {r.maTuyen}</option>)}</select></label>
+        <label>Tuyến xe<select aria-label="Tuyến xe" data-validation-label="tuyến xe" required value={form.maTuyen} onChange={e=>setForm({...form,maTuyen:e.target.value,maXe:'',gioDenDuKien:''})}><option value="">Chọn tuyến</option>{choices.map(choice=><option key={choice.value} value={choice.value} disabled={choice.disabled}>{choice.label}</option>)}</select></label>
         <label>Xe dự kiến (không bắt buộc)<select aria-label="Xe dự kiến (không bắt buộc)" value={form.maXe} onChange={e=>setForm({...form,maXe:e.target.value})}><option value="">Chưa gán xe</option>{vehicles.filter(v=>v.maNhaXe===route?.maNhaXe).map(v=><option key={v.maXe} value={v.maXe}>{v.bienSo} · {v.maXe}</option>)}</select></label>
         <label>Nhà xe vận hành<input readOnly value={operators.find(o=>o.maNhaXe===route?.maNhaXe)?.tenNhaXe??route?.maNhaXe??''}/></label>
         <label>Ngày khởi hành<input data-validation-label="ngày khởi hành" required type="date" value={form.ngayKhoiHanh} onChange={e=>setForm({...form,ngayKhoiHanh:e.target.value,gioDenDuKien:''})}/></label>
@@ -97,7 +100,7 @@ export default function TripManagement(){
     </section>
     <section className={styles.panel}><h2>Danh sách chuyến</h2>
       <form className={styles.filters} onSubmit={e=>{e.preventDefault();void action(()=>load());}}>
-        <label>Lọc tuyến<select aria-label="Lọc tuyến" value={filters.maTuyen} onChange={e=>setFilters({...filters,maTuyen:e.target.value})}><option value="">Tất cả tuyến</option>{routes.map(r=><option key={r.maTuyen} value={r.maTuyen}>{r.tenTuyen}</option>)}</select></label>
+        <label>Lọc tuyến<select aria-label="Lọc tuyến" value={filters.maTuyen} onChange={e=>setFilters({...filters,maTuyen:e.target.value})}><option value="">Tất cả tuyến</option>{filterChoices.map(choice=><option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>
         <label>Lọc xe<select aria-label="Lọc xe" value={filters.maXe} onChange={e=>setFilters({...filters,maXe:e.target.value})}><option value="">Tất cả xe</option>{vehicles.map(v=><option key={v.maXe} value={v.maXe}>{v.bienSo}</option>)}</select></label>
         <label>Lọc trạng thái<select aria-label="Lọc trạng thái" value={filters.trangThai} onChange={e=>setFilters({...filters,trangThai:e.target.value})}><option value="">Tất cả trạng thái</option>{Object.entries(states).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
         <label>Từ ngày<input type="date" value={filters.tuNgay} onChange={e=>setFilters({...filters,tuNgay:e.target.value})}/></label><label>Đến ngày<input type="date" value={filters.denNgay} onChange={e=>setFilters({...filters,denNgay:e.target.value})}/></label>

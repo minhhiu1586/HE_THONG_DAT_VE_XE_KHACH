@@ -6,6 +6,7 @@ import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
 import { useManagementFocus } from '@/lib/use-management-focus';
+import { sortedUnique } from '@/lib/management-options';
 import styles from './RouteManagement.module.css';
 
 type City = { maTinhThanh: string; tenTinhThanh: string; khuVuc: string | null };
@@ -18,6 +19,9 @@ const emptyStation = { maBenXe: '', tenBenXe: '', diaChi: '', soDienThoai: '', m
 const emptyRoute = { maTuyen: '', tenTuyen: '', tramKhoiHanh: '', tramDen: '', thoiGianKhoiHanh: '', khoangCachKM: '', thoiGianDuKien: '', giaCoBan: '', moTa: '', trangThai: 'SAP_KHAI_THAC' };
 const statusLabels: Record<string, string> = { SAP_KHAI_THAC: 'Sắp khai thác', DANG_KHAI_THAC: 'Đang khai thác', TAM_NGUNG: 'Tạm ngừng', NGUNG_KHAI_THAC: 'Ngừng khai thác' };
 const statuses = ['SAP_KHAI_THAC', 'DANG_KHAI_THAC', 'TAM_NGUNG', 'NGUNG_KHAI_THAC'];
+const cityList = (items: City[]) => sortedUnique(items, item => item.maTinhThanh, item => item.tenTinhThanh);
+const stationList = (items: Station[]) => sortedUnique(items, item => item.maBenXe, item => item.tenBenXe);
+const routeList = (items: Route[]) => sortedUnique(items, item => item.maTuyen, item => item.tenTuyen);
 
 export default function RouteManagement() {
   const { user, loading, request } = useAuth(); const router = useRouter();
@@ -43,17 +47,17 @@ export default function RouteManagement() {
   }
   const isAdmin = user?.loaiTaiKhoan === 'ADMIN'; const mayManage = isAdmin || user?.loaiTaiKhoan === 'NHA_XE';
 
-  const loadCities = useCallback(async () => setCities(await request<City[]>(`/tinh-thanh?q=${encodeURIComponent(citySearch)}`)), [request, citySearch]);
+  const loadCities = useCallback(async () => setCities(cityList(await request<City[]>(`/tinh-thanh?q=${encodeURIComponent(citySearch)}`))), [request, citySearch]);
   const loadStations = useCallback(async () => {
     const query = new URLSearchParams(); if (stationSearch) query.set('q', stationSearch);
     if (stationCity) query.set('maTinhThanh', stationCity); if (stationStatus) query.set('trangThai', stationStatus);
-    setStations(await request<Station[]>(`/ben-xe${query.size ? `?${query}` : ''}`));
+    setStations(stationList(await request<Station[]>(`/ben-xe${query.size ? `?${query}` : ''}`)));
   }, [request, stationSearch, stationCity, stationStatus]);
   const loadRoutes = useCallback(async () => {
     const query = new URLSearchParams();
     if (filterStart) query.set('tramKhoiHanh', filterStart); if (filterEnd) query.set('tramDen', filterEnd); if (filterStatus) query.set('trangThai', filterStatus);
     if (isAdmin && filterOperator) query.set('maNhaXe', filterOperator);
-    setRoutes(await request<Route[]>(`/tuyen-xe${query.size ? `?${query}` : ''}`));
+    setRoutes(routeList(await request<Route[]>(`/tuyen-xe${query.size ? `?${query}` : ''}`)));
   }, [request, filterStart, filterEnd, filterStatus, filterOperator, isAdmin]);
   const refresh = useCallback(async () => { await Promise.all([loadCities(), loadStations(), loadRoutes()]); }, [loadCities, loadStations, loadRoutes]);
   useEffect(() => {
@@ -62,7 +66,7 @@ export default function RouteManagement() {
     let active = true;
     Promise.all([request<City[]>('/tinh-thanh'), request<Station[]>('/ben-xe'), request<Route[]>('/tuyen-xe')])
       .then(([cityData, stationData, routeData]) => {
-        if (active) { setCities(cityData); setStations(stationData); setRoutes(routeData); }
+        if (active) { setCities(cityList(cityData)); setStations(stationList(stationData)); setRoutes(routeList(routeData)); }
       }).catch(e => { if (active) setError(errorMessage(e)); });
     return () => { active = false; };
   }, [loading, user, mayManage, router, request]);

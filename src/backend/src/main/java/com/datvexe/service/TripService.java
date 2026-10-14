@@ -93,7 +93,13 @@ public final class TripService {
         if(from!=null && to!=null && from.isAfter(to))throw new DomainException(400,"Khoảng ngày không hợp lệ.");
         String scope=RequestIdentity.operatorId(),requested=optional(owner);
         if(scope!=null && requested!=null && !scope.equals(requested))throw AccessControl.denied();
-        var filters=new ChuyenXeRepository.Filters(scope==null?requested:scope,optional(route),optional(vehicle),from,to,state);
+        String routeCodes=null;
+        if(route!=null && !route.isBlank()) {
+            var codes=route.split(",",-1);
+            if(codes.length>100)throw new DomainException(400,"Chỉ lọc tối đa 100 mã tuyến.");
+            routeCodes=String.join(",",Arrays.stream(codes).map(TripService::id).distinct().toList());
+        }
+        var filters=new ChuyenXeRepository.Filters(scope==null?requested:scope,routeCodes,optional(vehicle),from,to,state);
         var repo=new ChuyenXeRepository(em);long total=repo.count(filters);
         var values=repo.search(filters,(page-1)*size,size).stream().map(c->view(em,c)).toList();
         return Map.of("items",values,"page",page,"size",size,"totalItems",total,"totalPages",(total+size-1)/size);
