@@ -24,6 +24,7 @@ export default function TripCard({ trip, onChoose }: { trip: SearchTrip; onChoos
         <div className="trip-operator-logo">{logo ? <Image src={logo} alt="" width={48} height={48} sizes="48px" /> : <span>NX</span>}</div>
         <div className="trip-operator-info"><h2>{company}</h2>
           <div className="trip-card-meta"><span>{trip.tenLoaiXe ?? `${trip.soChoNgoi} chỗ`}</span><time dateTime={trip.ngayKhoiHanh}>{date}</time>{trip.bienSo && <span>{trip.bienSo}</span>}</div>
+          <div className="trip-card-meta"><span>Mã chuyến: {trip.maChuyen}</span></div>
         </div>
       </div>
       <span className={available ? 'trip-availability available' : 'trip-availability'}>{availability}</span>
