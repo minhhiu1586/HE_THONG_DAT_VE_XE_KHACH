@@ -27,7 +27,10 @@ def main():
                                 input=statement, encoding='utf-8', text=True, capture_output=True, check=True)
         return result.stdout.strip()
 
-    expected = {'nha_xe': 5, 'nhan_vien': 35, 'nguoi_dung': 47, 'xe': 10, 'ghe': 320, 'tuyen_xe': 20, 'diem_dung': 40}
+    expected = {'nha_xe': 5, 'nhan_vien': 37, 'nguoi_dung': 49, 'xe': 10, 'ghe': 320, 'tuyen_xe': 20, 'diem_dung': 40}
+    assert sql("SELECT count(*) FROM nhan_vien WHERE loai_nhan_vien='KIEM_VE'") == '2'
+    assert sql("SELECT count(*) FROM nhan_vien WHERE loai_nhan_vien='KIEM_VE' AND ma_nha_xe IS NULL") == '2'
+    assert sql("SELECT count(*) FROM nhan_vien WHERE loai_nhan_vien='TAI_XE'") == '20'
     for table, count in expected.items():
         actual = int(sql(f'SELECT count(*) FROM {table}'))
         assert actual == count, (table, actual, count)
@@ -84,7 +87,7 @@ def main():
         call('POST', '/auth/dang-xuat')
         csrf = None
         if index % 10 == 0:
-            print(f'Checked {index}/47 account logins.', flush=True)
+            print(f'Checked {index}/{len(accounts)} account logins.', flush=True)
     day = (datetime.now(timezone(timedelta(hours=7))).date()+timedelta(days=1)).isoformat()
     routes = json.loads(sql("SELECT json_agg(json_build_object('id',ma_tuyen,'from',tram_khoi_hanh,'to',tram_den)) FROM tuyen_xe"))
     available = 0
@@ -97,7 +100,7 @@ def main():
             assert any(seat['tinhTrangKhaDung'] == 'TRONG' for seat in seat_map['danhSachGhe'])
             available += 1
     assert available > 0
-    login_result = 'logins skipped' if args.skip_logins else '47 logins'
+    login_result = 'logins skipped' if args.skip_logins else f'{len(accounts)} logins'
     print(f'PASS: project counts, relationships, no schedule conflicts, {login_result} and {checks} API calls; search/seat maps available.')
 
 

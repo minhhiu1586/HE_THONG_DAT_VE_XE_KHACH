@@ -97,6 +97,15 @@ class EmployeeServiceTest {
             var main=new PhanCongChuyenXe(); main.maPhanCong="MAIN"; main.chuyenXe=trip;
             main.nhanVien=em.find(NhanVien.class,"E"); main.vaiTro=VaiTroChuyen.TAI_XE_CHINH; em.persist(main);
             assertThrows(DomainException.class,()->AssignmentRules.readyForOperation(em,trip));
+            var inspector=new NhanVien(); inspector.maNhanVien="CHECKER"; inspector.hoTen="Kiểm vé";
+            inspector.email="checker@example.test"; inspector.soDienThoai="0912345681";
+            inspector.loaiNhanVien=LoaiNhanVien.KIEM_VE; em.persist(inspector);
+            assertDoesNotThrow(()->AssignmentRules.validate(em,trip,inspector,VaiTroChuyen.KIEM_VE,null));
+            assertThrows(DomainException.class,()->AssignmentRules.validate(em,trip,inspector,VaiTroChuyen.TAI_XE_CHINH,null));
+            assertThrows(DomainException.class,()->AssignmentRules.validate(em,trip,inspector,VaiTroChuyen.PHU_XE,null));
+            var checking=new PhanCongChuyenXe(); checking.maPhanCong="CHECKING"; checking.chuyenXe=trip;
+            checking.nhanVien=inspector; checking.vaiTro=VaiTroChuyen.KIEM_VE; em.persist(checking);
+            assertThrows(DomainException.class,()->AssignmentRules.readyForOperation(em,trip));
             var assistant=new NhanVien(); assistant.maNhanVien="P"; assistant.hoTen="P"; assistant.email="p@example.test";
             assistant.soDienThoai="0912345679"; assistant.nhaXe=route.nhaXe; assistant.loaiNhanVien=LoaiNhanVien.PHU_XE; em.persist(assistant);
             var support=new PhanCongChuyenXe(); support.maPhanCong="SUPPORT"; support.chuyenXe=trip;
@@ -118,5 +127,9 @@ class EmployeeServiceTest {
         assertEquals(TrangThaiNhanVien.DANG_LAM_VIEC,employees.get("E").get("trangThai"));
         assertEquals("R",employees.assignments("E").getFirst().get("tenTuyen"));
         assertEquals(409,assertThrows(DomainException.class,()->employees.delete("E")).status());
+        var checkerUpdate=new EmployeeInputs.Employee("CHECKER","Kiểm vé cập nhật","0912345681","checker@example.test",
+            null,null,LoaiNhanVien.KIEM_VE,TrangThaiNhanVien.DANG_LAM_VIEC,null,null);
+        assertDoesNotThrow(()->employees.save("CHECKER",checkerUpdate));
+        assertEquals(409,assertThrows(DomainException.class,()->employees.delete("CHECKER")).status());
     }
 }

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
-import { Employee, noteText, roles, Schedule, scheduleTime, states, tripRoles, tripStates } from './employee-types';
+import { Employee, InspectionTrip, noteText, roles, Schedule, scheduleTime, states, tripRoles, tripStates } from './employee-types';
 import TicketInspectionPanel from './TicketInspectionPanel';
 import styles from './EmployeeManagement.module.css';
 
@@ -17,6 +17,7 @@ export default function EmployeeSchedule() {
   const router = useRouter();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [schedule, setSchedule] = useState<Schedule[]>([]);
+  const [inspectionTrips, setInspectionTrips] = useState<InspectionTrip[]>([]);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState('');
   const [section, setSection] = useState<Section>('overview');
@@ -32,7 +33,9 @@ export default function EmployeeSchedule() {
     request<Employee[]>('/nhan-vien').then(async data => {
       const own = data[0];
       const assigned = own ? await request<Schedule[]>(`/nhan-vien/${encodeURIComponent(own.maNhanVien)}/phan-cong`) : [];
-      if (active) { setEmployee(own ?? null); setSchedule(assigned); }
+      const trips = own?.loaiNhanVien === 'KIEM_VE' && !own.maNhaXe ? await request<InspectionTrip[]>('/kiem-ve/chuyen-xe') : [];
+      if (active) setInspectionTrips(trips);
+      if (active) { setEmployee(own ?? null); setSchedule(assigned); if (own?.loaiNhanVien === 'KIEM_VE') setSection('ticketCheck'); }
     }).catch(cause => { if (active) setError(errorMessage(cause)); })
       .finally(() => { if (active) setFetching(false); });
     return () => { active = false; };
@@ -45,7 +48,8 @@ export default function EmployeeSchedule() {
   const pages = Math.max(1, Math.ceil(filtered.length / 8));
   const current = Math.min(page, pages);
   const nextTrip = working[0];
-  const title = employee?.loaiNhanVien === 'TAI_XE' ? 'Không gian tài xế' : employee?.loaiNhanVien === 'PHU_XE' ? 'Không gian phụ xe' : 'Không gian nhân viên';
+  const systemInspector = employee?.loaiNhanVien === 'KIEM_VE' && !employee.maNhaXe;
+  const title = employee?.loaiNhanVien === 'TAI_XE' ? 'Không gian tài xế' : employee?.loaiNhanVien === 'PHU_XE' ? 'Không gian phụ xe' : employee?.loaiNhanVien === 'KIEM_VE' ? 'Không gian kiểm vé' : 'Không gian nhân viên';
 
   async function changeTripState(item:Schedule,target:'bat-dau'|'hoan-thanh') {
     if(transitioning)return;setTransitioning(item.maChuyen);setNotice('');setError('');
@@ -73,31 +77,31 @@ export default function EmployeeSchedule() {
 
   return <main className={styles.page}>
     <header className={styles.heading}>
-      <div><span className={styles.eyebrow}>{title}</span><h1>Xin chào, {employee?.hoTen ?? user.hoTen}</h1><p>Hồ sơ công việc và lịch chuyến dành riêng cho bạn.</p></div>
+      <div><span className={styles.eyebrow}>{title}</span><h1>Xin chào, {employee?.hoTen ?? user.hoTen}</h1><p>{systemInspector ? 'Kiểm vé và hồ sơ nhân viên chung của hệ thống.' : 'Hồ sơ công việc và lịch chuyến dành riêng cho bạn.'}</p></div>
       <Link className={styles.scope} href="/tai-khoan">Tài khoản và bảo mật →</Link>
     </header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {notice && <p className={styles.success} role="status">{notice}</p>}
     {fetching ? <p role="status">Đang tải hồ sơ và lịch…</p> : !employee ? <section className={styles.panel}><h2>Hồ sơ nhân viên</h2><p>Tài khoản chưa được liên kết hồ sơ. Liên hệ quản lý nhà xe để cập nhật.</p></section> : <>
       <nav className={styles.workspaceNav} aria-label="Không gian nhân viên">
-        {Object.entries(sections).map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id as Section)}>{label}</button>)}
+        {Object.entries(sections).filter(([id]) => !systemInspector || id !== 'schedule').map(([id, label]) => <button key={id} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id as Section)}>{label}</button>)}
       </nav>
       {section === 'overview' && <>
         <div className={styles.summary}>
           <div><strong>{roles[employee.loaiNhanVien]}</strong><span>Vai trò nghiệp vụ</span></div>
-          <div><strong>{working.length}</strong><span>Chuyến đang được giao</span></div>
+          <div><strong>{systemInspector ? inspectionTrips.length : working.length}</strong><span>{systemInspector ? 'Chuyến trong phạm vi kiểm vé' : 'Chuyến đang được giao'}</span></div>
           <div><strong>{states[employee.trangThai]}</strong><span>Trạng thái làm việc</span></div>
         </div>
-        <section className={styles.panel}><h2>Chuyến tiếp theo trong lịch</h2>{nextTrip ? journey(nextTrip) : <p>Chưa có chuyến đang được giao.</p>}<button className={styles.primary} onClick={() => setSection('schedule')}>Xem toàn bộ lịch</button></section>
+        {systemInspector ? <section className={styles.panel}><h2>Kiểm vé chung của hệ thống</h2><p>Tra mã vé hoặc chuỗi QR, đối chiếu đúng chuyến và xác nhận hành khách lên xe. Hồ sơ kiểm vé không thuộc nhà xe và không sử dụng lịch phân công theo hãng.</p><button className={styles.primary} onClick={() => setSection('ticketCheck')}>Mở kiểm vé</button></section> : <section className={styles.panel}><h2>Chuyến tiếp theo trong lịch</h2>{nextTrip ? journey(nextTrip) : <p>Chưa có chuyến đang được giao.</p>}<button className={styles.primary} onClick={() => setSection('schedule')}>Xem toàn bộ lịch</button></section>}
         <section className={styles.panel}><h2>Thông tin công việc</h2><p>{employee.loaiNhanVien === 'TAI_XE' ? 'Kiểm tra giờ khởi hành, vai trò tài xế chính/phụ và ghi chú điều phối trước mỗi chuyến.' : 'Kiểm tra giờ khởi hành, tuyến phục vụ và ghi chú điều phối trước mỗi chuyến.'}</p><p>Liên hệ người điều phối khi hồ sơ hoặc lịch cần điều chỉnh.</p></section>
       </>}
-      {section === 'ticketCheck' && <TicketInspectionPanel schedule={schedule} />}
+      {section === 'ticketCheck' && <TicketInspectionPanel schedule={systemInspector ? inspectionTrips : schedule} systemInspector={systemInspector} />}
       {section === 'profile' && <section className={styles.panel}>
         <h2>Hồ sơ nhân viên của tôi</h2>
         <dl className={styles.details}>
           <div><dt>Mã nhân viên</dt><dd>{employee.maNhanVien}</dd></div>
           <div><dt>Họ tên</dt><dd>{employee.hoTen}</dd></div>
-          <div><dt>Nhà xe</dt><dd>{employee.maNhaXe}</dd></div>
+          <div><dt>Phạm vi nhân viên</dt><dd>{employee.maNhaXe ?? 'Nhân viên hệ thống'}</dd></div>
           <div><dt>Vai trò</dt><dd>{roles[employee.loaiNhanVien]}</dd></div>
           <div><dt>Trạng thái</dt><dd>{states[employee.trangThai]}</dd></div>
           <div><dt>Ngày sinh</dt><dd>{employee.ngaySinh ? employee.ngaySinh.split('-').reverse().join('/') : 'Chưa cung cấp'}</dd></div>
@@ -105,7 +109,7 @@ export default function EmployeeSchedule() {
           <div><dt>Điện thoại công việc</dt><dd>{employee.soDienThoai}</dd></div>
           {employee.loaiNhanVien === 'TAI_XE' && <><div><dt>Số bằng lái</dt><dd>{employee.soBangLai ?? 'Chưa cung cấp'}</dd></div><div><dt>Hạn bằng lái</dt><dd>{employee.ngayHetHanBangLai?.split('-').reverse().join('/') ?? 'Chưa cung cấp'}</dd></div></>}
         </dl>
-        <p className={styles.hint}>Hồ sơ công việc do quản lý nhà xe cập nhật. Bạn có thể chỉnh thông tin tài khoản tại trang tài khoản và bảo mật.</p>
+        <p className={styles.hint}>{systemInspector ? 'Hồ sơ kiểm vé chung do quản trị hệ thống cập nhật.' : 'Hồ sơ công việc do quản lý nhà xe cập nhật.'} Bạn có thể chỉnh thông tin tài khoản tại trang tài khoản và bảo mật.</p>
       </section>}
       {section === 'schedule' && <section className={styles.panel}>
         <h2>Lịch phân công của tôi</h2>

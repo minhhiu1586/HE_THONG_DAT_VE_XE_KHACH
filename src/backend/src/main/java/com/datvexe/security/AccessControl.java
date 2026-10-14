@@ -87,9 +87,12 @@ public final class AccessControl {
         if (caller.nhanVien == null) throw denied();
         NhanVien employee = resource(em, NhanVien.class, caller.nhanVien.maNhanVien);
         ChuyenXe trip = resource(em, ChuyenXe.class, tripId);
-        if (employee.trangThai != TrangThaiNhanVien.DANG_LAM_VIEC
-                || employee.nhaXe.trangThai != TrangThaiNhaXe.HOAT_DONG || trip.tuyenXe.nhaXe == null
-                || !employee.nhaXe.maNhaXe.equals(trip.tuyenXe.nhaXe.maNhaXe)) throw denied();
+        if (employee.trangThai != TrangThaiNhanVien.DANG_LAM_VIEC || trip.tuyenXe.nhaXe == null
+                || trip.tuyenXe.nhaXe.trangThai != TrangThaiNhaXe.HOAT_DONG
+                || !systemInspector(employee) && (employee.nhaXe == null
+                    || employee.nhaXe.trangThai != TrangThaiNhaXe.HOAT_DONG
+                    || !employee.nhaXe.maNhaXe.equals(trip.tuyenXe.nhaXe.maNhaXe))) throw denied();
+        if (systemInspector(employee)) return;
         var assignments = em.createQuery("select p from PhanCongChuyenXe p where p.nhanVien = :n and p.chuyenXe = :c", PhanCongChuyenXe.class)
             .setParameter("n", employee).setParameter("c", trip).setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultList();
         if (assignments.isEmpty()) throw denied();
@@ -101,6 +104,9 @@ public final class AccessControl {
             }
         }
         catch (EntityNotFoundException e) { throw denied(); }
+    }
+    public static boolean systemInspector(NhanVien employee) {
+        return employee.loaiNhanVien == LoaiNhanVien.KIEM_VE && employee.nhaXe == null;
     }
     public static void ticketAccess(EntityManager em, NguoiDung caller, String id) {
         VeXe ticket = resource(em, VeXe.class, id);

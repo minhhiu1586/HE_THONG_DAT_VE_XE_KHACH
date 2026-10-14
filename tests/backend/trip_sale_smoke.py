@@ -101,10 +101,10 @@ def main():
     held=call('GET','/xe/'+ident('X2')+'/ghe')[0]['maGhe']
     sql(f"INSERT INTO giu_cho(ma_giu_cho,ma_chuyen,ma_ghe,ngay_dat,thoi_diem_bat_dau,thoi_diem_het_han,trang_thai) VALUES ('{ident('H')}', '{winner}','{held}',LOCALTIMESTAMP,LOCALTIMESTAMP,LOCALTIMESTAMP+INTERVAL '15 minutes','DANG_GIU')")
     call('PUT','/chuyen-xe/'+winner+'/xe',dict(maXe=ident('CLOSE_X')),409)
-    call('POST',MANAGE+'/'+winner+'/huy',expected=409)
+    call('POST',MANAGE+'/'+winner+'/huy',expected=400)
     sql(f"INSERT INTO don_dat_ve(ma_don,ma_nguoi_dung,ngay_dat,tong_tien,tien_giam,khach_dat_ten,khach_dat_so_dien_thoai,kenh_dat,trang_thai) VALUES ('{ident('O')}','{auth.user_id}',LOCALTIMESTAMP,100000,0,'Test','0901234567','WEB','DA_THANH_TOAN');"
         f"INSERT INTO ve_xe(ma_ve,ma_chuyen,ma_ghe,ma_don,ho_ten_khach_hang,so_dien_thoai_khach_hang,gia_ve,trang_thai) VALUES ('{ident('V')}','{ident('C1')}','{seat}','{ident('O')}','Test','0901234567',100000,'DA_XUAT_VE')")
-    call('DELETE',MANAGE+'/'+ident('C1'),expected=409);call('POST',MANAGE+'/'+ident('C1')+'/huy',expected=409)
+    call('DELETE',MANAGE+'/'+ident('C1'),expected=409);call('POST',MANAGE+'/'+ident('C1')+'/huy',expected=400)
     call('PUT','/chuyen-xe/'+ident('C1')+'/xe',dict(maXe=ident('CLOSE_X')),409)
     call('PUT','/xe/'+ident('X1')+'/ghe/'+seat,dict(viTri='RENAMED',tang=1,trangThai='HOAT_DONG'),409)
     assert detail('C1')['maXe']==ident('X1') and detail('C1')['gioKhoiHanh']=='08:00:00'
@@ -115,8 +115,15 @@ def main():
     blocked('CLOSED','HAN_DAT_VE');assert detail('CLOSED')['daHetHanDatVe'] and not detail('CLOSED')['coTheDatVe'];assert all(c['maChuyen']!=ident('CLOSED') for c in search(start.date().isoformat()))
     call('GET','/chuyen-xe/'+ident('CLOSED')+'/ghe',expected=409,anonymous=True)
     call('POST',MANAGE,draft('FOREIGN',vehicle='XB',route='RB'),201)
+    grouped=ident('R')+','+ident('RB')
+    total=sum(call('GET',MANAGE+'?maTuyen='+ident(code))['totalItems'] for code in ('R','RB'))
+    combined=call('GET',MANAGE+'?maTuyen='+grouped+'&size=1')
+    assert combined['totalItems']==total and combined['totalPages']==total and len(combined['items'])==1
+    assert all(item['maTuyen'] in (ident('R'),ident('RB')) for item in call('GET',MANAGE+'?maTuyen='+grouped)['items'])
+    call('GET',MANAGE+'?maTuyen='+ident('R')+',',expected=400)
     sql(f"UPDATE nguoi_dung SET loai_tai_khoan='NHA_XE',ma_nha_xe='{ident('A')}' WHERE ma_nguoi_dung='{auth.user_id}'")
     assert all(c['maNhaXe']==ident('A') for c in call('GET',MANAGE)['items'])
+    assert all(c['maNhaXe']==ident('A') for c in call('GET',MANAGE+'?maTuyen='+grouped)['items'])
     assert call('POST',MANAGE,draft('OWN_NX'),201)['maNhaXe']==ident('A')
     call('GET',MANAGE+'?maNhaXe='+ident('B'),expected=403)
     for method,end,body in [('GET','',None),('PUT','',draft('FOREIGN',vehicle='XB',route='RB')),('POST','/mo-ban',None),('DELETE','',None)]:

@@ -18,6 +18,7 @@ public final class ChuyenXeRepository extends JpaRepository<ChuyenXe> {
         }
         return trip;
     }
+    /** tuyen accepts comma-separated route IDs grouped by the UI; owner scope remains independent. */
     public record Filters(String nhaXe, String tuyen, String xe, LocalDate tuNgay,
         LocalDate denNgay, TrangThaiChuyen trangThai) {}
     public List<ChuyenXe> search(Filters filters, int offset, int size) {
@@ -33,7 +34,7 @@ public final class ChuyenXeRepository extends JpaRepository<ChuyenXe> {
     private static Map<String,Object> parameters(Filters f) {
         Map<String,Object> result=new LinkedHashMap<>();
         if(f.nhaXe()!=null) result.put("owner",f.nhaXe());
-        if(f.tuyen()!=null) result.put("route",f.tuyen());
+        if(f.tuyen()!=null) result.put("routes",Arrays.asList(f.tuyen().split(",")));
         if(f.xe()!=null) result.put("vehicle",f.xe());
         if(f.tuNgay()!=null) result.put("fromDate",f.tuNgay());
         if(f.denNgay()!=null) result.put("toDate",f.denNgay());
@@ -43,7 +44,7 @@ public final class ChuyenXeRepository extends JpaRepository<ChuyenXe> {
     private static String where(Filters f) {
         List<String> clauses=new ArrayList<>();
         if(f.nhaXe()!=null) clauses.add("c.tuyenXe.nhaXe.maNhaXe=:owner");
-        if(f.tuyen()!=null) clauses.add("c.tuyenXe.maTuyen=:route");
+        if(f.tuyen()!=null) clauses.add("c.tuyenXe.maTuyen in :routes");
         if(f.xe()!=null) clauses.add("c.xe.maXe=:vehicle");
         if(f.tuNgay()!=null) clauses.add("c.ngayKhoiHanh>=:fromDate");
         if(f.denNgay()!=null) clauses.add("c.ngayKhoiHanh<=:toDate");

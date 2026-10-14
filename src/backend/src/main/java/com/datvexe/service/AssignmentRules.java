@@ -25,11 +25,16 @@ public final class AssignmentRules {
         trip.tuyenXe=(TuyenXe)org.hibernate.Hibernate.unproxy(trip.tuyenXe);
         if(role==null) throw new DomainException(400,"Thiếu vai trò.");
         require(employee.trangThai==TrangThaiNhanVien.DANG_LAM_VIEC,"Nhân viên không đang làm việc.");
-        require(role==VaiTroChuyen.PHU_XE?employee.loaiNhanVien==LoaiNhanVien.PHU_XE:employee.loaiNhanVien==LoaiNhanVien.TAI_XE,
+        require(employee.loaiNhanVien==switch(role) {
+            case PHU_XE -> LoaiNhanVien.PHU_XE;
+            case KIEM_VE -> LoaiNhanVien.KIEM_VE;
+            default -> LoaiNhanVien.TAI_XE;
+        },
             "Loại nhân viên không phù hợp vai trò.");
-        require(trip.tuyenXe.nhaXe!=null && employee.nhaXe!=null && employee.nhaXe.maNhaXe.equals(trip.tuyenXe.nhaXe.maNhaXe),
+        require(trip.tuyenXe.nhaXe!=null && (com.datvexe.security.AccessControl.systemInspector(employee)
+            || employee.nhaXe!=null && employee.nhaXe.maNhaXe.equals(trip.tuyenXe.nhaXe.maNhaXe)),
             "Nhân viên không thuộc nhà xe của tuyến.");
-        if(role!=VaiTroChuyen.PHU_XE) require(employee.soBangLai!=null && !employee.soBangLai.isBlank()
+        if(employee.loaiNhanVien==LoaiNhanVien.TAI_XE) require(employee.soBangLai!=null && !employee.soBangLai.isBlank()
             && employee.ngayHetHanBangLai!=null && !employee.ngayHetHanBangLai.isBefore(trip.gioDenDuKien.toLocalDate()),
             "Bằng lái thiếu hoặc hết hạn trước khi kết thúc chuyến.");
         LocalDateTime start=LocalDateTime.of(trip.ngayKhoiHanh,trip.gioKhoiHanh);

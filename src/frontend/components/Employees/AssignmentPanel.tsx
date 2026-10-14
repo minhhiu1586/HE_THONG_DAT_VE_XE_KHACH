@@ -12,7 +12,8 @@ export default function AssignmentPanel({ employee, employees }: { employee: Emp
   const { request } = useAuth();
   const [schedule, setSchedule] = useState<Schedule[]>([]), [crew, setCrew] = useState<Assignment[]>([]);
   const [historyPage, setHistoryPage] = useState(1);
-  const fresh = { ...empty, vaiTro: employee.loaiNhanVien === 'PHU_XE' ? 'PHU_XE' : 'TAI_XE_CHINH' };
+  const allowedRoles = employee.loaiNhanVien === 'TAI_XE' ? ['TAI_XE_CHINH', 'TAI_XE_PHU'] : employee.loaiNhanVien === 'PHU_XE' ? ['PHU_XE'] : employee.loaiNhanVien === 'KIEM_VE' ? ['KIEM_VE'] : [];
+  const fresh = { ...empty, vaiTro: allowedRoles[0] ?? '' };
   const [form, setForm] = useState(fresh), [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [error, setError] = useState(''), [success, setSuccess] = useState(''), [preview, setPreview] = useState('');
@@ -37,7 +38,7 @@ export default function AssignmentPanel({ employee, employees }: { employee: Emp
   async function loadTrip(id: string) {
     const trip = await request<Trip>(`/chuyen-xe/${encodeURIComponent(id.trim())}`);
     const route = await request<Route>(`/tuyen-xe/${encodeURIComponent(trip.maTuyen)}`);
-    if (route.maNhaXe !== employee.maNhaXe) throw new Error('Chuyến không thuộc nhà xe của nhân viên.');
+    if (employee.maNhaXe && route.maNhaXe !== employee.maNhaXe) throw new Error('Chuyến không thuộc nhà xe của nhân viên.');
     setSelectedTrip(trip); setRouteName(route.tenTuyen); setCrew([]);
   }
   async function action(work: () => Promise<void>, message: string) {
@@ -87,7 +88,7 @@ export default function AssignmentPanel({ employee, employees }: { employee: Emp
         <div className={styles.wide}><button type="button" disabled={busy || !form.maChuyen.trim()} onClick={() => void action(() => loadTrip(form.maChuyen), '')}>Tải thông tin chuyến</button>
           {selectedTrip && <p>{routeName} — {selectedTrip.ngayKhoiHanh} {selectedTrip.gioKhoiHanh} → {selectedTrip.gioDenDuKien.replace('T', ' ')} · {tripStates[selectedTrip.trangThai] ?? selectedTrip.trangThai}</p>}</div>
         <label>Vai trò trên chuyến<select value={form.vaiTro} onChange={e => { setForm({ ...form, vaiTro: e.target.value }); setPreview(''); }}>
-          {Object.entries(tripRoles).map(([id, label]) => <option value={id} key={id} disabled={employee.loaiNhanVien === 'PHU_XE' ? id !== 'PHU_XE' : id === 'PHU_XE'}>{label}</option>)}</select></label>
+          {Object.entries(tripRoles).map(([id, label]) => <option value={id} key={id} disabled={!allowedRoles.includes(id)}>{label}</option>)}</select></label>
         <label>Ghi chú<textarea maxLength={800} value={form.ghiChu} onChange={e => setForm({ ...form, ghiChu: e.target.value })} /></label>
         <p className={`${styles.warning} ${styles.wide}`}>Chuyến trên 4 giờ cần kiểm tra kế hoạch nghỉ/đổi tài xế. Hệ thống không tự chứng nhận đủ giờ nghỉ.</p>
         <label className={`${styles.check} ${styles.wide}`}><input type="checkbox" checked={form.xacNhanKeHoachLaiNghi} onChange={e => setForm({ ...form, xacNhanKeHoachLaiNghi: e.target.checked })} />Tôi đã kiểm tra kế hoạch nghỉ/đổi tài xế cho chuyến này.</label>

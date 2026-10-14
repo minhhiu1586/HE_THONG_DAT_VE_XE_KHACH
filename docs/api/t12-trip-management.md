@@ -31,6 +31,8 @@ Chi tiết có `ngungNhanDatVeLuc`, `serverTime`, `phutDungNhanDatVe`, `daHetHan
 
 Report: `duDieuKien`, thời hạn/serverTime, `dieuKien` gồm `maDieuKien`, `tenDieuKien`, `dat`, `lyDo`. Nhóm: TRANG_THAI, HAN_DAT_VE, LICH_TRINH, TUYEN_BEN, NHA_XE, XE_DANG_KIEM, LICH_XE, NHAN_SU. Lỗi nghiệp vụ dùng cơ chế API lỗi chung; dữ liệu đầu vào sai 400, tài nguyên không tồn tại 404, xung đột nghiệp vụ 409.
 
+`maTuyen` nhận một mã hoặc danh sách mã phân cách bằng dấu phẩy, tối đa 100 mã. Ví dụ `maTuyen=TX_FUTA_1_1,TX_TB_1_1` lọc một hành trình có nhiều nhà xe. Tổng số và phân trang được tính sau khi lọc toàn bộ nhóm; phạm vi NHA_XE vẫn được áp dụng. Bộ lọc tuyến trên giao diện hiển thị mỗi tên tuyến một lần, theo A–Z, không kèm tên nhà xe.
+
 ## Tích hợp và bảo vệ dữ liệu
 
 T12 khóa nhà xe/chuyến trong giao dịch, tái kiểm tra xe và phân công T11 khi mở bán. Hai yêu cầu mở bán xung đột cùng xe chỉ một yêu cầu thành công. Mở bán lại trong hạn không sinh bản ghi trùng. Kiểm tra thời hạn lại ngay trước ghi trạng thái.
@@ -39,6 +41,6 @@ Không đổi xe của chuyến đã mở bán; không đổi xe/sơ đồ khi �
 
 Public API tìm chuyến chỉ trả chuyến `DANG_MO_BAN` còn đủ điều kiện và chưa hết hạn. Chi tiết lịch sử vẫn có thể đọc, nhưng `coTheDatVe=false` khi không được đặt. Không công bố phân công nhân viên riêng tư trên public response.
 
-Module giữ ghế/đặt vé phải gọi `AccessControl.saleAllowed` và `VehicleRules.seatSellable` trong giao dịch ghi, theo đồng hồ backend; không tin lựa chọn hoặc cờ frontend. T12 chưa triển khai toàn bộ giữ ghế, thanh toán hay mua vé; kiểm tra helper không thay thế nghiệm thu các API đó. Trang tìm vé hiện có còn dùng dữ liệu mock thuộc công việc tích hợp tiếp theo.
+Module giữ ghế/đặt vé phải gọi `AccessControl.saleAllowed` và `VehicleRules.seatSellable` trong giao dịch ghi, theo đồng hồ backend; không tin lựa chọn hoặc cờ frontend. Giữ ghế, đặt vé, thanh toán và hoàn vé có hợp đồng và kiểm thử riêng.
 
 Giao diện quản lý: `/quan-tri/chuyen-xe`, menu Quản lý và thanh bên. T11 phân công được tích hợp qua API hiện có; không thêm module giao diện T11 ngoài phạm vi. Trang chủ và tìm chuyến đọc dữ liệu trực tiếp từ API/database, theo [T13](t13-trip-search-availability.md); frontend không dùng danh sách chuyến hoặc địa điểm mẫu.

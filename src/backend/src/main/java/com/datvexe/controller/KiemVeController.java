@@ -41,7 +41,9 @@ public class KiemVeController extends HttpServlet {
         }
 
         try {
-            if ("/xac-minh".equals(info)) {
+            if ("/chuyen-xe".equals(info) && method.equals("GET")) {
+                json.writeValue(res.getOutputStream(),service.inspectionTrips());
+            } else if ("/xac-minh".equals(info)) {
                 if (!method.equals("POST")) {
                     res.setHeader("Allow", "POST, OPTIONS");
                     throw new DomainException(405, "Phương thức không được hỗ trợ.");

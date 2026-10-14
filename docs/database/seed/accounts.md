@@ -1,6 +1,15 @@
 # Tài khoản đăng nhập dự án
 
-Nguồn: `002_accounts_staff_fleet.sql`. Danh sách gồm 47 tài khoản khởi tạo. Mật khẩu dưới đây là mật khẩu ban đầu; nếu tài khoản đã đổi mật khẩu thì dùng mật khẩu mới. Nạp lại seed giữ nguyên mật khẩu hiện có.
+Nguồn: `002_accounts_staff_fleet.sql`. Danh sách gồm 49 tài khoản khởi tạo. Mật khẩu dưới đây là mật khẩu ban đầu; nếu tài khoản đã đổi mật khẩu thì dùng mật khẩu mới. Nạp lại seed giữ nguyên mật khẩu hiện có.
+
+## Nhân viên kiểm vé hệ thống
+
+| Tên | Mã nhân viên | Email | Mật khẩu khởi tạo |
+| --- | --- | --- | --- |
+| Nguyễn Hoàng Phúc | `NV_KV01` | `kiemve1@datvexe.test` | `DatVeXe2026!` |
+| Trần Minh Châu | `NV_KV02` | `kiemve2@datvexe.test` | `DatVeXe2026!` |
+
+Hai tài khoản có quyền `NHAN_VIEN`, nghiệp vụ `KIEM_VE`, không thuộc nhà xe và không cần phân công theo hãng. Đăng nhập tại `/dang-nhap`, chuyển đến `/nhan-vien`, chọn chuyến cần kiểm trong mục **Kiểm vé & Lên xe**. Nhân viên kiểm vé chung được tra và xác nhận vé trên các chuyến đang mở bán/đang chạy của nhà xe hoạt động; không có quyền sửa hồ sơ nhân sự hoặc bắt đầu/kết thúc chuyến.
 
 ## Quản trị hệ thống
 

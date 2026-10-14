@@ -6,6 +6,7 @@ import { useAuth } from '@/components/Account/AuthProvider';
 import { errorMessage } from '@/lib/account-api';
 import { vietnameseValidation, clearValidation } from '@/lib/form-validation';
 import { useManagementFocus } from '@/lib/use-management-focus';
+import { sortedUnique } from '@/lib/management-options';
 import styles from './RouteManagement.module.css';
 
 type City = { maTinhThanh: string; tenTinhThanh: string; khuVuc: string | null };
@@ -18,11 +19,18 @@ const emptyStation = { maBenXe: '', tenBenXe: '', diaChi: '', soDienThoai: '', m
 const emptyRoute = { maTuyen: '', tenTuyen: '', tramKhoiHanh: '', tramDen: '', thoiGianKhoiHanh: '', khoangCachKM: '', thoiGianDuKien: '', giaCoBan: '', moTa: '', trangThai: 'SAP_KHAI_THAC' };
 const statusLabels: Record<string, string> = { SAP_KHAI_THAC: 'Sắp khai thác', DANG_KHAI_THAC: 'Đang khai thác', TAM_NGUNG: 'Tạm ngừng', NGUNG_KHAI_THAC: 'Ngừng khai thác' };
 const statuses = ['SAP_KHAI_THAC', 'DANG_KHAI_THAC', 'TAM_NGUNG', 'NGUNG_KHAI_THAC'];
+const stationStates: Record<string, string> = { HOAT_DONG: 'Hoạt động', TAM_NGUNG: 'Tạm ngừng', DONG_CUA: 'Đóng cửa', BAO_TRI: 'Bảo trì' };
+const cityList = (items: City[]) => sortedUnique(items, item => item.maTinhThanh, item => item.tenTinhThanh);
+const stationList = (items: Station[]) => sortedUnique(items, item => item.maBenXe, item => item.tenBenXe);
+const routeList = (items: Route[]) => sortedUnique(items, item => item.maTuyen, item => item.tenTuyen);
 
 export default function RouteManagement() {
   const { user, loading, request } = useAuth(); const router = useRouter();
   const [tab, setTab] = useState<Tab>('routes'); const [cities, setCities] = useState<City[]>([]);
   const [stations, setStations] = useState<Station[]>([]); const [routes, setRoutes] = useState<Route[]>([]);
+  // Table filters must not shrink the lookup catalogs used by other tabs and forms.
+  const [cityResults, setCityResults] = useState<City[]>([]);
+  const [stationResults, setStationResults] = useState<Station[]>([]);
   const [citySearch, setCitySearch] = useState(''); const [stationSearch, setStationSearch] = useState('');
   const [stationCity, setStationCity] = useState(''); const [stationStatus, setStationStatus] = useState('');
   const [filterStart, setFilterStart] = useState(''); const [filterEnd, setFilterEnd] = useState(''); const [filterStatus, setFilterStatus] = useState(''); const [filterOperator, setFilterOperator] = useState('');
@@ -43,26 +51,36 @@ export default function RouteManagement() {
   }
   const isAdmin = user?.loaiTaiKhoan === 'ADMIN'; const mayManage = isAdmin || user?.loaiTaiKhoan === 'NHA_XE';
 
-  const loadCities = useCallback(async () => setCities(await request<City[]>(`/tinh-thanh?q=${encodeURIComponent(citySearch)}`)), [request, citySearch]);
+  const loadCities = useCallback(async () => setCityResults(cityList(await request<City[]>(`/tinh-thanh?q=${encodeURIComponent(citySearch)}`))), [request, citySearch]);
   const loadStations = useCallback(async () => {
     const query = new URLSearchParams(); if (stationSearch) query.set('q', stationSearch);
     if (stationCity) query.set('maTinhThanh', stationCity); if (stationStatus) query.set('trangThai', stationStatus);
-    setStations(await request<Station[]>(`/ben-xe${query.size ? `?${query}` : ''}`));
+    setStationResults(stationList(await request<Station[]>(`/ben-xe${query.size ? `?${query}` : ''}`)));
   }, [request, stationSearch, stationCity, stationStatus]);
   const loadRoutes = useCallback(async () => {
     const query = new URLSearchParams();
     if (filterStart) query.set('tramKhoiHanh', filterStart); if (filterEnd) query.set('tramDen', filterEnd); if (filterStatus) query.set('trangThai', filterStatus);
     if (isAdmin && filterOperator) query.set('maNhaXe', filterOperator);
-    setRoutes(await request<Route[]>(`/tuyen-xe${query.size ? `?${query}` : ''}`));
+    setRoutes(routeList(await request<Route[]>(`/tuyen-xe${query.size ? `?${query}` : ''}`)));
   }, [request, filterStart, filterEnd, filterStatus, filterOperator, isAdmin]);
-  const refresh = useCallback(async () => { await Promise.all([loadCities(), loadStations(), loadRoutes()]); }, [loadCities, loadStations, loadRoutes]);
+  const loadCatalogs = useCallback(async () => {
+    const [cityData, stationData] = await Promise.all([request<City[]>('/tinh-thanh'), request<Station[]>('/ben-xe')]);
+    setCities(cityList(cityData)); setStations(stationList(stationData));
+  }, [request]);
+  const refresh = useCallback(async () => {
+    await Promise.all([loadCities(), loadStations(), loadRoutes(), loadCatalogs()]);
+  }, [loadCities, loadStations, loadRoutes, loadCatalogs]);
   useEffect(() => {
     if (!loading && !user) router.replace('/dang-nhap?next=/quan-tri/tuyen-duong');
     if (!mayManage) return;
     let active = true;
     Promise.all([request<City[]>('/tinh-thanh'), request<Station[]>('/ben-xe'), request<Route[]>('/tuyen-xe')])
       .then(([cityData, stationData, routeData]) => {
-        if (active) { setCities(cityData); setStations(stationData); setRoutes(routeData); }
+        if (active) {
+          const allCities = cityList(cityData), allStations = stationList(stationData);
+          setCities(allCities); setCityResults(allCities);
+          setStations(allStations); setStationResults(allStations); setRoutes(routeList(routeData));
+        }
       }).catch(e => { if (active) setError(errorMessage(e)); });
     return () => { active = false; };
   }, [loading, user, mayManage, router, request]);
@@ -151,29 +169,29 @@ export default function RouteManagement() {
         <button disabled={busy}>{editingCity ? 'Lưu thay đổi' : 'Thêm tỉnh/thành'}</button>{editingCity && <button type="button" onClick={() => { setCityForm(emptyCity); setEditingCity(false); }}>Hủy</button>}
       </form>
       <div className={styles.tableWrap}><table><thead><tr><th>Mã</th><th>Tỉnh/thành</th><th>Khu vực</th><th>Thao tác</th></tr></thead><tbody>
-        {cities.map(city => <tr key={city.maTinhThanh}><td>{city.maTinhThanh}</td><td>{city.tenTinhThanh}</td><td>{city.khuVuc || '—'}</td><td className={styles.actions}>
+        {cityResults.map(city => <tr key={city.maTinhThanh}><td>{city.maTinhThanh}</td><td>{city.tenTinhThanh}</td><td>{city.khuVuc || '—'}</td><td className={styles.actions}>
           <button onClick={() => editCity(city)}>Sửa</button>
           <button disabled={busy} onClick={() => { if (window.confirm(`Xóa ${city.tenTinhThanh}?`)) void mutate(`/tinh-thanh/${encodeURIComponent(city.maTinhThanh)}`, 'DELETE', undefined, 'Đã xóa tỉnh/thành phố.'); }}>Xóa</button>
-        </td></tr>)}{cities.length === 0 && <tr><td colSpan={4}>Chưa có tỉnh/thành phù hợp.</td></tr>}</tbody></table></div>
+        </td></tr>)}{cityResults.length === 0 && <tr><td colSpan={4}>Chưa có tỉnh/thành phù hợp.</td></tr>}</tbody></table></div>
     </section>}
 
     {tab === 'stations' && isAdmin && <section ref={stationTarget} className={styles.panel}>
       <div className={styles.sectionTitle}><div><h2 data-management-focus tabIndex={-1}>Bến xe</h2><p>Mỗi bến thuộc một tỉnh/thành phố; bến đã gắn tuyến không thể xóa.</p></div><div className={styles.search}><input aria-label="Tìm bến xe" placeholder="Mã hoặc tên bến xe" value={stationSearch} onChange={e => setStationSearch(e.target.value)} /><button onClick={() => void loadStations()}>Tìm</button></div></div>
       <div className={styles.filters}><label>Tỉnh/thành<select data-validation-label="tỉnh/thành" value={stationCity} onChange={e => setStationCity(e.target.value)}><option value="">Tất cả</option>{cities.map(city => <option key={city.maTinhThanh} value={city.maTinhThanh}>{city.tenTinhThanh}</option>)}</select></label>
-        <label>Trạng thái<select data-validation-label="trạng thái" value={stationStatus} onChange={e => setStationStatus(e.target.value)}><option value="">Tất cả</option>{['HOAT_DONG','TAM_NGUNG','DONG_CUA','BAO_TRI'].map(s => <option key={s}>{s}</option>)}</select></label><button onClick={() => void loadStations()}>Lọc bến xe</button></div>
+        <label>Trạng thái<select data-validation-label="trạng thái" value={stationStatus} onChange={e => setStationStatus(e.target.value)}><option value="">Tất cả</option>{Object.entries(stationStates).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button onClick={() => void loadStations()}>Lọc bến xe</button></div>
       <form onInvalid={vietnameseValidation} onInput={clearValidation} onChange={clearValidation} className={styles.form} onSubmit={stationSubmit}><label>Mã bến<input data-validation-label="mã bến" value={stationForm.maBenXe} disabled={editingStation} maxLength={40} required onChange={e => setStationForm({ ...stationForm, maBenXe: e.target.value })} /></label>
         <label>Tên bến<input data-validation-label="tên bến" value={stationForm.tenBenXe} maxLength={160} required onChange={e => setStationForm({ ...stationForm, tenBenXe: e.target.value })} /></label>
         <label>Địa chỉ<input data-validation-label="địa chỉ" value={stationForm.diaChi} maxLength={255} required onChange={e => setStationForm({ ...stationForm, diaChi: e.target.value })} /></label>
         <label>Điện thoại<input data-validation-label="điện thoại" value={stationForm.soDienThoai} maxLength={30} onChange={e => setStationForm({ ...stationForm, soDienThoai: e.target.value })} /></label>
         <label>Tỉnh/thành<select data-validation-label="tỉnh/thành" required value={stationForm.maTinhThanh} onChange={e => setStationForm({ ...stationForm, maTinhThanh: e.target.value })}><option value="">Chọn tỉnh/thành</option>{cities.map(city => <option key={city.maTinhThanh} value={city.maTinhThanh}>{city.tenTinhThanh}</option>)}</select></label>
-        <label>Trạng thái<select data-validation-label="trạng thái" value={stationForm.trangThai} onChange={e => setStationForm({ ...stationForm, trangThai: e.target.value })}>{['HOAT_DONG','TAM_NGUNG','DONG_CUA','BAO_TRI'].map(s => <option key={s}>{s}</option>)}</select></label>
+        <label>Trạng thái<select data-validation-label="trạng thái" value={stationForm.trangThai} onChange={e => setStationForm({ ...stationForm, trangThai: e.target.value })}>{Object.entries(stationStates).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <button disabled={busy}>{editingStation ? 'Lưu thay đổi' : 'Thêm bến xe'}</button>{editingStation && <button type="button" onClick={() => { setStationForm(emptyStation); setEditingStation(false); }}>Hủy</button>}
       </form>
       <div className={styles.tableWrap}><table><thead><tr><th>Mã</th><th>Bến xe</th><th>Tỉnh</th><th>Địa chỉ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>
-        {stations.map(station => <tr key={station.maBenXe}><td>{station.maBenXe}</td><td>{station.tenBenXe}</td><td>{cities.find(c => c.maTinhThanh === station.maTinhThanh)?.tenTinhThanh || station.maTinhThanh}</td><td>{station.diaChi}</td><td>{station.trangThai}</td><td className={styles.actions}>
+        {stationResults.map(station => <tr key={station.maBenXe}><td>{station.maBenXe}</td><td>{station.tenBenXe}</td><td>{cities.find(c => c.maTinhThanh === station.maTinhThanh)?.tenTinhThanh || station.maTinhThanh}</td><td>{station.diaChi}</td><td>{stationStates[station.trangThai] ?? station.trangThai}</td><td className={styles.actions}>
           <button onClick={() => editStation(station)}>Sửa</button>
           <button disabled={busy} onClick={() => { if (window.confirm(`Xóa ${station.tenBenXe}?`)) void mutate(`/ben-xe/${encodeURIComponent(station.maBenXe)}`, 'DELETE', undefined, 'Đã xóa bến xe.'); }}>Xóa</button>
-        </td></tr>)}{stations.length === 0 && <tr><td colSpan={6}>Chưa có bến xe phù hợp.</td></tr>}</tbody></table></div>
+        </td></tr>)}{stationResults.length === 0 && <tr><td colSpan={6}>Chưa có bến xe phù hợp.</td></tr>}</tbody></table></div>
     </section>}
 
     {tab === 'routes' && <>

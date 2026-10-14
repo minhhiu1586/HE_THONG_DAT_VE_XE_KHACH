@@ -1,6 +1,7 @@
 """Load the project dataset without resetting an existing database; publish through T12 APIs."""
 import argparse
 import http.cookiejar
+import hashlib
 from http.client import HTTPException
 import json
 import os
@@ -37,8 +38,22 @@ def main():
     exists = sql(f"SELECT count(*) FROM pg_database WHERE datname='{args.database}'", 'postgres')
     if exists != '1':
         sql(f'CREATE DATABASE "{args.database}"', 'postgres')
-    schema = '\n'.join(file.read_text(encoding='utf-8') for file in
-                       sorted((ROOT / 'docs/database/schema').glob('[0-9][0-9][0-9]_*.sql')))
+    # Share the migration ledger/checksum contract with apply-migrations.sh.
+    sql("CREATE TABLE IF NOT EXISTS schema_migrations (version varchar(16) PRIMARY KEY, "
+        "filename varchar(255) NOT NULL, checksum char(64) NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())")
+    migrations = []
+    for file in sorted((ROOT / 'docs/database/schema').glob('[0-9][0-9][0-9]_*.sql')):
+        version = file.name.split('_', 1)[0]
+        raw = file.read_bytes()
+        checksum = hashlib.sha256(raw.replace(b'\r\n', b'\n')).hexdigest()
+        recorded = sql(f"SELECT checksum FROM schema_migrations WHERE version='{version}'")
+        if recorded:
+            if recorded not in (checksum, hashlib.sha256(raw).hexdigest()):
+                raise RuntimeError(f'Migration {file.name} changed after application; create a new migration.')
+            continue
+        migrations.append(raw.decode('utf-8') +
+                          f"\nINSERT INTO schema_migrations(version,filename,checksum) VALUES ('{version}','{file.name}','{checksum}');")
+    schema = '\n'.join(migrations)
     data = '\n'.join((ROOT / 'docs/database/seed' / file).read_text(encoding='utf-8') for file in SEEDS)
     data = re.sub(r'^(BEGIN|COMMIT);\s*$', '', data, flags=re.M)
     sql('BEGIN;\n' + schema + '\n' + data + '\nCOMMIT;')
@@ -52,7 +67,9 @@ def main():
         backup.parent.mkdir(parents=True, exist_ok=True)
         if not backup.exists():
             backup.write_text(content, encoding='utf-8')
-        for key, value in [('POSTGRES_DB', args.database), ('DATABASE_URL', f'jdbc:postgresql://localhost:5432/{args.database}')]:
+        port_match = re.search(r'^POSTGRES_PORT=(\d+)\s*$', content, re.M)
+        port = port_match.group(1) if port_match else '5432'
+        for key, value in [('POSTGRES_DB', args.database), ('DATABASE_URL', f'jdbc:postgresql://localhost:{port}/{args.database}')]:
             line = key + '=' + value
             content = re.sub(r'^' + key + r'=.*$', lambda _: line, content, flags=re.M) if re.search(r'^' + key + '=', content, re.M) else content.rstrip() + '\n' + line + '\n'
         env_path.write_text(content.lstrip('\n'), encoding='utf-8')

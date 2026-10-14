@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '@/components/Account/AuthProvider';
-import { Schedule } from './employee-types';
+import { InspectionTrip } from './employee-types';
 import {
   checkInTicket,
   getPassengerList,
@@ -15,7 +15,8 @@ import { errorMessage, Profile } from '@/lib/account-api';
 import styles from './TicketInspectionPanel.module.css';
 
 interface Props {
-  schedule: Schedule[];
+  schedule: InspectionTrip[];
+  systemInspector?: boolean;
 }
 
 type InputMode = 'ticket' | 'qr';
@@ -39,7 +40,7 @@ type PassengerState =
       refreshError: string | null;
     };
 
-export default function TicketInspectionPanel({ schedule }: Props) {
+export default function TicketInspectionPanel({ schedule, systemInspector = false }: Props) {
   const { request, user } = useAuth();
   const activeTrips = schedule.filter(s => !['DA_HUY', 'HOAN_TAT'].includes(s.trangThai));
   const [selectedTrip, setSelectedTrip] = useState(() => activeTrips[0]?.maChuyen ?? '');
@@ -282,11 +283,11 @@ export default function TicketInspectionPanel({ schedule }: Props) {
     <div className={styles.panel}>
       <h2>Kiểm vé &amp; Xác nhận lên xe</h2>
       <p className={styles.intro}>
-        Chọn chuyến được phân công, rồi tra mã vé hoặc nhập riêng chuỗi QR do hành khách xuất trình.
+        {systemInspector ? 'Chọn chuyến cần kiểm vé trong hệ thống' : 'Chọn chuyến được phân công'}, rồi tra mã vé hoặc nhập riêng chuỗi QR do hành khách xuất trình.
       </p>
 
       <div className={styles.tripSelector}>
-        <label htmlFor="tripSelect">Chọn chuyến xe được phân công:</label>
+        <label htmlFor="tripSelect">{systemInspector ? 'Chọn chuyến cần kiểm vé:' : 'Chọn chuyến xe được phân công:'}</label>
         <select
           id="tripSelect"
           className={styles.selectInput}

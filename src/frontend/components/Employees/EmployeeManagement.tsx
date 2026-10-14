@@ -36,7 +36,7 @@ export default function EmployeeManagement() {
     finally { sending.current = false; setBusy(false); }
   }
   function select(employee: Employee) {
-    setSelected(employee); setForm({ ...employee, ngaySinh: employee.ngaySinh ?? '', soBangLai: employee.soBangLai ?? '', ngayHetHanBangLai: employee.ngayHetHanBangLai ?? '' });
+    setSelected(employee); setForm({ ...employee, maNhaXe: employee.maNhaXe ?? '', ngaySinh: employee.ngaySinh ?? '', soBangLai: employee.soBangLai ?? '', ngayHetHanBangLai: employee.ngayHetHanBangLai ?? '' });
     setError(''); setSuccess('');
   }
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -77,7 +77,7 @@ export default function EmployeeManagement() {
       {fetching ? <p role="status">Đang tải nhân viên…</p> : visible.length === 0 ? <p>Không có nhân viên phù hợp.</p> : <div className={styles.employeeList}>
         {visible.slice((current - 1) * pageSize, current * pageSize).map(n => <button type="button" key={n.maNhanVien} className={styles.employeeRow} aria-pressed={selected?.maNhanVien === n.maNhanVien} disabled={busy} onClick={() => select(n)}>
           <span className={styles.rowAvatar} aria-hidden="true">{n.hoTen.split(' ').filter(Boolean).slice(-2).map(part => part[0]).join('')}</span>
-          <span className={styles.rowContent}><strong>{n.hoTen}</strong><small>{roles[n.loaiNhanVien]} · {n.maNhanVien}</small><span className={styles.rowMeta}><span>{operators.find(o => o.maNhaXe === n.maNhaXe)?.tenNhaXe ?? n.maNhaXe}</span><span className={n.trangThai === 'DANG_LAM_VIEC' ? styles.rowActive : styles.rowInactive}>{states[n.trangThai]}</span></span></span>
+          <span className={styles.rowContent}><strong>{n.hoTen}</strong><small>{roles[n.loaiNhanVien]} · {n.maNhanVien}</small><span className={styles.rowMeta}><span>{n.maNhaXe ? operators.find(o => o.maNhaXe === n.maNhaXe)?.tenNhaXe ?? n.maNhaXe : 'Nhân viên hệ thống'}</span><span className={n.trangThai === 'DANG_LAM_VIEC' ? styles.rowActive : styles.rowInactive}>{states[n.trangThai]}</span></span></span>
         </button>)}
       </div>}
       {!fetching && visible.length > 0 && <nav className={styles.pagination} aria-label="Phân trang nhân viên">
@@ -89,7 +89,7 @@ export default function EmployeeManagement() {
       <p className={styles.hint}>{selected ? `${selected.maNhanVien} · ${roles[selected.loaiNhanVien]}` : 'Chọn nhà xe và nhập thông tin liên hệ để tạo hồ sơ.'}</p>
       <form onSubmit={submit} onInvalid={vietnameseValidation} onInput={clearValidation}>
         <fieldset disabled={busy || fetching} className={styles.form} style={{ border: 0, padding: 0 }}>
-          <label>Nhà xe<select required disabled={!!selected} value={form.maNhaXe} onChange={e => setForm({ ...form, maNhaXe: e.target.value })}><option value="">Chọn nhà xe</option>{operators.map(o => <option key={o.maNhaXe} value={o.maNhaXe}>{o.tenNhaXe}</option>)}</select></label>
+          <label>Phạm vi nhân viên<select required={form.loaiNhanVien !== 'KIEM_VE'} disabled={!!selected} value={form.maNhaXe} onChange={e => setForm({ ...form, maNhaXe: e.target.value })}><option value="">{form.loaiNhanVien === 'KIEM_VE' && user.loaiTaiKhoan === 'ADMIN' ? 'Nhân viên hệ thống' : 'Chọn nhà xe'}</option>{operators.map(o => <option key={o.maNhaXe} value={o.maNhaXe}>{o.tenNhaXe}</option>)}</select></label>
           <label>Mã nhân viên<input required disabled={!!selected} maxLength={40} value={form.maNhanVien} onChange={e => setForm({ ...form, maNhanVien: e.target.value })} /></label>
           <label>Họ tên<input required maxLength={160} value={form.hoTen} onChange={e => setForm({ ...form, hoTen: e.target.value })} /></label>
           <label>Điện thoại<input type="tel" required pattern="0[0-9]{9}" title="Điện thoại gồm 10 chữ số và bắt đầu bằng 0." maxLength={10} value={form.soDienThoai} onChange={e => setForm({ ...form, soDienThoai: e.target.value })} /></label>
@@ -106,6 +106,6 @@ export default function EmployeeManagement() {
           }, 'Đã xóa hồ sơ.');
         }}>Xóa hồ sơ</button>}</div>
       </form>
-    </section>{selected && <AssignmentPanel key={`${selected.maNhanVien}:${selected.loaiNhanVien}:${selected.trangThai}`} employee={selected} employees={employees} />}</div></div>
+    </section>{selected && (selected.loaiNhanVien === 'KIEM_VE' && !selected.maNhaXe ? <section className={styles.panel}><h2>Kiểm vé chung của hệ thống</h2><p>Nhân viên kiểm vé chung không thuộc nhà xe và không cần lịch phân công theo hãng. Khi đăng nhập, nhân viên chọn chuyến cần kiểm và nhập mã vé hoặc chuỗi QR.</p></section> : <AssignmentPanel key={`${selected.maNhanVien}:${selected.loaiNhanVien}:${selected.trangThai}`} employee={selected} employees={employees} />)}</div></div>
   </div>;
 }
