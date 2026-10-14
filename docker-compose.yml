@@ -56,6 +56,7 @@ services:
       - ./docs/database/schema/011_refund_tracking.sql:/docker-entrypoint-initdb.d/011_refund_tracking.sql:ro
       - ./docs/database/schema/012_ticket_checkin.sql:/docker-entrypoint-initdb.d/012_ticket_checkin.sql:ro
       - ./docs/database/schema/013_trip_lifecycle.sql:/docker-entrypoint-initdb.d/013_trip_lifecycle.sql:ro
+      - ./docs/database/schema/014_trip_reviews.sql:/docker-entrypoint-initdb.d/014_trip_reviews.sql:ro
       - ./docs/database/seed/001_catalog.sql:/docker-entrypoint-initdb.d/004_catalog.sql:ro
       - ./docs/database/seed/002_accounts_staff_fleet.sql:/docker-entrypoint-initdb.d/005_accounts_staff_fleet.sql:ro
       - ./docs/database/seed/003_routes_trips.sql:/docker-entrypoint-initdb.d/006_routes_trips.sql:ro
