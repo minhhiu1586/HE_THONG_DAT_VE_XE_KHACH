@@ -15,6 +15,7 @@ type Crew={maPhanCong:string;maNhanVien:string;hoTen:string;vaiTro:string;trangT
 type Trip={maChuyen:string;maTuyen:string;tenTuyen:string;maNhaXe:string;tenNhaXe:string;maXe:string|null;bienSo:string|null;ngayKhoiHanh:string;gioKhoiHanh:string;gioDenDuKien:string;giaVeDuKien:string;trangThai:string;ngungNhanDatVeLuc:string;phutDungNhanDatVe:number;coTheDatVe:boolean;daHetHanDatVe:boolean;coTheSua:boolean;coTheXoa:boolean;coTheHuy:boolean;nhanVienPhanCong:Crew[]};
 type Page={items:Trip[];page:number;totalPages:number;totalItems:number};
 type Report={duDieuKien:boolean;ngungNhanDatVeLuc:string;dieuKien:{maDieuKien:string;tenDieuKien:string;dat:boolean;lyDo:string|null}[]};
+type Lifecycle={maChuyen:string;trangThai:string;tongQuanHoan:{tongSoVeBiAnhHuong:number;soVeCanHoan:number;soVeDaHoan:number;tongTienDuKien:string;tongTienDaHoan:string;soYeuCauThanhCong:number;soYeuCauCanTheoDoi:number};lyLich:{trangThaiCu:string;trangThaiMoi:string;maNguoiThaoTac:string;vaiTro:string;lyDo:string;thoiDiem:string}[];khachBiAnhHuong:{veBiAnhHuong:{maVe:string;trangThai:string;giaThucTra:string}[];maDon:string;trangThaiXuLy:string;lyDoXuLy:string;lyDo:string;soVeConHieuLuc:number;yeuCauHoan:{maHoanTien:string;trangThai:string;soTienHoan:string;lyDoLoi:string}[]}[];thongBao:{trangThai:string;soLuong:number}[]};
 const states:Record<string,string>={NHAP:'Nháp',CHUA_KHOI_HANH:'Chưa mở bán (dữ liệu cũ)',DANG_MO_BAN:'Đang mở bán',DANG_CHAY:'Đang chạy',HOAN_TAT:'Hoàn tất',DA_HUY:'Đã hủy'};
 const crewRoles:Record<string,string>={TAI_XE_CHINH:'Tài xế chính',TAI_XE_PHU:'Tài xế phụ',PHU_XE:'Phụ xe',TAI_XE:'Tài xế'};
 const empty={maChuyen:'',maTuyen:'',maXe:'',ngayKhoiHanh:'',gioKhoiHanh:'',gioDenDuKien:''};
@@ -35,6 +36,7 @@ export default function TripManagement(){
   const [form,setForm]=useState(empty),[editing,setEditing]=useState(false);
   const [filters,setFilters]=useState({maTuyen:'',maXe:'',trangThai:'',tuNgay:'',denNgay:''});
   const [selected,setSelected]=useState<Trip|null>(null),[report,setReport]=useState<Report|null>(null);
+  const [lifecycle,setLifecycle]=useState<Lifecycle|null>(null),[cancelReason,setCancelReason]=useState(''),[confirmCancel,setConfirmCancel]=useState(false);
   const [viewingPassengersTrip, setViewingPassengersTrip] = useState<string | null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
   const [initialLoading,setInitialLoading]=useState(true);const waiting=busy||initialLoading;
@@ -62,8 +64,8 @@ export default function TripManagement(){
     return()=>{active=false;};
   },[request]);
   async function detail(code:string,navigate=true){
-    const [trip,checks]=await Promise.all([request<Trip>(`${API}/${encodeURIComponent(code)}`),request<Report>(`${API}/${encodeURIComponent(code)}/dieu-kien-mo-ban`)]);
-    setSelected(trip);setReport(checks);
+    const [trip,checks,history]=await Promise.all([request<Trip>(`${API}/${encodeURIComponent(code)}`),request<Report>(`${API}/${encodeURIComponent(code)}/dieu-kien-mo-ban`),request<Lifecycle>(`${API}/${encodeURIComponent(code)}/vong-doi`)]);
+    setSelected(trip);setReport(checks);setLifecycle(history);setConfirmCancel(false);
     if(navigate)focusDetail();
   }
   const route=routes.find(r=>r.maTuyen===form.maTuyen);
@@ -121,7 +123,19 @@ export default function TripManagement(){
           try{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/mo-ban`,'POST');}catch(failure){await detail(selected.maChuyen);throw failure;}
           await detail(selected.maChuyen,false);await load(page.page);
         },'Đã mở bán chuyến.');}}>Mở bán chuyến</button>
-        <button disabled={waiting||!selected.coTheHuy} onClick={()=>{if(window.confirm(`Hủy chuyến ${selected.maChuyen}?`))void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/huy`,'POST');await detail(selected.maChuyen,false);await load(page.page);},'Đã hủy chuyến.');}}>Hủy chuyến</button></div>
+        <button disabled={waiting||selected.trangThai!=='DANG_MO_BAN'} onClick={()=>void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/bat-dau`,'POST',{});await detail(selected.maChuyen,false);await load(page.page);},'Đã bắt đầu chuyến.')}>Bắt đầu chuyến</button>
+        <button disabled={waiting||selected.trangThai!=='DANG_CHAY'} onClick={()=>void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/hoan-thanh`,'POST',{});await detail(selected.maChuyen,false);await load(page.page);},'Đã hoàn tất chuyến.')}>Hoàn tất chuyến</button>
+        <button disabled={waiting||!selected.coTheHuy} onClick={()=>{setCancelReason('');setConfirmCancel(true);}}>Hủy chuyến</button></div>
+      {confirmCancel&&<form className={styles.form} onSubmit={event=>{event.preventDefault();void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/huy`,'POST',{lyDo:cancelReason});setConfirmCancel(false);await detail(selected.maChuyen,false);await load(page.page);},'Chuyến đã hủy. Các khoản hoàn và đối soát được theo dõi riêng bên dưới.');}}>
+        <label className={styles.wide}>Lý do hủy chuyến<input required minLength={3} maxLength={1000} value={cancelReason} onChange={event=>setCancelReason(event.target.value)} placeholder="Nhập lý do để thông báo và lưu lịch sử"/></label>
+        <p className={`${styles.wide} ${styles.error}`}>Xác nhận hủy sẽ ngừng giữ chỗ/đặt vé. Khoản đã thu được đưa vào xử lý hoàn hoặc đối soát; hủy chuyến không đồng nghĩa hoàn tiền thành công.</p>
+        <div className={`${styles.buttons} ${styles.wide}`}><button disabled={waiting}>Xác nhận hủy chuyến</button><button type="button" disabled={waiting} onClick={()=>setConfirmCancel(false)}>Quay lại</button></div>
+      </form>}
+      <h3>Khách bị ảnh hưởng và xử lý hoàn/đối soát</h3>
+      {lifecycle&&<p>Vé bị ảnh hưởng: {lifecycle.tongQuanHoan.tongSoVeBiAnhHuong} · Cần hoàn: {lifecycle.tongQuanHoan.soVeCanHoan} · Vé đã hoàn: {lifecycle.tongQuanHoan.soVeDaHoan} · Đã hoàn: {Number(lifecycle.tongQuanHoan.tongTienDaHoan).toLocaleString('vi-VN')}đ · Yêu cầu thành công: {lifecycle.tongQuanHoan.soYeuCauThanhCong} · Cần theo dõi: {lifecycle.tongQuanHoan.soYeuCauCanTheoDoi}</p>}
+      {lifecycle?.khachBiAnhHuong.length?<div className={styles.scroll}><table><thead><tr><th>Mã đơn</th><th>Vé còn hiệu lực</th><th>Trạng thái xử lý</th><th>Yêu cầu hoàn</th><th>Lý do hủy</th><th>Thao tác</th></tr></thead><tbody>{lifecycle.khachBiAnhHuong.map(item=><tr key={item.maDon}><td>{item.maDon}{item.veBiAnhHuong.map(ticket=><small key={ticket.maVe}>{ticket.maVe} · {ticket.trangThai}</small>)}</td><td>{item.soVeConHieuLuc}</td><td>{item.trangThaiXuLy==='CHO_XU_LY'?'Chờ xử lý hoàn':item.trangThaiXuLy==='CAN_DOI_SOAT'?'Cần đối soát thanh toán':item.trangThaiXuLy==='HOAN_TAT'?'Đã xử lý':'Không cần hoàn'}{item.lyDoXuLy&&<small>{item.lyDoXuLy}</small>}</td><td>{item.yeuCauHoan.map(refund=><small key={refund.maHoanTien}>{refund.maHoanTien} · {refund.trangThai} · {Number(refund.soTienHoan).toLocaleString('vi-VN')}đ{refund.lyDoLoi?` · ${refund.lyDoLoi}`:''}</small>)}</td><td>{item.lyDo}</td><td>{['CHO_XU_LY','CAN_DOI_SOAT'].includes(item.trangThaiXuLy)&&<button disabled={waiting} onClick={()=>void action(async()=>{await request(`${API}/${encodeURIComponent(selected.maChuyen)}/xu-ly-hoan`,'POST',{});await detail(selected.maChuyen,false);},'Đã cập nhật trạng thái xử lý hoàn/đối soát.')}>Tiếp tục xử lý</button>}</td></tr>)}</tbody></table></div>:<p>Chưa có đơn hàng bị ảnh hưởng.</p>}
+      <p>Thông báo email: {lifecycle?.thongBao.map(item=>`${item.trangThai}: ${item.soLuong}`).join(' · ')||'chưa có'}.</p>
+      <h3>Lịch sử vòng đời</h3>{lifecycle?.lyLich.length?<ul className={styles.checks}>{lifecycle.lyLich.map((item,index)=><li key={`${item.thoiDiem}-${index}`} className={styles.passed}><div><strong>{states[item.trangThaiCu]??item.trangThaiCu} → {states[item.trangThaiMoi]??item.trangThaiMoi}</strong><small>{item.maNguoiThaoTac} · {item.vaiTro} · {item.thoiDiem}{item.lyDo?` · ${item.lyDo}`:''}</small></div></li>)}</ul>:<p>Chưa có thao tác vòng đời được ghi nhận.</p>}
     </section>}
     {viewingPassengersTrip && (
       <TripPassengerModal

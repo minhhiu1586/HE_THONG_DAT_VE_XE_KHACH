@@ -11,6 +11,7 @@ import com.datvexe.security.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.*;
 import java.util.*;
 import java.util.function.Function;
@@ -102,6 +103,90 @@ public final class HoanVeService {
         // Return the same durable acceptance snapshot on the first call and replay.
         // GET /api/hoan-tien/{id} supplies the current processing result.
         return prepared.result();
+    }
+
+    /** T21 cancellation refunds use captured ticket prices and persist intent before calling VNPay. */
+    public Response processTripCancellation(String orderId,String tripId,String reason,String ip) {
+        Prepared prepared=tx(em->{
+            NguoiDung actor=authenticated(em);AccessControl.role(actor,LoaiTaiKhoan.ADMIN,LoaiTaiKhoan.NHA_XE);
+            ChuyenXe trip=AccessControl.resource(em,ChuyenXe.class,tripId);
+            if(trip.trangThai!=TrangThaiChuyen.DA_HUY)throw error("TRIP_NOT_CANCELLED","Chỉ xử lý hoàn sau khi chuyến đã hủy.");
+            AccessControl.operator(actor,trip.tuyenXe.nhaXe);
+            DonDatVe order=AccessControl.resource(em,DonDatVe.class,orderId);
+            if(em.createNativeQuery("select ma_don from trip_cancellation_work where ma_don=:order and ma_chuyen=:trip")
+                    .setParameter("order",orderId).setParameter("trip",tripId).getResultList().isEmpty())
+                throw error("CANCELLATION_WORK_NOT_FOUND","Không tìm thấy công việc xử lý của đơn bị ảnh hưởng.");
+            List<VeXe> tickets=new VeXeRepository(em).forOrder(orderId).stream()
+                    .filter(v->v.chuyenXe.maChuyen.equals(tripId)&&Set.of(TrangThaiVe.DA_XUAT_VE,TrangThaiVe.DA_LEN_XE).contains(v.trangThai)).toList();
+            boolean mixedOrder=em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon=:order and v.chuyenXe.maChuyen<>:trip",Long.class)
+                    .setParameter("order",orderId).setParameter("trip",tripId).getSingleResult()>0
+                    || em.createQuery("select count(h) from GiuCho h where h.donDatVe.maDon=:order and h.chuyenXe.maChuyen<>:trip",Long.class)
+                    .setParameter("order",orderId).setParameter("trip",tripId).getSingleResult()>0;
+            if(mixedOrder)throw error("CANCELLATION_PAYMENT_RECONCILIATION_REQUIRED","Đơn gồm vé của nhiều chuyến; cần đối soát riêng trước khi hoàn.");
+            long anyTickets=em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon=:order and v.chuyenXe.maChuyen=:trip",Long.class)
+                    .setParameter("order",orderId).setParameter("trip",tripId).getSingleResult();
+            boolean capturedWithoutTickets=tickets.isEmpty()&&anyTickets==0&&em.createQuery("select count(h) from GiuCho h where h.donDatVe.maDon=:order and h.chuyenXe.maChuyen=:trip",Long.class)
+                    .setParameter("order",orderId).setParameter("trip",tripId).getSingleResult()>0;
+            if(tickets.isEmpty()&&!capturedWithoutTickets)throw error("CANCELLATION_REFUND_NOT_REQUIRED","Đơn không còn vé đã phát hành hoặc khoản giữ chỗ cần hoàn.");
+            List<ThanhToan> captured=new ThanhToanRepository(em).forOrder(orderId).stream().filter(p->CAPTURED.contains(p.trangThai)).toList();
+            if(captured.size()!=1)throw error("CANCELLATION_PAYMENT_RECONCILIATION_REQUIRED","Chưa xác định được duy nhất khoản đã thu; cần đối soát.");
+            ThanhToan payment=lockPayment(em,captured.getFirst().maGiaoDich);
+            var repo=new HoanVeRepository(em);List<Entry> previous=repo.forOrder(orderId);
+            Entry existing=previous.stream().filter(e->e.paymentId().equals(payment.maGiaoDich)
+                    && Objects.toString(e.reason(),"").startsWith("NHA_XE_HUY_CHUYEN:")
+                    && HoanVeRepository.BLOCKING.contains(e.state())).findFirst().orElse(null);
+            if(existing!=null)return new Prepared(existing,null,payment.soTien,null,false);
+            if(capturedWithoutTickets) {
+                Entry completed=previous.stream().filter(e->e.paymentId().equals(payment.maGiaoDich)
+                        && Objects.toString(e.reason(),"").startsWith("NHA_XE_HUY_CHUYEN:") && e.state().equals("THANH_CONG")).findFirst().orElse(null);
+                if(completed!=null)return new Prepared(completed,null,payment.soTien,null,false);
+            }
+            if(previous.stream().anyMatch(e->e.paymentId().equals(payment.maGiaoDich)&&HoanVeRepository.BLOCKING.contains(e.state())))
+                throw error("REFUND_IN_PROGRESS","Đơn đang có yêu cầu hoàn khác; cần xử lý trước để tránh hoàn trùng.");
+            if(!Boolean.parseBoolean(System.getProperty("trip.cancellation.refund.approved",System.getenv().getOrDefault("TRIP_CANCELLATION_REFUND_APPROVED","false"))))
+                throw error("CANCELLATION_REFUND_POLICY_NOT_APPROVED","Chính sách hoàn 100% khi nhà xe hủy chuyến chưa được phê duyệt; công việc được giữ để đối soát.");
+            if(order.chinhSachHoanVe==null)throw error("REFUND_POLICY_MISSING","Đơn thiếu chính sách hoàn đã chốt; cần đối soát thủ công.");
+            var metadata=requireMetadata(em,payment);
+            List<Line> lines=new ArrayList<>();BigDecimal amount=BigDecimal.ZERO;
+            for(VeXe ticket:tickets) {
+                BigDecimal net=ticket.giaVe.setScale(0,RoundingMode.UNNECESSARY);
+                lines.add(new Line(ticket.maVe,money(net),"100","0",money(net)));amount=amount.add(net);
+            }
+            if(tickets.isEmpty())amount=payment.soTien.setScale(0,RoundingMode.UNNECESSARY);
+            assertBudget(previous,payment,amount,null);
+            String id="HT-"+UUID.randomUUID();String refundReason="NHA_XE_HUY_CHUYEN: "+reason;
+            if(refundReason.length()>500)refundReason=refundReason.substring(0,500);
+            Entry entry=new Entry(id,orderId,payment.maGiaoDich,actor.maNguoiDung,order.chinhSachHoanVe==null?null:order.chinhSachHoanVe.maChinhSach,
+                    refundReason,amount,"CHO_XU_LY",List.copyOf(lines),List.of(new History("TAO_YEU_CAU",null,null,null,now())),
+                    requestId(),null,amount.compareTo(payment.soTien)==0,null,clock.instant(),null);
+            repo.insert(entry);return new Prepared(entry,null,payment.soTien,metadata,true);
+        });
+        if(!prepared.fresh()) {
+            if(HoanVeRepository.BLOCKING.contains(prepared.entry().state())) {
+                Response current=verify(prepared.entry().id(),ip);
+                tx(em->{syncCancellationWork(em,orderId);return null;});
+                return current;
+            }
+            tx(em->{syncCancellationWork(em,orderId);return null;});
+            return HoanVeRepository.response(prepared.entry());
+        }
+        Response response=dispatch(prepared,ip);
+        tx(em->{syncCancellationWork(em,orderId);return null;});
+        return response;
+    }
+
+    private void syncCancellationWork(EntityManager em,String orderId) {
+        var blocking=((Number)em.createNativeQuery("select count(*) from refund_request where ma_don=:order and trang_thai in ('CHO_XU_LY','CAN_DOI_SOAT')")
+                .setParameter("order",orderId).getSingleResult()).longValue();
+        List<?> trips=em.createNativeQuery("select ma_chuyen from trip_cancellation_work where ma_don=:order")
+                .setParameter("order",orderId).getResultList();
+        for(Object trip:trips) {
+            long tickets=em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon=:order and v.chuyenXe.maChuyen=:trip and v.trangThai in :states",Long.class)
+                    .setParameter("order",orderId).setParameter("trip",trip.toString()).setParameter("states",List.of(TrangThaiVe.DA_XUAT_VE,TrangThaiVe.DA_LEN_XE)).getSingleResult();
+            String state=blocking>0?"CAN_DOI_SOAT":tickets==0?"HOAN_TAT":"CHO_XU_LY";
+            em.createNativeQuery("update trip_cancellation_work set trang_thai=:state,last_error=null,updated_at=:at where ma_don=:order and ma_chuyen=:trip")
+                    .setParameter("state",state).setParameter("at",clock.instant()).setParameter("order",orderId).setParameter("trip",trip.toString()).executeUpdate();
+        }
     }
     public Response get(String id) {
         return tx(em -> {
@@ -228,7 +313,7 @@ public final class HoanVeService {
                 List<Entry> previous = repo.forOrder(order.maDon); assertBudget(previous,payment,entry.amount(),entry.id());
                 for (Line line : entry.lines()) {
                     VeXe ticket = AccessControl.resource(em,VeXe.class,line.maVe());
-                    if (!ticket.donDatVe.maDon.equals(order.maDon) || ticket.trangThai != TrangThaiVe.DA_XUAT_VE)
+                    if (!ticket.donDatVe.maDon.equals(order.maDon) || (ticket.trangThai != TrangThaiVe.DA_XUAT_VE && !(Objects.toString(entry.reason(),"").startsWith("NHA_XE_HUY_CHUYEN:") && ticket.trangThai==TrangThaiVe.DA_LEN_XE)))
                         throw error("REFUND_TICKET_CONFLICT","Vé đã thay đổi trong thời gian hoàn; cần đối soát.");
                     ticket.trangThai = TrangThaiVe.DA_HOAN;
                 }
@@ -239,7 +324,9 @@ public final class HoanVeService {
             Entry updated = changed(entry,state,result.transactionNo(),state.equals("THANH_CONG")?null:
                     "VNP_"+result.responseCode()+"_"+result.transactionStatus(),"KET_QUA",result.responseCode()+"/"+result.transactionStatus(),
                     state.equals("THANH_CONG")?clock.instant():null);
-            repo.update(updated); return HoanVeRepository.response(updated);
+            repo.update(updated);
+            if(Objects.toString(entry.reason(),"").startsWith("NHA_XE_HUY_CHUYEN:"))syncCancellationWork(em,order.maDon);
+            return HoanVeRepository.response(updated);
         });
     }
     private Response uncertain(String id, RuntimeException failure) {
@@ -304,7 +391,20 @@ public final class HoanVeService {
         DonDatVe initial = em.find(DonDatVe.class,code(id));
         if (initial == null) throw missing();
         List<VeXe> tickets = new VeXeRepository(em).forOrder(id);
-        if (tickets.isEmpty()) throw error("REFUND_NOT_ALLOWED","Đơn chưa phát hành vé; thuộc luồng đối soát riêng.");
+        if (tickets.isEmpty()) {
+            List<?> cancellation=em.createNativeQuery("select w.ma_chuyen from trip_cancellation_work w join refund_request r on r.ma_don=w.ma_don where w.ma_don=:order and r.ly_do like 'NHA_XE_HUY_CHUYEN:%' limit 1")
+                    .setParameter("order",id).getResultList();
+            if(cancellation.isEmpty())throw error("REFUND_NOT_ALLOWED","Đơn chưa phát hành vé; thuộc luồng đối soát riêng.");
+            ChuyenXe trip=AccessControl.resource(em,ChuyenXe.class,cancellation.getFirst().toString());
+            DonDatVe order=AccessControl.resource(em,DonDatVe.class,id);
+            if(user!=null) {
+                if(ownerOnly||user.loaiTaiKhoan==LoaiTaiKhoan.KHACH_HANG) {
+                    AccessControl.role(user,LoaiTaiKhoan.KHACH_HANG);
+                    if(!order.nguoiDat.maNguoiDung.equals(user.maNguoiDung))throw AccessControl.denied();
+                } else {AccessControl.role(user,LoaiTaiKhoan.ADMIN,LoaiTaiKhoan.NHA_XE);AccessControl.operator(user,trip.tuyenXe.nhaXe);}
+            }
+            return order;
+        }
         ChuyenXe trip = (ChuyenXe)org.hibernate.Hibernate.unproxy(tickets.getFirst().chuyenXe);
         if (trip.tuyenXe.nhaXe != null) AccessControl.resource(em,NhaXe.class,trip.tuyenXe.nhaXe.maNhaXe);
         AccessControl.resource(em,ChuyenXe.class,trip.maChuyen);

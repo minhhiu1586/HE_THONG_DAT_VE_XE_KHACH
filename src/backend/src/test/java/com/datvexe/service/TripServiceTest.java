@@ -24,6 +24,9 @@ class TripServiceTest {
             "jakarta.persistence.jdbc.password","","hibernate.hbm2ddl.auto","create-drop"));
         trips=new TripService(factory,clock(DAY.minusDays(1).atStartOfDay()));vehicles=new VehicleService(factory);employees=new EmployeeService(factory);
         tx(em->{
+            em.createNativeQuery("create table trip_lifecycle_history(id varchar(40) primary key,ma_chuyen varchar(40),trang_thai_cu varchar(30),trang_thai_moi varchar(30),ma_nguoi_thao_tac varchar(40),vai_tro varchar(30),ly_do varchar(1000),created_at timestamp with time zone)").executeUpdate();
+            em.createNativeQuery("create table trip_cancellation_work(ma_don varchar(40),ma_chuyen varchar(40),trang_thai varchar(24),ly_do varchar(1000),last_error varchar(120),created_at timestamp with time zone,updated_at timestamp with time zone,primary key(ma_don,ma_chuyen))").executeUpdate();
+            em.createNativeQuery("create table trip_cancellation_notification(ma_don varchar(40),ma_chuyen varchar(40),status varchar(20),primary key(ma_don,ma_chuyen))").executeUpdate();
             for(String code:List.of("A","B")){var n=new NhaXe();n.maNhaXe=code;n.tenNhaXe=code;em.persist(n);}
             for(String code:List.of("AD","NX","KH")) {
                 var user=new NguoiDung();user.maNguoiDung=code;user.hoTen=code;user.email=code+"@example.test";user.soDienThoai=code;user.matKhau="not-a-login";
@@ -191,6 +194,57 @@ class TripServiceTest {
         context("NX","PUT","/api/quan-ly/chuyen-xe/B1","{}");assertEquals(403,assertThrows(DomainException.class,()->trips.update("B1",input("B1","FOREIGN","Y",LocalTime.NOON))).status());
         context("KH","POST","/api/quan-ly/chuyen-xe/A1/mo-ban",null);assertEquals(403,assertThrows(DomainException.class,()->trips.open("A1")).status());
         RequestIdentity.set(new RequestIdentity.Context(null,"GET","/api/quan-ly/chuyen-xe",null));assertEquals(401,assertThrows(DomainException.class,()->trips.get("A1")).status());
+    }
+
+    @Test void lifecycleRejectsInvalidStatesAndDoesNotDuplicateHistory() throws Exception {
+        ready("C");trips.open("C");
+        context("AD","POST","/api/quan-ly/chuyen-xe/C/bat-dau",null);
+        assertEquals(TrangThaiChuyen.DANG_CHAY,trips.transition("C",TrangThaiChuyen.DANG_CHAY,null).get("trangThai"));
+        assertEquals(409,assertThrows(DomainException.class,()->trips.transition("C",TrangThaiChuyen.DANG_CHAY,null)).status());
+        context("AD","POST","/api/quan-ly/chuyen-xe/C/hoan-thanh",null);
+        assertEquals(TrangThaiChuyen.HOAN_TAT,trips.transition("C",TrangThaiChuyen.HOAN_TAT,null).get("trangThai"));
+        assertEquals(409,assertThrows(DomainException.class,()->trips.transition("C",TrangThaiChuyen.HOAN_TAT,null)).status());
+        tx(em->assertEquals(2L,((Number)em.createNativeQuery("select count(*) from trip_lifecycle_history").getSingleResult()).longValue()));
+    }
+    @Test void lifecycleRechecksVehicleAndRejectsCustomer() throws Exception {
+        ready("C");trips.open("C");
+        context("KH","POST","/api/chuyen-xe/C/bat-dau",null);
+        assertEquals(403,assertThrows(DomainException.class,()->trips.transition("C",TrangThaiChuyen.DANG_CHAY,null)).status());
+        RequestIdentity.clear();tx(em->em.find(Xe.class,"X").trangThai=TrangThaiXe.BAO_TRI);
+        assertEquals(409,assertThrows(DomainException.class,()->trips.transition("C",TrangThaiChuyen.DANG_CHAY,null)).status());
+        assertEquals(TrangThaiChuyen.DANG_MO_BAN,trips.get("C").get("trangThai"));
+    }
+    @Test void cancellingReleasesHoldsWithoutAnOrderAndRequiresReason() {
+        ready("C");trips.open("C");
+        tx(em->{var h=new GiuCho();h.maGiuCho="H";h.chuyenXe=em.find(ChuyenXe.class,"C");h.ghe=em.find(Xe.class,"X").danhSachGhe.getFirst();h.ngayDat=DAY.minusDays(1).atStartOfDay();h.thoiDiemBatDau=h.ngayDat;h.thoiDiemHetHan=DAY.atTime(7,0);em.persist(h);});
+        assertEquals(400,assertThrows(DomainException.class,()->trips.cancel("C"," ")).status());
+        assertEquals(TrangThaiChuyen.DA_HUY,trips.cancel("C","Xe gặp sự cố").get("trangThai"));
+        tx(em->assertEquals(TrangThaiGiuCho.DA_HUY,em.find(GiuCho.class,"H").trangThai));
+        assertEquals(409,assertThrows(DomainException.class,()->trips.cancel("C","Xe gặp sự cố")).status());
+        assertEquals(409,assertThrows(DomainException.class,()->trips.transition("C",TrangThaiChuyen.DANG_CHAY,null)).status());
+        assertEquals(409,assertThrows(DomainException.class,()->trips.open("C")).status());
+    }
+    @Test void assignedDriverCanOperateButCannotCancelOrOperateAnotherTrip() {
+        ready("C");trips.open("C");
+        trips.create(input("OTHER","RETURN",null,LocalTime.of(16,0)));
+        tx(em->{var u=new NguoiDung();u.maNguoiDung="DRIVER";u.hoTen="Tài xế";u.email="driver@test.local";u.soDienThoai="0999000011";u.matKhau="test";u.loaiTaiKhoan=LoaiTaiKhoan.NHAN_VIEN;u.trangThai=TrangThaiTaiKhoan.HOAT_DONG;u.nhanVien=em.find(NhanVien.class,"CE1");em.persist(u);
+            var auth=new AuthSession();auth.tokenHash="DRIVER";auth.csrfToken="DRIVER";auth.nguoiDung=u;auth.taoLuc=Instant.now();auth.hetHan=Instant.now().plusSeconds(3600);em.persist(auth);});
+        RequestIdentity.set(new RequestIdentity.Context(new CurrentUser("DRIVER",LoaiTaiKhoan.NHAN_VIEN,null,"CE1","DRIVER"),"POST","/api/chuyen-xe/OTHER/bat-dau",null));
+        assertEquals(403,assertThrows(DomainException.class,()->trips.transition("OTHER",TrangThaiChuyen.DANG_CHAY,null)).status());
+        RequestIdentity.set(new RequestIdentity.Context(new CurrentUser("DRIVER",LoaiTaiKhoan.NHAN_VIEN,null,"CE1","DRIVER"),"POST","/api/chuyen-xe/C/bat-dau",null));
+        assertEquals(TrangThaiChuyen.DANG_CHAY,trips.transition("C",TrangThaiChuyen.DANG_CHAY,null).get("trangThai"));
+        RequestIdentity.set(new RequestIdentity.Context(new CurrentUser("DRIVER",LoaiTaiKhoan.NHAN_VIEN,null,"CE1","DRIVER"),"POST","/api/chuyen-xe/C/huy",null));
+        assertEquals(403,assertThrows(DomainException.class,()->trips.cancel("C","Sự cố")).status());
+        RequestIdentity.set(new RequestIdentity.Context(new CurrentUser("DRIVER",LoaiTaiKhoan.NHAN_VIEN,null,"CE1","DRIVER"),"POST","/api/chuyen-xe/C/hoan-thanh",null));
+        assertEquals(TrangThaiChuyen.HOAN_TAT,trips.transition("C",TrangThaiChuyen.HOAN_TAT,null).get("trangThai"));
+    }
+    @Test void completingDoesNotMarkUninspectedPassengersAsBoarded() {
+        ready("C");trips.open("C");
+        tx(em->{var o=new DonDatVe();o.maDon="O";o.nguoiDat=em.find(NguoiDung.class,"KH");o.ngayDat=DAY.atStartOfDay();o.khachDatTen="Khách";o.khachDatSoDienThoai="0999000012";em.persist(o);
+            var seats=em.find(Xe.class,"X").danhSachGhe;
+            for(int n=0;n<2;n++){var v=new VeXe();v.maVe="V"+n;v.donDatVe=o;v.chuyenXe=em.find(ChuyenXe.class,"C");v.ghe=seats.get(n);v.hoTenKhachHang="Khách";v.soDienThoaiKhachHang="0999000012";v.giaVe=BigDecimal.TEN;v.trangThai=n==0?TrangThaiVe.DA_LEN_XE:TrangThaiVe.DA_XUAT_VE;em.persist(v);}});
+        trips.transition("C",TrangThaiChuyen.DANG_CHAY,null);trips.transition("C",TrangThaiChuyen.HOAN_TAT,null);
+        tx(em->{assertEquals(TrangThaiVe.DA_LEN_XE,em.find(VeXe.class,"V0").trangThai);assertEquals(TrangThaiVe.DA_XUAT_VE,em.find(VeXe.class,"V1").trangThai);});
     }
     void context(String id,String method,String path,String body)throws Exception {
         var role=id.equals("NX")?LoaiTaiKhoan.NHA_XE:id.equals("KH")?LoaiTaiKhoan.KHACH_HANG:LoaiTaiKhoan.ADMIN;

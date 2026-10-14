@@ -88,6 +88,7 @@ class HoanVeServicePostgresTest {
     @AfterEach
     void tearDown() throws Exception {
         RequestIdentity.clear();
+        System.clearProperty("trip.cancellation.refund.approved");
         if (!schemaCreated) return;
         verifyGeneratedSchemaName();
         try {
@@ -304,7 +305,7 @@ class HoanVeServicePostgresTest {
     void restartedServiceVerifiesStoredRefundTransactionCorrelation() {
         Fixture fixture = seed(2, "10000", "80", "0", true, true, false);
         String refundTransaction = "REFUND-TXN-41";
-        gateway.refundAction = command -> result(command, "00", "05", refundTransaction, true);
+        gateway.refundAction = command -> result(command, "00", "01", refundTransaction, true);
         HoanVeDto.Response initial = response(create(fixture, fixture.userId(),
                 List.of(fixture.ticketIds().get(0)), "verify-pending"));
         assertEquals("CAN_DOI_SOAT", initial.trangThai());
@@ -498,6 +499,101 @@ class HoanVeServicePostgresTest {
             workers.shutdownNow();
             workers.awaitTermination(10, TimeUnit.SECONDS);
         }
+    }
+
+    @Test void t21CancelsPaidTripAndRefundsNetFareWithoutChangingOtherRefundRules() throws Exception {
+        Fixture f=seed(2,"9000","80","0",true,true,true);
+        String trip=prepareT21(f);
+        withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Xe gặp sự cố"));
+        HoanVeDto.Response refunded=withT21Admin(f,trip,()->service.processTripCancellation(f.orderId(),trip,"Xe gặp sự cố","127.0.0.1"));
+        assertEquals("THANH_CONG",refunded.trangThai());assertEquals("18000",refunded.soTienHoan());
+        assertEquals(1,gateway.refundCalls.get());
+        for(String id:f.ticketIds())assertEquals(TrangThaiVe.DA_HOAN,ticketState(id));
+        assertEquals(409,assertThrows(DomainException.class,()->withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Hủy lần hai"))).status());
+        assertEquals(1,gateway.refundCalls.get());
+    }
+    @Test void t21TimeoutReconcilesWithoutSendingAnotherRefund() throws Exception {
+        Fixture f=seed(1,"10000","100","0",true,true,false);String trip=prepareT21(f);
+        withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Sự cố"));
+        gateway.refundAction=c->{throw new IllegalStateException("timeout");};
+        HoanVeDto.Response pending=withT21Admin(f,trip,()->service.processTripCancellation(f.orderId(),trip,"Sự cố","127.0.0.1"));
+        assertEquals("CAN_DOI_SOAT",pending.trangThai());assertEquals(TrangThaiVe.DA_XUAT_VE,ticketState(f.ticketIds().getFirst()));
+        clock.advance(Duration.ofSeconds(31));
+        withT21Admin(f,trip,()->service.processTripCancellation(f.orderId(),trip,"Sự cố","127.0.0.1"));
+        assertEquals(1,gateway.refundCalls.get());
+    }
+    @Test void t21DoesNotCreateAnotherRefundWhileT19RequestIsUncertain() throws Exception {
+        Fixture f=seed(1,"10000","100","0",true,true,false);
+        gateway.refundAction=c->{throw new IllegalStateException("timeout");};
+        assertEquals("CAN_DOI_SOAT",response(create(f,f.userId(),f.ticketIds(),"prior-refund")).trangThai());
+        String trip=prepareT21(f);
+        withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Sự cố"));
+        assertThrows(AccountException.class,()->withT21Admin(f,trip,()->service.processTripCancellation(f.orderId(),trip,"Sự cố","127.0.0.1")));
+        assertEquals(1,gateway.refundCalls.get());
+    }
+    @Test void t21UnpaidOrderReleasesHoldsAndDoesNotRequestRefund() throws Exception {
+        Fixture f=seed(1,"10000","100","0",true,true,false);String trip=prepareT21(f);
+        edit(em->{
+            VeXe v=em.find(VeXe.class,f.ticketIds().getFirst());
+            GiuCho h=new GiuCho();h.maGiuCho="HOLD";h.chuyenXe=v.chuyenXe;h.ghe=v.ghe;h.donDatVe=v.donDatVe;
+            h.ngayDat=LocalDateTime.ofInstant(START,VIETNAM);h.thoiDiemBatDau=h.ngayDat;h.thoiDiemHetHan=h.ngayDat.plusMinutes(10);em.persist(h);em.remove(v);
+            ((DonDatVe)org.hibernate.Hibernate.unproxy(em.find(DonDatVe.class,f.orderId()))).trangThai=TrangThaiDon.CHO_THANH_TOAN;
+            em.find(ThanhToan.class,f.paymentId()).trangThai=TrangThaiThanhToan.THAT_BAI;
+        });
+        withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Sự cố"));
+        try(EntityManager em=factory.createEntityManager()) {
+            assertEquals(TrangThaiGiuCho.DA_HUY,em.find(GiuCho.class,"HOLD").trangThai);
+            assertEquals(TrangThaiDon.DA_HUY,((DonDatVe)org.hibernate.Hibernate.unproxy(em.find(DonDatVe.class,f.orderId()))).trangThai);
+            assertEquals("KHONG_CAN_HOAN",em.createNativeQuery("select trang_thai from trip_cancellation_work").getSingleResult());
+            assertEquals(0L,((Number)em.createNativeQuery("select count(*) from refund_request").getSingleResult()).longValue());
+        }
+        assertEquals(0,gateway.refundCalls.get());
+    }
+    @Test void t21ConcurrentCancellationHasOnlyOneHistoryAndWorkItem() throws Exception {
+        Fixture f=seed(1,"10000","100","0",true,true,false);String trip=prepareT21(f);
+        ExecutorService workers=Executors.newFixedThreadPool(2);CountDownLatch go=new CountDownLatch(1);
+        try {
+            java.util.concurrent.Callable<Integer> task=()->{go.await();try{withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Sự cố"));return 200;}catch(DomainException e){return e.status();}};
+            var a=workers.submit(task);var b=workers.submit(task);go.countDown();
+            assertEquals(java.util.Set.of(200,409),java.util.Set.of(a.get(15,TimeUnit.SECONDS),b.get(15,TimeUnit.SECONDS)));
+            try(EntityManager em=factory.createEntityManager()) {
+                assertEquals(1L,((Number)em.createNativeQuery("select count(*) from trip_lifecycle_history").getSingleResult()).longValue());
+                assertEquals(1L,((Number)em.createNativeQuery("select count(*) from trip_cancellation_work").getSingleResult()).longValue());
+            }
+        }finally{workers.shutdownNow();}
+    }
+    @Test void t21DoesNotSendRefundBeforePolicyApproval() throws Exception {
+        Fixture f=seed(1,"10000","100","0",true,true,false);String trip=prepareT21(f);
+        System.setProperty("trip.cancellation.refund.approved","false");
+        withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Sự cố"));
+        AccountException error=assertThrows(AccountException.class,()->withT21Admin(f,trip,()->service.processTripCancellation(f.orderId(),trip,"Sự cố","127.0.0.1")));
+        assertEquals("CANCELLATION_REFUND_POLICY_NOT_APPROVED",error.code());assertEquals(0,gateway.refundCalls.get());
+        try(EntityManager em=factory.createEntityManager()) {assertEquals(TrangThaiChuyen.DA_HUY,em.find(ChuyenXe.class,trip).trangThai);}
+    }
+    @Test void t21CapturedPaymentWithoutTicketCanBeRefundedOnlyOnce() throws Exception {
+        Fixture f=seed(1,"10000","100","0",true,true,false);String trip=prepareT21(f);
+        edit(em->{VeXe v=em.find(VeXe.class,f.ticketIds().getFirst());GiuCho h=new GiuCho();h.maGiuCho="LATE_HOLD";h.chuyenXe=v.chuyenXe;h.ghe=v.ghe;h.donDatVe=v.donDatVe;h.ngayDat=LocalDateTime.ofInstant(START,VIETNAM);h.thoiDiemBatDau=h.ngayDat;h.thoiDiemHetHan=h.ngayDat.plusMinutes(10);em.persist(h);em.remove(v);});
+        withT21Admin(f,trip,()->new TripService(factory,clock).cancel(trip,"Sự cố"));
+        HoanVeDto.Response first=withT21Admin(f,trip,()->service.processTripCancellation(f.orderId(),trip,"Sự cố","127.0.0.1"));
+        HoanVeDto.Response replay=withT21Admin(f,trip,()->service.processTripCancellation(f.orderId(),trip,"Sự cố","127.0.0.1"));
+        assertEquals("THANH_CONG",first.trangThai());assertEquals(first.maHoanTien(),replay.maHoanTien());assertEquals(1,gateway.refundCalls.get());
+        var report=withT21Admin(f,trip,()->new TripService(factory,clock).lifecycleReport(trip));
+        assertEquals(TrangThaiChuyen.DA_HUY,report.get("trangThai"));
+        try(EntityManager em=factory.createEntityManager()) {assertEquals("HOAN_TAT",em.createNativeQuery("select trang_thai from trip_cancellation_work").getSingleResult());}
+    }
+    private String prepareT21(Fixture f) throws Exception {
+        System.setProperty("trip.cancellation.refund.approved","true");
+        promoteOtherFixtureUserToAdmin(f);
+        try(Connection c=DriverManager.getConnection(schemaScopedUrl(jdbcUrl,schema),jdbcUser,jdbcPassword);Statement st=c.createStatement()) {
+            var migration=java.nio.file.Path.of("docs/database/schema/013_trip_lifecycle.sql");
+            if(!java.nio.file.Files.exists(migration))migration=java.nio.file.Path.of("../../docs/database/schema/013_trip_lifecycle.sql");
+            st.execute(java.nio.file.Files.readString(migration));
+        }
+        try(EntityManager em=factory.createEntityManager()) {return em.find(VeXe.class,f.ticketIds().getFirst()).chuyenXe.maChuyen;}
+    }
+    private <T>T withT21Admin(Fixture f,String trip,Supplier<T> action) {
+        RequestIdentity.set(new RequestIdentity.Context(new CurrentUser(f.otherUserId(),LoaiTaiKhoan.ADMIN,null,null,f.otherSessionId()),"POST","/api/quan-ly/chuyen-xe/"+trip+"/huy",null));
+        try{return action.get();}finally{RequestIdentity.clear();}
     }
 
     private Fixture seed(int ticketCount, String fareText, String rateText, String feeText,

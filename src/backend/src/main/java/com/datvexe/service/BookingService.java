@@ -311,6 +311,15 @@ public final class BookingService {
                     node.put("tuyenXe", trip.tuyenXe.tenTuyen);
                     node.put("ngayKhoiHanh", trip.ngayKhoiHanh.toString());
                     node.put("gioKhoiHanh", trip.gioKhoiHanh.toString());
+                    node.put("trangThaiChuyen",trip.trangThai.name());
+                    if(trip.trangThai==TrangThaiChuyen.DA_HUY) {
+                        List<Object[]> cancellation=em.createNativeQuery("select trang_thai,ly_do from trip_cancellation_work where ma_don=:order and ma_chuyen=:trip")
+                                .setParameter("order",order.maDon).setParameter("trip",trip.maChuyen).getResultList();
+                        if(!cancellation.isEmpty()) {
+                            node.put("trangThaiXuLyHuyChuyen",cancellation.getFirst()[0].toString());
+                            node.put("lyDoHuyChuyen",Objects.toString(cancellation.getFirst()[1],""));
+                        }
+                    }
                 }
                 resultList.add(node);
             }

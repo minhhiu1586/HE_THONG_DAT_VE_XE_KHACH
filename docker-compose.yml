@@ -17,6 +17,7 @@ services:
       BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-}
       BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-Vexexin}
       EMAIL_NOTIFICATIONS_ENABLED: ${EMAIL_NOTIFICATIONS_ENABLED:-true}
+      TRIP_CANCELLATION_REFUND_APPROVED: ${TRIP_CANCELLATION_REFUND_APPROVED:-false}
       VNP_RETURN_URL: ${VNP_RETURN_URL:-http://localhost:3000/thanh-toan/return}
     volumes:
       - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
@@ -54,6 +55,7 @@ services:
       - ./docs/database/schema/010_refund_policy.sql:/docker-entrypoint-initdb.d/010_refund_policy.sql:ro
       - ./docs/database/schema/011_refund_tracking.sql:/docker-entrypoint-initdb.d/011_refund_tracking.sql:ro
       - ./docs/database/schema/012_ticket_checkin.sql:/docker-entrypoint-initdb.d/012_ticket_checkin.sql:ro
+      - ./docs/database/schema/013_trip_lifecycle.sql:/docker-entrypoint-initdb.d/013_trip_lifecycle.sql:ro
       - ./docs/database/seed/001_catalog.sql:/docker-entrypoint-initdb.d/004_catalog.sql:ro
       - ./docs/database/seed/002_accounts_staff_fleet.sql:/docker-entrypoint-initdb.d/005_accounts_staff_fleet.sql:ro
       - ./docs/database/seed/003_routes_trips.sql:/docker-entrypoint-initdb.d/006_routes_trips.sql:ro

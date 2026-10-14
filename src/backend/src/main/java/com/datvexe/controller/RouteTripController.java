@@ -100,6 +100,7 @@ public class RouteTripController extends HttpServlet {
                         case "hoan-thanh" -> TrangThaiChuyen.HOAN_TAT;
                         default -> throw new DomainException(404, "API không tồn tại");
                     };
+                    if(target==TrangThaiChuyen.DA_HUY) throw new DomainException(400,"API hủy chuyến yêu cầu lý do; dùng /api/quan-ly/chuyen-xe/{maChuyen}/huy.");
                     result = service.transition(p[1], target);
                 } else throw new DomainException(404, "API không tồn tại");
             } else throw new DomainException(404, "API không tồn tại");
