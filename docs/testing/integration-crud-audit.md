@@ -55,6 +55,8 @@ Các ca nghiệp vụ còn lại trong bảng đã kiểm qua HTTP/PostgreSQL; c
 
 Tài xế `tx1.futa@datvexe.test` đã đăng nhập trên web: vào `/quan-tri/nhan-vien` bị chặn quyền; `/nhan-vien` hiển thị Nguyễn Minh Đức, lịch 30 chuyến và hồ sơ NV_FUTA_01 chỉ đọc. Hồ sơ công việc do quản lý cập nhật; thông tin tài khoản có trang riêng.
 
+Lượt kiểm frontend tiếp theo: admin/điều hành/tài xế/khách đăng nhập đúng phạm vi; bộ lọc tuyến có 14 tên duy nhất, 30 chuyến chia trang 20/10; tìm chuyến theo tên địa điểm ra đúng FUTA/Thành Bưởi; chọn 2 ghế tính 360.000đ, bỏ hết ghế khóa nút tiếp tục. Không tạo đơn hoặc thanh toán trong lượt này.
+
 Log nằm trong thư mục target và có thể mất khi Maven clean; hướng dẫn và bài kiểm thử được lưu trong Git.
 
 ## Luồng 1 — Đăng nhập và phạm vi quyền
@@ -163,6 +165,8 @@ Chọn TP. Hồ Chí Minh – Cần Thơ rồi lọc: admin thấy cả FUTA và
 Kiểm tra tự động phần lựa chọn: `node tests/frontend/management_options_check.cjs` (đã đạt); frontend production build và TypeScript đã đạt sau thay đổi.
 
 API danh sách chuyến nhận `maTuyen` là một mã hoặc nhiều mã phân cách bằng dấu phẩy (tối đa 100 mã). Backend kiểm từng mã, lọc trước khi đếm/phân trang và giữ điều kiện phạm vi nhà xe. Bộ HTTP chuyến kiểm nhóm tuyến, phân trang, mã không hợp lệ và quyền điều hành.
+
+Hồi quy đổi tab: tìm “Cần Thơ” ở tỉnh/thành, hoặc lọc bến “Miền Tây”/trạng thái không có kết quả, rồi chuyển sang tuyến phải vẫn có đủ 10 bến với tên tỉnh đầy đủ. Kết quả lọc của bảng được tách khỏi danh mục dùng chung cho form. Trạng thái bến hiển thị bằng tiếng Việt và vẫn gửi đúng giá trị API. Đã kiểm thêm/sửa/xóa tỉnh tạm `QA_FRONT_CITY_1014`; danh mục cập nhật sau lưu và bản ghi tạm đã dọn.
 
 Đã kiểm bản cập nhật trên web: bộ lọc có 14 tên tuyến duy nhất theo A–Z; chọn TP. Hồ Chí Minh – Cần Thơ trả 30 chuyến của FUTA và Thành Bưởi trong bảng kết quả. Bộ HTTP chuyến đạt 123 kiểm tra và đối chiếu dữ liệu trước/sau khớp.
 
