@@ -1,5 +1,6 @@
 import type { Profile } from './account-api';
 
+// Mô tả menu quản lý: adminOnly chỉ điều chỉnh mục hiển thị, không thay thế kiểm tra quyền server.
 export const managementItems = [
   { href: '/quan-tri/nhan-vien', label: 'Nhân viên và phân công', icon: '👥', description: 'Hồ sơ nhân viên và lịch phân công chuyến.', adminOnly: false },
   { href: '/quan-tri/tai-khoan', label: 'Tài khoản', icon: '👤', description: 'Quản lý trạng thái tài khoản người dùng.', adminOnly: true },
@@ -9,7 +10,9 @@ export const managementItems = [
   { href: '/quan-tri/chuyen-xe', label: 'Chuyến xe và mở bán', icon: '📅', description: 'Tạo chuyến nháp, kiểm tra vận hành và xác nhận mở bán.', adminOnly: false },
   { href: '/quan-tri/danh-gia', label: 'Kiểm duyệt đánh giá', icon: '⭐', description: 'Duyệt và quản lý nhận xét chuyến xe.', adminOnly: false },
 ];
+// ADMIN và NHA_XE dùng khu vực quản lý; mỗi API bên trong vẫn có quyền/phạm vi riêng.
 export function canManage(role?: Profile['loaiTaiKhoan']) { return role === 'ADMIN' || role === 'NHA_XE'; }
+// Ẩn các mục chỉ ADMIN đối với NHA_XE; backend vẫn từ chối nếu người dùng tự gọi API ngoài menu.
 export function navigationFor(role: Profile['loaiTaiKhoan']) {
   return canManage(role) ? managementItems.filter(item => role === 'ADMIN' || !item.adminOnly) : [];
 }

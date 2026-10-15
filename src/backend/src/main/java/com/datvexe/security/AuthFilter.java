@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
 
+// CỬA VÀO API: xác thực phiên, kiểm tra role/CSRF rồi mới chuyển request đến Servlet.
 @WebFilter(urlPatterns = "/api/*")
 public class AuthFilter implements Filter {
     public static final String COOKIE = "datvexe_session";
@@ -19,11 +20,13 @@ public class AuthFilter implements Filter {
     private final ObjectMapper json = new ObjectMapper();
     private AccountService accounts;
     @Override public void init(FilterConfig config) { accounts = new AccountService(Jpa.factory()); }
+    // Đọc token do browser gửi trong cookie datvexe_session; không lấy role từ dữ liệu client tự khai.
     public static String token(HttpServletRequest request) {
         if (request.getCookies() != null) for (Cookie c : request.getCookies()) if (COOKIE.equals(c.getName())) return c.getValue();
         return null;
     }
     public static boolean secureCookies() { return Boolean.parseBoolean(System.getenv().getOrDefault("AUTH_COOKIE_SECURE", "false")); }
+    // HttpOnly ngăn JS đọc cookie; Max-Age=0 dùng khi logout. Secure phụ thuộc cấu hình môi trường.
     public static void cookie(HttpServletResponse response, String token, long seconds) {
         response.addHeader("Set-Cookie", COOKIE + "=" + token + "; Path=/api; HttpOnly; SameSite=Lax; Max-Age=" + seconds
             + (secureCookies() ? "; Secure" : ""));
@@ -45,23 +48,29 @@ public class AuthFilter implements Filter {
         try {
             if (path.contains("%") || path.contains(";") || path.contains("//")) throw AccountException.invalid("path", "Đường dẫn không hợp lệ.");
             if (req.getMethod().equals("OPTIONS")) { if (origin != null && !allowedOrigin.equals(origin)) throw AccessControl.denied(); res.setStatus(204); return; }
+            // GET/HEAD không yêu cầu CSRF ở bước dưới; request thay đổi dữ liệu còn được kiểm tra Origin nếu có.
             boolean safe = Set.of("GET", "HEAD").contains(req.getMethod());
             if (!safe && origin != null && !allowedOrigin.equals(origin)) throw AccessControl.denied();
+            // LOGIN/REGISTER được publicEndpoint cho phép khi chưa có phiên; public vẫn chịu kiểm tra request.
             boolean publicApi = AccessPolicy.publicEndpoint(req.getMethod(), path);
             AccountService.Identity identity = null;
             if (!publicApi) {
+                // API bảo vệ: gọi AccountService.authenticate() để đối chiếu cookie với phiên và user trong DB.
                 try { identity = accounts.authenticate(token(req)); }
                 catch (AccountException e) { cookie(res, "", 0); throw e; }
+                // Chuyển danh tính đã xác minh cho Controller; tiếp theo kiểm tra role và CSRF với thao tác thay đổi dữ liệu.
                 req.setAttribute(IDENTITY, identity);
                 AccessPolicy.role(identity.user(), path, req.getMethod());
                 if (!safe && !csrf(identity.csrfToken(), req.getHeader("X-CSRF-Token")))
                     throw new AccountException(403, "FORBIDDEN", "Yêu cầu không hợp lệ. Vui lòng tải lại trang.");
+            // Public POST như login chưa có CSRF phiên; yêu cầu header ứng dụng X-Requested-With đúng giá trị.
             } else if (!safe && !"datvexe".equals(req.getHeader("X-Requested-With"))) {
                 throw AccessControl.denied();
             }
             JsonNode body = null;
             HttpServletRequest actual = req;
             if (!safe) {
+                // Đọc tối đa 64 KiB + 1 byte để phát hiện body quá lớn; chỉ nhận JSON khi body không rỗng.
                 byte[] bytes = req.getInputStream().readNBytes(65_537);
                 if (bytes.length > 65_536) throw new AccountException(413, "REQUEST_TOO_LARGE", "Nội dung yêu cầu quá lớn.");
                 if (bytes.length > 0) {
@@ -71,17 +80,21 @@ public class AuthFilter implements Filter {
                     actual = new CachedRequest(req, bytes);
                 }
             }
+            // Đặt context theo request cho kiểm tra tài nguyên trong service; không phải lưu phiên dài hạn.
             RequestIdentity.set(new RequestIdentity.Context(identity == null ? null : identity.user(), req.getMethod(), path, body));
+            // Cho request đi tiếp đến Controller; lỗi nghiệp vụ ném ra được bắt và chuyển sang JSON ở đây.
             chain.doFilter(actual, res);
         } catch (DomainException e) { ApiErrors.write(res, e); }
         catch (RuntimeException e) {
             req.getServletContext().log("API failure trace=" + res.getHeader("X-Trace-Id"), e);
             ApiErrors.write(res, new AccountException(500, "INTERNAL_ERROR", "Không thể xử lý yêu cầu lúc này."));
+        // Luôn xóa ThreadLocal: Tomcat có thể tái sử dụng cùng thread để xử lý một người dùng khác.
         } finally { RequestIdentity.clear(); }
     }
     private static boolean csrf(String expected, String supplied) {
         return supplied != null && MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), supplied.getBytes(StandardCharsets.UTF_8));
     }
+    // Filter đã đọc body; wrapper cung cấp stream mới để Controller/Jackson vẫn đọc lại được JSON.
     private static final class CachedRequest extends HttpServletRequestWrapper {
         private final byte[] bytes;
         CachedRequest(HttpServletRequest request, byte[] bytes) { super(request); this.bytes = bytes; }

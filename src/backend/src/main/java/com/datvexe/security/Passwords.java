@@ -11,16 +11,19 @@ public final class Passwords {
     private static final int ITERATIONS = 600_000;
     private static final SecureRandom RANDOM = new SecureRandom();
     private Passwords() {}
+    // Kiểm tra mật khẩu mới khi đăng ký/đổi mật khẩu: 10–128 ký tự, có chữ và số; backend kiểm tra lại dù UI có validation.
     public static void validate(String value, String field) {
         if (value == null || value.length() < 10 || value.length() > 128
                 || value.codePoints().noneMatch(Character::isLetter) || value.codePoints().noneMatch(Character::isDigit))
             throw AccountException.invalid(field, "Mật khẩu cần 10–128 ký tự, có chữ và số.");
     }
+    // Sinh salt riêng rồi lưu thuật toán + số vòng + salt + hash; không lưu mật khẩu thô, không thể giải mã hash.
     public static String hash(String password) {
         byte[] salt = new byte[16]; RANDOM.nextBytes(salt);
         return "pbkdf2-sha256$" + ITERATIONS + "$" + Base64.getEncoder().encodeToString(salt)
             + "$" + Base64.getEncoder().encodeToString(derive(password, salt, ITERATIONS));
     }
+    // LOGIN gọi hàm này: đọc tham số hash cũ, tính lại từ mật khẩu nhập và so sánh; không tạo salt mới khi kiểm tra.
     public static boolean matches(String password, String encoded) {
         if (password == null || password.length() > 128 || encoded == null) return false;
         try {
@@ -30,9 +33,11 @@ public final class Passwords {
             if (iterations < ITERATIONS || iterations > 1_200_000) return false;
             byte[] salt = Base64.getDecoder().decode(p[2]), expected = Base64.getDecoder().decode(p[3]);
             if (salt.length != 16 || expected.length != 32) return false;
+            // So kết quả hash bằng hàm so sánh dành cho dữ liệu nhạy cảm.
             return MessageDigest.isEqual(expected, derive(password, salt, iterations));
         } catch (IllegalArgumentException e) { return false; }
     }
+    // PBKDF2-HMAC-SHA256 tạo khóa 256 bit; nhiều vòng làm việc dò mật khẩu tốn công hơn hash nhanh thông thường.
     private static byte[] derive(String password, byte[] salt, int iterations) {
         PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, 256);
         try { return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded(); }

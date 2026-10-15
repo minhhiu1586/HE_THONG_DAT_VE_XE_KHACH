@@ -10,6 +10,7 @@ import java.util.Set;
 /** Endpoint roles plus resource guards. Unknown endpoints do not become public by default. */
 public final class AccessPolicy {
     private AccessPolicy() {}
+    // Filter hỏi quyền công khai theo CẢ method và path: GET công khai không làm POST cùng tài nguyên thành công khai.
     public static boolean publicEndpoint(String method, String path) {
         if (method.equals("POST")) return Set.of("/api/auth/dang-ky", "/api/auth/dang-nhap").contains(path);
         return method.equals("GET") && (Set.of("/api/danh-gia/cong-khai", "/api/health", "/api/tinh-thanh", "/api/ben-xe", "/api/tuyen-xe/cong-khai", "/api/chuyen-xe", "/api/phuong-thuc-thanh-toan", "/api/khuyen-mai", "/api/thanh-toan/return/vnpay", "/api/thanh-toan/callback/vnpay").contains(path)
@@ -17,6 +18,8 @@ public final class AccessPolicy {
             || path.matches("/api/chuyen-xe/[^/]+(?:/(?:ghe|gia|trang-thai))?"));
     }
     public static void role(CurrentUser user, String path) { role(user, path, "POST"); }
+    // PHÂN QUYỀN ENDPOINT: sau xác thực, kiểm tra role được gọi nhóm chức năng nào.
+    // Ví dụ booking chỉ KHACH_HANG; API quản trị tài khoản chỉ ADMIN.
     public static void role(CurrentUser user, String path, String method) {
         if(path.equals("/api/kiem-ve/chuyen-xe") && method.equals("GET")) {
             if(user.loaiTaiKhoan()!=LoaiTaiKhoan.NHAN_VIEN) throw AccessControl.denied();
@@ -88,6 +91,7 @@ public final class AccessPolicy {
             if (user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN && user.loaiTaiKhoan() != LoaiTaiKhoan.NHA_XE) throw AccessControl.denied();
             return;
         }
+        // ĐIỂM DEMO: khách hàng gọi GET /api/quan-tri/tai-khoan bị 403 tại đây dù bỏ qua menu frontend.
         if (path.startsWith("/api/quan-tri/") || path.startsWith("/api/loai-xe")
                 || path.startsWith("/api/tinh-thanh") || path.startsWith("/api/ben-xe")) {
             if (user.loaiTaiKhoan() != LoaiTaiKhoan.ADMIN) throw AccessControl.denied();
@@ -99,6 +103,8 @@ public final class AccessPolicy {
         }
     }
     /** Called inside the business service transaction, before reading or writing private data. */
+    // PHÂN QUYỀN DỮ LIỆU: các service gọi guard trong transaction để kiểm tra lại danh tính và tài nguyên.
+    // Riêng AccountService dùng AccessControl trực tiếp trong từng nghiệp vụ tài khoản.
     public static void guard(EntityManager em) {
         var context = RequestIdentity.get();
         if (context == null || publicEndpoint(context.method(), context.path())) return; // internal trusted calls/tests

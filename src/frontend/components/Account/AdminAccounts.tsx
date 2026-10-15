@@ -16,12 +16,15 @@ export default function AdminAccounts() {
   const [page, setPage] = useState(1), [data, setData] = useState<Page>({ items: [], totalPages: 0 });
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState('');
   const sending = useRef(false);
+  // Gọi API quản trị qua request của AuthProvider: cookie do browser gửi, CSRF do wrapper cung cấp.
   const load = useCallback(async () => {
     setBusy(true);
     try { setData(await request<Page>(`/quan-tri/tai-khoan?page=${page}&size=20`)); setError(''); }
     catch (error) { setError(errorMessage(error)); }
     finally { setBusy(false); }
   }, [page, request]);
+  // Kiểm tra giao diện: chưa có user thì về login, không phải ADMIN thì không tải danh sách.
+  // Quyền thực sự còn được AuthFilter/AccessPolicy và AccountService.accounts kiểm tra ở backend.
   useEffect(() => {
     if (!loading && !user) router.replace('/dang-nhap?next=/quan-tri/tai-khoan');
     if (user?.loaiTaiKhoan !== 'ADMIN') return;
@@ -31,6 +34,7 @@ export default function AdminAccounts() {
     }).catch(error => { if (active) setError(errorMessage(error)); });
     return () => { active = false; };
   }, [loading, user, router, page, request]);
+  // Khóa/mở khóa tài khoản: PUT trạng thái → backend cập nhật và thu hồi phiên → tải lại danh sách.
   async function toggle(account: Profile) {
     if (sending.current) return; sending.current = true; setBusy(true); setError(''); setSuccess('');
     try {
@@ -40,6 +44,7 @@ export default function AdminAccounts() {
     } catch (error) { setError(errorMessage(error)); }
     finally { sending.current = false; setBusy(false); }
   }
+  // Đợi kiểm tra phiên rồi mới render; thông báo không có quyền ở đây là lớp giao diện.
   if (loading || !user) return <div className={styles.page}>Đang kiểm tra quyền…</div>;
   if (user.loaiTaiKhoan !== 'ADMIN') return <div className={styles.page}><p className={styles.error} role="alert">Bạn không có quyền quản lý tài khoản.</p></div>;
   return <div className={styles.admin}><header className={styles.adminHeading}><p className={styles.eyebrow}>QUẢN TRỊ HỆ THỐNG</p><h1>Quản lý tài khoản</h1><p>Kiểm tra trạng thái và quyền truy cập của người dùng.</p></header><section className={styles.card}><div className={styles.sectionTitle}><h2>Danh sách tài khoản</h2><Link href="/quan-tri/nha-xe">Quản lý nhà xe →</Link></div>

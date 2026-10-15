@@ -214,6 +214,7 @@ public final class Entities {
         public GiuCho() {}
     }
 
+    // TÀI KHOẢN: JPQL dùng tên NguoiDung; @Table ánh xạ bảng nguoi_dung và các unique constraint định danh.
     @Entity(name = "NguoiDung") @Table(name = "nguoi_dung", uniqueConstraints = {
         @UniqueConstraint(name = "uq_nguoi_dung_email", columnNames = "email"),
         @UniqueConstraint(name = "uq_nguoi_dung_dien_thoai", columnNames = "so_dien_thoai"),
@@ -226,9 +227,11 @@ public final class Entities {
         @Column(name = "ngay_sinh") public LocalDate ngaySinh;
         @Column(name = "so_dien_thoai", nullable = false, length = 30) public String soDienThoai;
         @Column(name = "email", nullable = false, length = 254) public String email;
+        // Giá trị là encoded hash PBKDF2, không phải mật khẩu thô; Profile DTO không chứa trường này.
         @Column(name = "mat_khau", nullable = false, length = 255) public String matKhau;
         @Column(name = "cccd", length = 20) public String cccd;
         @Enumerated(EnumType.STRING) @Column(name = "loai_tai_khoan", nullable = false, length = 30)
+        // Vai trò quyết định quyền; khác với trạng thái HOAT_DONG/KHOA quyết định tài khoản còn được sử dụng hay không.
         public LoaiTaiKhoan loaiTaiKhoan = LoaiTaiKhoan.KHACH_HANG;
         @Enumerated(EnumType.STRING) @Column(name = "trang_thai", nullable = false, length = 30)
         public TrangThaiTaiKhoan trangThai = TrangThaiTaiKhoan.CHO_XAC_THUC;

@@ -13,8 +13,11 @@ import java.time.*;
 import java.util.*;
 import java.util.function.Function;
 
+// TẦNG NGHIỆP VỤ: đăng nhập, vòng đời phiên, hồ sơ và quản trị tài khoản.
+// Controller lo HTTP; service quyết định điều kiện hợp lệ và thao tác DB bằng JPA.
 public final class AccountService {
     private static final SecureRandom RANDOM = new SecureRandom();
+    // Tài khoản không tồn tại vẫn so khớp hash giả để giảm khác biệt xử lý quá rõ giữa các trường hợp.
     private static final String DUMMY_HASH = Passwords.hash("DummyPasswordForTiming123");
     private final EntityManagerFactory factory;
     private final Clock clock;
@@ -24,15 +27,18 @@ public final class AccountService {
         if (lifetime.isNegative() || lifetime.isZero()) throw new IllegalArgumentException("Session lifetime must be positive");
         this.factory = factory; this.clock = clock; this.lifetime = lifetime;
     }
+    // DTO đầu ra chỉ chọn thông tin hồ sơ; không serialize entity chứa hash mật khẩu ra frontend.
     public record Profile(String maNguoiDung, String hoTen, String email, String soDienThoai,
                           GioiTinh gioiTinh, LocalDate ngaySinh, String cccd,
                           LoaiTaiKhoan loaiTaiKhoan, TrangThaiTaiKhoan trangThai) {}
+    // Login là kết quả nội bộ có raw token để Controller đặt cookie; không trả nguyên record này thành JSON.
     public record Login(String token, String csrfToken, Instant hetHan, Profile nguoiDung) {}
     public record Identity(CurrentUser user, String csrfToken, Instant hetHan) {}
     private static Profile view(NguoiDung n) {
         return new Profile(n.maNguoiDung, n.hoTen, n.email, n.soDienThoai, n.gioiTinh,
             n.ngaySinh, n.cccd, n.loaiTaiKhoan, n.trangThai);
     }
+    // Mỗi nghiệp vụ mở EM/transaction riêng: thành công commit, RuntimeException rollback, cuối cùng đóng EM.
     private <T> T tx(Function<EntityManager, T> action) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction tx = em.getTransaction(); tx.begin();
@@ -86,6 +92,7 @@ public final class AccountService {
             if (c instanceof org.hibernate.exception.ConstraintViolationException) return true;
         return false;
     }
+    // ĐĂNG KÝ: kiểm tra dữ liệu, hash mật khẩu, ngăn trùng định danh; service tự cấp KHACH_HANG/HOAT_DONG.
     public Profile register(AccountInputs.DangKy input) {
         String fullName = name(input.hoTen()), address = email(input.email()), number = phone(input.soDienThoai()), identity = cccd(input.cccd());
         birth(input.ngaySinh()); Passwords.validate(input.matKhau(), "matKhau");
@@ -102,33 +109,42 @@ public final class AccountService {
             });
         } catch (PersistenceException e) { if (constraint(e)) throw duplicate(); throw e; }
     }
+    // LOGIN ← AccountController: chuẩn hóa email → tìm user → so mật khẩu/trạng thái → lưu phiên → trả Login.
     public Login login(AccountInputs.DangNhap input) {
         String address;
         try { address = email(input.email()); }
         catch (AccountException e) { address = "invalid@invalid.test"; }
         final String normalized = address;
         return tx(em -> {
+            // BƯỚC 1: repository tìm bằng JPQL; nếu có user thì lock và refresh trước khi quyết định đăng nhập.
             NguoiDung n = new NguoiDungRepository(em).byEmail(normalized);
             if (n != null) n = new NguoiDungRepository(em).lock(n.maNguoiDung);
+            // BƯỚC 2: PBKDF2 so mật khẩu nhập với hash đã lưu (hoặc hash giả nếu không tìm thấy user).
             boolean valid = Passwords.matches(input.matKhau(), n == null ? DUMMY_HASH : n.matKhau);
+            // BƯỚC 3: sai mật khẩu, không tồn tại hoặc bị khóa đều bị từ chối chung 401.
             if (!valid || n == null || n.trangThai != TrangThaiTaiKhoan.HOAT_DONG)
                 throw new AccountException(401, "UNAUTHENTICATED", "Email hoặc mật khẩu không đúng, hoặc tài khoản không thể đăng nhập.");
+            // BƯỚC 4: dọn phiên hết hạn rồi tạo phiên mới; DB chỉ lưu hash token, CSRF và thời gian.
             em.createQuery("delete from AuthSession s where s.hetHan <= :now").setParameter("now", clock.instant()).executeUpdate();
             String token = randomToken(); AuthSession session = new AuthSession();
             session.tokenHash = tokenHash(token); session.nguoiDung = n; session.csrfToken = randomToken();
             session.taoLuc = clock.instant(); session.hetHan = session.taoLuc.plus(lifetime);
+            // persist đăng ký entity với JPA; tx() commit trước khi kết quả quay về Controller đặt cookie.
             em.persist(session); return new Login(token, session.csrfToken, session.hetHan, view(n));
         });
     }
+    // XÁC THỰC CÁC REQUEST SAU LOGIN: Filter gọi bằng token cookie, không cần gửi lại email/mật khẩu.
     public Identity authenticate(String token) {
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) throw unauthenticated();
         return tx(em -> {
+            // Hash token để tra phiên; từ chối nếu không tồn tại/hết hạn rồi kiểm tra tài khoản còn hoạt động.
             AuthSession s = em.find(AuthSession.class, tokenHash(token));
             if (s == null || !clock.instant().isBefore(s.hetHan)) throw unauthenticated();
             NguoiDung n = active(em, s.nguoiDung.maNguoiDung);
             // Re-read after locking the account: logout/change-password may have revoked it meanwhile.
             try { em.refresh(s); } catch (EntityNotFoundException e) { throw unauthenticated(); }
             if (!clock.instant().isBefore(s.hetHan)) throw unauthenticated();
+            // Role/nhà xe/nhân viên lấy từ DB hiện tại; không tin role do frontend tự gửi. /me không gia hạn phiên ở đây.
             return new Identity(new CurrentUser(n.maNguoiDung, n.loaiTaiKhoan, n.nhaXe == null ? null : n.nhaXe.maNhaXe, n.nhanVien == null ? null : n.nhanVien.maNhanVien, s.tokenHash), s.csrfToken, s.hetHan);
         });
     }
@@ -145,6 +161,7 @@ public final class AccountService {
             });
         } catch (PersistenceException e) { if (constraint(e)) throw duplicate(); throw e; }
     }
+    // LOGOUT: xóa đúng phiên hiện tại và đúng user; các phiên khác của user không bị xóa bởi thao tác này.
     public void logout(String token, CurrentUser user) {
         tx(em -> {
             AccessControl.authenticated(em, user, clock.instant());
@@ -152,6 +169,7 @@ public final class AccountService {
                 .setParameter("token", tokenHash(token)).setParameter("id", user.maNguoiDung()).executeUpdate(); return null;
         });
     }
+    // ĐỔI MẬT KHẨU: xác minh mật khẩu hiện tại, hash mật khẩu mới và thu hồi tất cả phiên của user.
     public void changePassword(CurrentUser user, AccountInputs.DoiMatKhau input) {
         Passwords.validate(input.matKhauMoi(), "matKhauMoi");
         tx(em -> {
@@ -163,6 +181,7 @@ public final class AccountService {
             n.matKhau = Passwords.hash(input.matKhauMoi()); revoke(em, n); return null;
         });
     }
+    // DANH SÁCH QUẢN TRỊ: kiểm tra phiên và role ADMIN trong transaction trước khi đếm/lấy dữ liệu phân trang.
     public Map<String, Object> accounts(CurrentUser user, int page, int size) {
         if (page < 1 || size < 1 || size > 100) throw AccountException.invalid("page", "Phân trang không hợp lệ.");
         return tx(em -> {
@@ -175,6 +194,7 @@ public final class AccountService {
             return Map.of("items", items, "page", page, "size", size, "totalItems", count, "totalPages", (count + size - 1) / size);
         });
     }
+    // KHÓA/MỞ KHÓA: chỉ ADMIN, không tự đổi trạng thái tài khoản mình; thu hồi phiên của tài khoản mục tiêu.
     public Profile status(CurrentUser user, String id, AccountInputs.TrangThai input) {
         if (input.trangThai() != TrangThaiTaiKhoan.KHOA && input.trangThai() != TrangThaiTaiKhoan.HOAT_DONG)
             throw AccountException.invalid("trangThai", "Chỉ cho phép khóa hoặc mở khóa tài khoản.");
@@ -187,10 +207,13 @@ public final class AccountService {
             return view(n);
         });
     }
+    // Thu hồi mọi phiên của một user: dùng khi đổi mật khẩu hoặc đổi trạng thái tài khoản.
     private static void revoke(EntityManager em, NguoiDung n) {
         em.createQuery("delete from AuthSession s where s.nguoiDung = :user").setParameter("user", n).executeUpdate();
     }
+    // Sinh 32 byte ngẫu nhiên → Base64 URL không padding, 43 ký tự; đây không phải JWT.
     private static String randomToken() { byte[] bytes = new byte[32]; RANDOM.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
+    // SHA-256 dùng cho token ngẫu nhiên để đối chiếu phiên; mật khẩu người dùng dùng PBKDF2 riêng.
     public static String tokenHash(String token) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); }

@@ -11,6 +11,8 @@ import java.util.Arrays;
 public final class AccessControl {
     private AccessControl() {}
     public static AccountException denied() { return new AccountException(403, "FORBIDDEN", "Bạn không có quyền thực hiện thao tác này."); }
+    // KIỂM TRA TRONG TRANSACTION: đọc lại/lock user và phiên; phải hoạt động, còn hạn và thuộc đúng user.
+    // Bổ sung cho kiểm tra Filter để không chỉ dựa vào danh tính được chụp trước đó.
     public static NguoiDung authenticated(EntityManager em, CurrentUser identity, Instant now) {
         if (identity == null) throw new AccountException(401, "UNAUTHENTICATED", "Vui lòng đăng nhập.");
         NguoiDung n = em.find(NguoiDung.class, identity.maNguoiDung(), LockModeType.PESSIMISTIC_WRITE);
@@ -22,12 +24,14 @@ public final class AccessControl {
             throw new AccountException(401, "UNAUTHENTICATED", "Phiên đăng nhập không còn hiệu lực. Vui lòng đăng nhập lại.");
         return n;
     }
+    // Kiểm tra vai trò của entity vừa đọc từ DB; không nằm trong danh sách allowed thì ném 403.
     public static void role(NguoiDung n, LoaiTaiKhoan... allowed) {
         if (Arrays.stream(allowed).noneMatch(r -> r == n.loaiTaiKhoan)) throw denied();
     }
     public static void profileOwner(NguoiDung caller, String target) {
         if (!caller.maNguoiDung.equals(target)) throw denied();
     }
+    // Giới hạn phạm vi nhà xe: NHA_XE chỉ thao tác dữ liệu nhà xe mình; ADMIN được qua kiểm tra chủ sở hữu này.
     public static void operator(NguoiDung caller, NhaXe owner) {
         role(caller, LoaiTaiKhoan.NHA_XE, LoaiTaiKhoan.ADMIN);
         if (caller.loaiTaiKhoan == LoaiTaiKhoan.ADMIN) return;
@@ -67,6 +71,7 @@ public final class AccessControl {
         if (operator != null && resource(em, NhaXe.class, operator.maNhaXe).trangThai != TrangThaiNhaXe.HOAT_DONG)
             throw new AccountException(409, "OPERATOR_SUSPENDED", "Nhà xe chưa hoạt động; không thể bán vé mới.");
     }
+    // Giới hạn theo chủ đơn: cùng role KHACH_HANG không có nghĩa được truy cập đơn của người khác.
     public static void orderOwner(EntityManager em, NguoiDung caller, String id) {
         role(caller, LoaiTaiKhoan.KHACH_HANG);
         DonDatVe order = resource(em, DonDatVe.class, id);

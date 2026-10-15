@@ -8,6 +8,7 @@ public final class AccountInputs {
     private AccountInputs() {}
     public record DangKy(String hoTen, String email, String soDienThoai, String matKhau,
                          GioiTinh gioiTinh, LocalDate ngaySinh, String cccd) {}
+    // Jackson đọc JSON login vào record này; chỉ nhận email/matKhau, không nhận vai trò do client tự cấp.
     public record DangNhap(String email, String matKhau) {}
     public record HoSo(String hoTen, String email, String soDienThoai, GioiTinh gioiTinh,
                        LocalDate ngaySinh, String cccd) {}

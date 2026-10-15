@@ -12,6 +12,7 @@ public final class Jpa {
         catch (ClassNotFoundException e) { throw new ExceptionInInitializerError(e); }
     }
 
+    // Factory dùng chung cho persistence unit datvexe; validate chỉ kiểm tra schema, không tự sửa database.
     private static final EntityManagerFactory FACTORY = Persistence.createEntityManagerFactory("datvexe", Map.of(
         "jakarta.persistence.jdbc.driver", System.getProperty("db.driver", "org.postgresql.Driver"),
         "jakarta.persistence.jdbc.url", System.getProperty("db.url", System.getenv().getOrDefault("DATABASE_URL", "jdbc:postgresql://localhost:5432/datvexe")),
@@ -20,6 +21,7 @@ public final class Jpa {
         "hibernate.hbm2ddl.auto", System.getProperty("db.ddl", "validate")
     ));
 
+    // AccountService lấy factory này rồi tự mở EM/transaction trong tx(); không chia sẻ một EM cho tất cả request.
     public static EntityManagerFactory factory() { return FACTORY; }
 
     public static <T> T read(Function<EntityManager, T> action) {

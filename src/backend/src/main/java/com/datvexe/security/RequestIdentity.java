@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 /** Scoped to one servlet request; always cleared in finally, including pooled-thread reuse. */
 public final class RequestIdentity {
     public record Context(CurrentUser user, String method, String path, JsonNode body) {}
+    // Context tạm theo thread xử lý request, không phải bảng phiên; Filter luôn remove trong finally vì Tomcat tái sử dụng thread.
     private static final ThreadLocal<Context> CURRENT = new ThreadLocal<>();
     private RequestIdentity() {}
     public static Context get() { return CURRENT.get(); }

@@ -11,6 +11,7 @@ import java.util.*;
 public final class ApiErrors {
     private static final ObjectMapper JSON = new ObjectMapper();
     private ApiErrors() {}
+    // Filter gọi khi bắt lỗi nghiệp vụ: chuyển status/code/message/details/traceId thành JSON cho accountRequest xử lý.
     public static void write(HttpServletResponse response, DomainException error) throws IOException {
         String code = error instanceof AccountException a ? a.code() : switch (error.status()) {
             case 400 -> "VALIDATION_ERROR"; case 401 -> "UNAUTHENTICATED"; case 403 -> "FORBIDDEN";
