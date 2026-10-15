@@ -1,4 +1,3 @@
-import { groupSearchOptions } from './search-locations';
 
 export interface CityRecord {
   maTinhThanh: string;
@@ -171,26 +170,17 @@ export async function holdSeats(request: HoldSeatRequest): Promise<HoldSeatRespo
 }
 
 export async function getSearchOptions(): Promise<SearchOption[]> {
-  const [cities, stations] = await Promise.all([
-    apiGet<CityRecord[]>('/tinh-thanh'),
-    apiGet<StationRecord[]>('/ben-xe?trangThai=HOAT_DONG'),
-  ]);
-  return groupSearchOptions(cities, stations);
+  const cities = await apiGet<CityRecord[]>('/tinh-thanh');
+  return cities.map(city => ({
+    value: `CITY:${city.maTinhThanh}`,
+    label: city.tenTinhThanh,
+    kind: 'CITY' as const,
+  })).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
 }
 
 export async function searchTrips(from: string, to: string, date: string): Promise<SearchTrip[]> {
-  const options = await getSearchOptions();
-  const aliasesFor = (value: string) => options.find(option => option.value === value || option.aliases?.includes(value))?.aliases ?? [value];
-  const requests = aliasesFor(from).flatMap(origin => aliasesFor(to).map(destination => ({ origin, destination })));
-  const trips = new Map<string, SearchTrip>();
-  for (let offset = 0; offset < requests.length; offset += 4) {
-    const results = await Promise.all(requests.slice(offset, offset + 4).map(({ origin, destination }) => {
-      const query = new URLSearchParams({ from: origin, to: destination, date });
-      return apiGet<SearchTrip[]>(`/chuyen-xe?${query.toString()}`);
-    }));
-    for (const result of results) for (const trip of result) trips.set(trip.maChuyen, trip);
-  }
-  return [...trips.values()].sort((a, b) => a.gioKhoiHanh.localeCompare(b.gioKhoiHanh) || a.maChuyen.localeCompare(b.maChuyen));
+  const query = new URLSearchParams({ from, to, date });
+  return apiGet<SearchTrip[]>(`/chuyen-xe?${query.toString()}`);
 }
 
 export async function getTrip(tripId: string): Promise<SearchTrip> {
