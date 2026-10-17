@@ -3,7 +3,7 @@
   "info": {
     "title": "Booking and Order API (T16)",
     "version": "0.1.0-draft",
-    "description": "Module contract for session-owned seat holds and booking orders. Passenger drafts live only in the servlet HTTP session until T17 issuance; no ticket row is created for them. See booking-order.md for lifecycle, migration, and smoke instructions."
+    "description": "Module contract for session-owned seat holds and booking orders. Passenger drafts live only in the servlet HTTP session until T17 issuance; no ticket row is created for them. See giu-cho-va-don-dat-ve.md for lifecycle, migration, and smoke instructions."
   },
   "servers": [
     {

@@ -20,8 +20,8 @@ services:
       TRIP_CANCELLATION_REFUND_APPROVED: ${TRIP_CANCELLATION_REFUND_APPROVED:-false}
       VNP_RETURN_URL: ${VNP_RETURN_URL:-http://localhost:3000/thanh-toan/return}
     volumes:
-      - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
-      - ./src/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT/WEB-INF/lib/postgresql-42.7.5.jar:/usr/local/tomcat/lib/postgresql-42.7.5.jar:ro
+      - ./apps/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war:/usr/local/tomcat/webapps/ROOT.war:ro
+      - ./apps/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT/WEB-INF/lib/postgresql-42.7.5.jar:/usr/local/tomcat/lib/postgresql-42.7.5.jar:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,27 +43,28 @@ services:
       retries: 12
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docs/database/schema/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
-      - ./docs/database/schema/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
-      - ./docs/database/schema/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
-      - ./docs/database/schema/004_booking_order.sql:/docker-entrypoint-initdb.d/004_booking_order.sql:ro
-      - ./docs/database/schema/005_booking_session.sql:/docker-entrypoint-initdb.d/005_booking_session.sql:ro
-      - ./docs/database/schema/006_payment_vnpay.sql:/docker-entrypoint-initdb.d/006_payment_vnpay.sql:ro
-      - ./docs/database/schema/007_booking_email.sql:/docker-entrypoint-initdb.d/007_booking_email.sql:ro
-      - ./docs/database/schema/008_ticket_public_code.sql:/docker-entrypoint-initdb.d/008_ticket_public_code.sql:ro
-      - ./docs/database/schema/009_ticket_qr_email.sql:/docker-entrypoint-initdb.d/009_ticket_qr_email.sql:ro
-      - ./docs/database/schema/010_refund_policy.sql:/docker-entrypoint-initdb.d/010_refund_policy.sql:ro
-      - ./docs/database/schema/011_refund_tracking.sql:/docker-entrypoint-initdb.d/011_refund_tracking.sql:ro
-      - ./docs/database/schema/012_ticket_checkin.sql:/docker-entrypoint-initdb.d/012_ticket_checkin.sql:ro
-      - ./docs/database/schema/013_trip_lifecycle.sql:/docker-entrypoint-initdb.d/013_trip_lifecycle.sql:ro
-      - ./docs/database/schema/014_trip_reviews.sql:/docker-entrypoint-initdb.d/014_trip_reviews.sql:ro
-      - ./docs/database/schema/015_system_ticket_inspectors.sql:/docker-entrypoint-initdb.d/015_system_ticket_inspectors.sql:ro
-      - ./docs/database/seed/001_catalog.sql:/docker-entrypoint-initdb.d/017_catalog.sql:ro
-      - ./docs/database/seed/002_accounts_staff_fleet.sql:/docker-entrypoint-initdb.d/018_accounts_staff_fleet.sql:ro
-      - ./docs/database/seed/003_routes_trips.sql:/docker-entrypoint-initdb.d/019_routes_trips.sql:ro
-      - ./docs/database/schema/017_canonical_cities.sql:/docker-entrypoint-initdb.d/016a_canonical_cities.sql:ro
-      - ./docs/database/schema/016_global_inspector_identities.sql:/docker-entrypoint-initdb.d/016_global_inspector_identities.sql:ro
-      - ./docs/database/schema:/migrations/schema:ro
+      - ./database/migrations/001_route_trip.sql:/docker-entrypoint-initdb.d/001_route_trip.sql:ro
+      - ./database/migrations/002_vehicle_alignment.sql:/docker-entrypoint-initdb.d/002_vehicle_alignment.sql:ro
+      - ./database/migrations/003_account_auth.sql:/docker-entrypoint-initdb.d/003_account_auth.sql:ro
+      - ./database/migrations/004_booking_order.sql:/docker-entrypoint-initdb.d/004_booking_order.sql:ro
+      - ./database/migrations/005_booking_session.sql:/docker-entrypoint-initdb.d/005_booking_session.sql:ro
+      - ./database/migrations/006_payment_vnpay.sql:/docker-entrypoint-initdb.d/006_payment_vnpay.sql:ro
+      - ./database/migrations/007_booking_email.sql:/docker-entrypoint-initdb.d/007_booking_email.sql:ro
+      - ./database/migrations/008_ticket_public_code.sql:/docker-entrypoint-initdb.d/008_ticket_public_code.sql:ro
+      - ./database/migrations/009_ticket_qr_email.sql:/docker-entrypoint-initdb.d/009_ticket_qr_email.sql:ro
+      - ./database/migrations/010_refund_policy.sql:/docker-entrypoint-initdb.d/010_refund_policy.sql:ro
+      - ./database/migrations/011_refund_tracking.sql:/docker-entrypoint-initdb.d/011_refund_tracking.sql:ro
+      - ./database/migrations/012_ticket_checkin.sql:/docker-entrypoint-initdb.d/012_ticket_checkin.sql:ro
+      - ./database/migrations/013_trip_lifecycle.sql:/docker-entrypoint-initdb.d/013_trip_lifecycle.sql:ro
+      - ./database/migrations/014_trip_reviews.sql:/docker-entrypoint-initdb.d/014_trip_reviews.sql:ro
+      - ./database/migrations/015_system_ticket_inspectors.sql:/docker-entrypoint-initdb.d/015_system_ticket_inspectors.sql:ro
+      - ./database/seed/001_catalog.sql:/docker-entrypoint-initdb.d/017_catalog.sql:ro
+      - ./database/seed/002_accounts_staff_fleet.sql:/docker-entrypoint-initdb.d/018_accounts_staff_fleet.sql:ro
+      - ./database/seed/003_routes_trips.sql:/docker-entrypoint-initdb.d/019_routes_trips.sql:ro
+      - ./database/migrations/017_canonical_cities.sql:/docker-entrypoint-initdb.d/016a_canonical_cities.sql:ro
+      - ./database/migrations/018_remove_ticket_inspection.sql:/docker-entrypoint-initdb.d/016b_remove_ticket_inspection.sql:ro
+      - ./database/migrations/016_global_inspector_identities.sql:/docker-entrypoint-initdb.d/016_global_inspector_identities.sql:ro
+      - ./database/migrations:/migrations/schema:ro
       - ./scripts/record-init-migrations.sh:/docker-entrypoint-initdb.d/099_record_init_migrations.sh:ro
 
   migrate:
@@ -74,7 +75,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-datvexe_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datvexe_password}
     volumes:
-      - ./docs/database/schema:/migrations/schema:ro
+      - ./database/migrations:/migrations/schema:ro
       - ./scripts/apply-migrations.sh:/migrations/apply.sh:ro
     entrypoint: ["/bin/sh", "/migrations/apply.sh"]
     depends_on:

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: T07 — Tài khoản và xác thực
   version: 1.0.0
-  description: Đã triển khai; xem account-auth.md và hướng dẫn T07.1. Mutation cần
+  description: Đã triển khai; xem tai-khoan-va-xac-thuc.md và hướng dẫn T07.1. Mutation cần
     CSRF/header chỉ rõ trong endpoint.
 servers:
 - url: /
@@ -26,43 +26,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/Profile'
         '400':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '403':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '409':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '413':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '415':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '429':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
@@ -92,43 +92,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/Session'
         '400':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '401':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '403':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '413':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '415':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '429':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
@@ -154,37 +154,37 @@ paths:
         '204':
           description: Thành công
         '400':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '401':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '403':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '413':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '415':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
@@ -203,13 +203,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Session'
         '401':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
@@ -232,43 +232,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/Profile'
         '400':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '401':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '403':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '409':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '413':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '415':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
@@ -294,37 +294,37 @@ paths:
         '204':
           description: Thành công
         '400':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '401':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '403':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '413':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '415':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
@@ -362,25 +362,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/AccountPage'
         '400':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '401':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '403':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
@@ -409,49 +409,49 @@ paths:
               schema:
                 $ref: '#/components/schemas/Profile'
         '400':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '401':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '403':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '404':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '409':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '413':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '415':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:
                 $ref: ./openapi.yaml#/components/schemas/ErrorResponse
         '500':
-          description: Xem account-auth.md; lỗi thống nhất
+          description: Xem tai-khoan-va-xac-thuc.md; lỗi thống nhất
           content:
             application/json:
               schema:

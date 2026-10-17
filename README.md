@@ -1,410 +1,295 @@
-# 🚌 HỆ THỐNG ĐẶT VÉ XE KHÁCH TRỰC TUYẾN
+# Vexexin — Hệ thống đặt vé xe khách trực tuyến
 
-### Online Bus Ticket Booking & Management System
+Ứng dụng web hỗ trợ tìm kiếm chuyến xe, chọn ghế, đặt vé, thanh toán trực tuyến và quản lý hoạt động nhà xe.
 
-**Đồ án cuối kỳ môn Lập trình Web**
+## Mục lục
 
-**Trường Đại học Công nghệ Kỹ thuật TP. Hồ Chí Minh**
+- [Chức năng](#chuc-nang)
+- [Công nghệ](#cong-nghe)
+- [Kiến trúc và cấu trúc thư mục](#cau-truc-source)
+- [Cài đặt và chạy](#cai-dat)
+- [Cấu hình](#cau-hinh)
+- [Dữ liệu mẫu](#du-lieu)
+- [Kiểm thử](#kiem-thu)
+- [Khắc phục lỗi thường gặp](#xu-ly-loi)
+- [Tài liệu](#tai-lieu)
 
-[GitHub Repository](https://github.com/minhhiu1586/HE_THONG_DAT_VE_XE_KHACH)
+## Chức năng
 
----
+### Khách hàng
 
-## 📋 Mục Lục
+- Đăng ký, đăng nhập, đăng xuất, cập nhật hồ sơ và đổi mật khẩu.
+- Tìm chuyến theo điểm đi, điểm đến và ngày khởi hành.
+- Xem chi tiết chuyến, giá vé và sơ đồ ghế.
+- Chọn nhiều ghế, giữ chỗ trong 15 phút và nhập thông tin người đi.
+- Xem báo giá, áp dụng khuyến mãi và thanh toán qua VNPay.
+- Xem lịch sử đặt vé, vé điện tử có QR và nhận email xác nhận.
+- Yêu cầu hoàn vé, theo dõi trạng thái hoàn tiền và đánh giá chuyến đi khi đủ điều kiện.
 
-1. [Giới Thiệu](#-giới-thiệu)
-2. [Tính Năng](#-tính-năng)
-3. [Công Nghệ Sử Dụng](#-công-nghệ-sử-dụng)
-4. [Kiến Trúc Hệ Thống](#-kiến-trúc-hệ-thống)
-5. [Cài Đặt và Chạy Dự Án](#-cài-đặt-và-chạy-dự-án)
-6. [Cấu Hình](#-cấu-hình)
-7. [Database và API](#-database-và-api)
-8. [Deployment](#-deployment)
-9. [Screenshots](#-screenshots)
-10. [Contributing](#-contributing)
-11. [Team](#-team)
+### Quản lý nhà xe
 
----
+- Quản lý tuyến đường, bến xe và điểm dừng.
+- Quản lý loại xe, phương tiện và sơ đồ ghế.
+- Quản lý hồ sơ nhân viên, bằng lái, lịch làm việc và phân công chuyến.
+- Tạo chuyến nháp, kiểm tra điều kiện mở bán, bắt đầu, hoàn thành và hủy chuyến.
+- Quản lý dữ liệu và kiểm duyệt đánh giá trong phạm vi nhà xe.
 
-## 🎯 Giới Thiệu
+### Quản trị hệ thống
 
-**Hệ thống đặt vé xe khách trực tuyến** là ứng dụng web hỗ trợ khách hàng tìm kiếm chuyến xe, lựa chọn ghế, đặt vé, thanh toán và quản lý vé trực tuyến.
+- Quản lý tài khoản, trạng thái và quyền truy cập.
+- Quản lý nhà xe và liên kết tài khoản quản lý.
+- Quản lý các danh mục, dữ liệu vận tải theo chính sách truy cập.
 
-Bên cạnh đó, hệ thống cung cấp các chức năng quản lý nhà xe, phương tiện, tuyến đường, lịch trình, nhân viên, kiểm vé và báo cáo hoạt động.
+### Luồng đặt vé
 
-### Mục tiêu
+```text
+Tìm chuyến → Xem chi tiết → Chọn ghế → Giữ chỗ
+    → Nhập thông tin người đi → Chốt giá → Thanh toán
+    → Backend xác minh giao dịch → Phát hành vé và gửi email
+```
 
-- Số hóa quy trình tìm kiếm và đặt vé xe khách.
-- Hỗ trợ đặt nhiều vé và mua hộ hành khách.
-- Giữ ghế trong 15 phút, hạn chế tranh chấp và bán trùng ghế.
-- Tích hợp thanh toán trực tuyến và vé điện tử.
-- Hỗ trợ hoàn vé, kiểm vé và quản lý chuyến xe.
-- Cung cấp công cụ quản trị và thống kê cho nhà xe.
+Giá, thời hạn giữ ghế và trạng thái thanh toán được Backend xác định. Vé chỉ được phát hành sau khi xác minh thanh toán; trạng thái gửi email được xử lý riêng. Hoàn vé áp dụng theo điều kiện và chính sách của đơn/vé.
 
-> **Trạng thái dự án:** Đang phát triển. Một số API đặt vé, báo giá, thanh toán VNPay và yêu cầu hoàn tiền đã có trong mã nguồn Backend; việc tích hợp đầu cuối và môi trường triển khai cần được đánh giá theo kết quả kiểm thử. Một số màn hình Frontend vẫn dùng dữ liệu mẫu. Tài liệu mô tả cả API đã triển khai trong mã nguồn và phần còn đề xuất.
-
----
-
-## ✨ Tính Năng
-
-### 🔍 Khách vãng lai
-
-- Tìm kiếm chuyến theo điểm đi, điểm đến và ngày khởi hành.
-- Xem thông tin chuyến, nhà xe, giá vé và sơ đồ ghế.
-- Đăng ký và đăng nhập tài khoản.
-
-### 👤 Khách hàng
-
-- Tìm kiếm, lựa chọn và giữ ghế trong 15 phút.
-- Đặt nhiều vé trong cùng một đơn, hỗ trợ mua hộ.
-- Áp dụng mã khuyến mãi và thanh toán trực tuyến.
-- Xem lịch sử đặt vé và vé điện tử có mã QR.
-- Yêu cầu hoàn vé và theo dõi trạng thái hoàn.
-- Đánh giá chuyến xe khi đủ điều kiện.
-
-### 🏢 Người quản lý nhà xe
-
-- Quản lý xe, loại xe và sơ đồ ghế.
-- Quản lý tuyến đường, lịch trình và chuyến xe.
-- Quản lý nhân viên và phân công chuyến.
-- Mở bán, theo dõi và hủy chuyến theo quy định.
-- Xem danh sách hành khách và báo cáo hoạt động.
-
-### 🎫 Nhân viên nhà xe
-
-- Xem các chuyến được phân công.
-- Xem danh sách hành khách.
-- Kiểm tra vé bằng mã QR hoặc mã vé.
-- Xác nhận hành khách lên xe.
-
-### 🛡️ Quản trị viên
-
-- Quản lý tài khoản và phân quyền.
-- Quản lý nhà xe và danh mục hệ thống.
-- Quản lý khuyến mãi và phương thức thanh toán.
-- Theo dõi giao dịch, thống kê và báo cáo.
-- Kiểm duyệt đánh giá.
-
-### 🔐 Quy tắc nghiệp vụ chính
-
-- Ghế được giữ tối đa **15 phút**, do Backend xác định.
-- Một ghế trên một chuyến không được bán cho hai vé còn hiệu lực.
-- Một đơn có thể chứa nhiều vé cho cùng chuyến.
-- Người đi không bắt buộc phải có tài khoản.
-- Vé chỉ được phát hành sau khi thanh toán được Backend xác minh.
-- Hỗ trợ hoàn từng vé đủ điều kiện trong đơn nhiều vé.
-- Nhân viên chỉ được kiểm vé trong phạm vi được phân công.
-
----
-
-## 🛠️ Công Nghệ Sử Dụng
+## Công nghệ
 
 | Thành phần | Công nghệ |
 |---|---|
-| Backend | Java 21, Jakarta Servlet, Maven |
-| ORM | JPA, Hibernate |
-| Frontend | Next.js, React, TypeScript |
-| Database | PostgreSQL |
-| Application Server | Apache Tomcat |
-| Containerization | Docker, Docker Compose |
-| Version Control | Git, GitHub |
-| Project Management | Plane |
-| Modeling | PlantUML |
+| Frontend | Next.js 16, React 19, TypeScript, CSS Modules |
+| Backend | Java 21, Jakarta Servlet 6, Maven, Jackson |
+| ORM | JPA, Hibernate 6 |
+| Database | PostgreSQL 16 |
+| Máy chủ ứng dụng | Apache Tomcat 10.1 |
+| Thanh toán | VNPay sandbox |
+| Email | Brevo HTTP API |
+| Mã QR | ZXing |
+| Kiểm thử | JUnit 5, H2, PostgreSQL, script Python và kiểm thử trình duyệt |
+| Môi trường chạy | Docker, Docker Compose |
 
----
-
-## 🏗️ Kiến Trúc Hệ Thống
-
-Hệ thống được xây dựng theo kiến trúc **Frontend–Backend tách biệt**, với Backend tổ chức theo các tầng xử lý.
+## Kiến trúc và cấu trúc thư mục
 
 ```text
-┌─────────────────────────────────┐
-│           FRONTEND              │
-│     Next.js / React / TS        │
-└────────────────┬────────────────┘
-                 │ HTTP / REST API
-┌────────────────▼────────────────┐
-│           CONTROLLER            │
-│         Jakarta Servlet         │
-└────────────────┬────────────────┘
-                 │
-┌────────────────▼────────────────┐
-│             SERVICE             │
-│          Business Logic         │
-└────────────────┬────────────────┘
-                 │
-┌────────────────▼────────────────┐
-│           REPOSITORY            │
-│          JPA / Hibernate        │
-└────────────────┬────────────────┘
-                 │
-┌────────────────▼────────────────┐
-│            DATABASE             │
-│           PostgreSQL            │
-└─────────────────────────────────┘
+Trình duyệt → Next.js → /api/* → Filter
+    → Servlet Controller → Service → Repository → JPA → PostgreSQL
 ```
 
-### Project Structure
+Frontend gọi API qua Next.js; Backend quản lý xác thực, nghiệp vụ và truy cập dữ liệu. Backend được đóng gói thành một WAR; Frontend sử dụng một bộ dependency cài tại thư mục gốc.
 
 ```text
 HE_THONG_DAT_VE_XE_KHACH/
-│
-├── .github/                # CI và Pull Request
-├── docs/
-│   ├── requirements/       # Yêu cầu và Use Case
-│   ├── diagrams/           # Sơ đồ hệ thống
-│   ├── database/           # Schema và migration
-│   ├── api/                # API contracts
-│   ├── plans/              # Kế hoạch
-│   └── tasks/              # Tài liệu công việc
-│
-├── src/
-│   ├── backend/            # Java Servlet, JPA
-│   └── frontend/           # Next.js, React
-│
-├── tests/                  # Kiểm thử
-├── scripts/                # Công cụ migration
-├── docker-compose.yml
+├── apps/
+│   ├── frontend/          # Next.js routes, layout, public và cấu hình
+│   └── backend/           # Maven, resource và WAR tích hợp
+├── members/               # Source Frontend, Backend và Java test
+├── shared/                # Domain, JPA, bảo mật, UI và tiện ích dùng chung
+├── database/
+│   ├── migrations/        # Lịch sử thay đổi schema
+│   ├── seed/              # Dữ liệu mẫu
+│   ├── README.md
+│   └── tai-khoan-mau.md
+├── docs/                  # API, thiết kế và tài liệu kỹ thuật
+├── tests/                 # Kiểm thử tích hợp, giao diện và use case
+├── scripts/               # Migration và nạp dữ liệu
+├── .github/               # CI và mẫu Pull Request
 ├── .env.example
-├── CONTRIBUTING.md
+├── docker-compose.yml
+├── pom.xml
+├── package.json
+├── package-lock.json
+├── tsconfig.json
 └── README.md
 ```
 
----
+Maven gom source từ `members/` và `shared/` để build Backend. Next.js tham chiếu source qua alias TypeScript. Các lệnh cài đặt, build và chạy đều thực hiện tại root repository.
 
-## 🚀 Cài Đặt và Chạy Dự Án
+## Cài đặt và chạy
 
 ### Yêu cầu
 
-- Git
-- Java JDK 21
-- Apache Maven 3.9+
-- Node.js 22
-- Docker Desktop và Docker Compose v2
+- Git, JDK 21, Maven 3.9 trở lên.
+- Node.js 22 và npm.
+- Docker Desktop chạy Linux containers, Docker Compose v2.
+- Python 3 để nạp dữ liệu và chạy script kiểm thử.
 
-Các lệnh dưới đây dành cho **PowerShell trên Windows**.
+Các lệnh sau dùng **PowerShell**, thực hiện tại thư mục gốc dự án.
 
-### 1. Clone Repository
+### 1. Lấy source và tạo cấu hình
 
 ```powershell
 git clone https://github.com/minhhiu1586/HE_THONG_DAT_VE_XE_KHACH.git
-
 cd HE_THONG_DAT_VE_XE_KHACH
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-### 2. Cấu hình môi trường
+Điền cấu hình trong `.env`. Đặt mật khẩu PostgreSQL trước lần tạo database đầu tiên. Với volume có sẵn, thông tin đăng nhập phải khớp database đang dùng.
+
+### 2. Build và chạy Backend
 
 ```powershell
-Copy-Item .env.example .env
-```
-
-Cập nhật các giá trị cần thiết trong `.env`, đặc biệt là thông tin PostgreSQL.
-
-**Không commit file `.env` lên GitHub.**
-File `.env` ở thư mục gốc được Docker Compose đọc; nếu chạy Next.js riêng và cần đổi API URL, đặt `NEXT_PUBLIC_API_URL` trong môi trường frontend trước khi chạy `npm run dev`.
-
-### 3. Build Backend và chạy Database
-
-```powershell
-mvn -B -f src/backend/pom.xml clean verify
-
+mvn -B clean verify
 docker compose up -d postgres
-
 docker compose run --rm migrate
-
 docker compose up -d backend
 ```
 
-Kiểm tra Backend:
+WAR đầu ra: `apps/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war`.
+
+Chờ Tomcat deploy, sau đó kiểm tra Backend trả HTTP `200`:
 
 ```powershell
 curl.exe -i http://localhost:8080/api/health
 ```
 
-### 4. Chạy Frontend
+### 3. Nạp dữ liệu và mở bán chuyến mẫu
 
-Mở terminal mới từ thư mục gốc dự án:
+Khi Backend đã sẵn sàng và đang dùng cấu hình database mặc định:
 
 ```powershell
-cd src/frontend
+python scripts/load_project_data.py
+python tests/backend/project_data_check.py
+```
 
+Loader nạp migration/seed và mở bán chuyến qua API để kiểm tra điều kiện vận hành. Docker init chỉ tạo dữ liệu nền và chuyến nháp. Nếu đổi database/user, truyền tham số phù hợp theo `python scripts/load_project_data.py --help`.
+
+Nếu admin mẫu đã đổi mật khẩu, đặt biến môi trường `PROJECT_ADMIN_PASSWORD` trước khi chạy loader. Nạp lại seed giữ nguyên mật khẩu và các bản ghi hiện có.
+
+### 4. Chạy Frontend
+
+Mở terminal khác tại root:
+
+```powershell
 npm ci
-
 npm run dev
 ```
 
-### Địa chỉ truy cập
-
-| Dịch vụ | URL |
+| Dịch vụ | Địa chỉ mặc định |
 |---|---|
-| Frontend | http://localhost:3000 |
+| Trang chủ | http://localhost:3000/home |
+| Đăng nhập | http://localhost:3000/dang-nhap |
 | Backend API | http://localhost:8080/api |
-| Health Check | http://localhost:8080/api/health |
+| Health check | http://localhost:8080/api/health |
+| PostgreSQL | `localhost:5432` |
 
-### 5. Kiểm thử
+Frontend chạy riêng bằng npm; Compose chạy Backend và PostgreSQL.
 
-Từ thư mục gốc dự án:
-
-```powershell
-mvn -B -f src/backend/pom.xml verify
-
-python tests/use-cases/check_matrix.py
-```
-
-Kiểm tra Frontend:
+### Build Frontend và dừng dịch vụ
 
 ```powershell
-cd src/frontend
-
-npm run lint
-
 npm run build
+npm run start
 ```
 
-### 6. Dừng môi trường
+Dừng `npm run dev` trước khi chạy `start` trên cùng cổng. Dừng Backend và database bằng:
 
 ```powershell
 docker compose down
 ```
 
----
+Không dùng `down -v` nếu cần giữ dữ liệu PostgreSQL.
 
-## ⚙️ Cấu Hình
-
-Các biến môi trường được khai báo trong [`.env.example`](.env.example).
+## Cấu hình
 
 | Biến | Mục đích |
 |---|---|
-| `POSTGRES_DB` | Tên database |
-| `POSTGRES_USER` | Tài khoản PostgreSQL |
-| `POSTGRES_PASSWORD` | Mật khẩu PostgreSQL |
-| `POSTGRES_PORT` | Cổng PostgreSQL |
-| `DATABASE_URL` | JDBC URL khi chạy Backend ngoài Docker |
-| `FRONTEND_ORIGIN` | Origin được Backend chấp nhận |
-| `AUTH_COOKIE_SECURE` | Bật Secure Cookie khi sử dụng HTTPS |
-| `NEXT_PUBLIC_API_URL` | Địa chỉ API cho Frontend |
-| `BACKEND_URL` | Đích API rewrite của Next.js |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Database và thông tin đăng nhập |
+| `POSTGRES_PORT` | Cổng PostgreSQL trên máy host |
+| `DATABASE_URL` | JDBC URL khi chạy Backend ngoài Compose |
+| `FRONTEND_ORIGIN` | Origin Frontend được Backend chấp nhận |
+| `AUTH_COOKIE_SECURE` | Thuộc tính Secure của cookie khi dùng HTTPS |
+| `BACKEND_URL` | Đích rewrite API của Next.js, mặc định `http://127.0.0.1:8080` |
+| `NEXT_PUBLIC_API_URL` | Ghi đè URL cho các hàm booking có đọc biến này; để trống khi dùng `/api` cùng origin |
+| `VEHICLE_TURNAROUND_MINUTES` | Thời gian chuẩn bị xe giữa các chuyến |
+| `TRIP_BOOKING_CUTOFF_MINUTES` | Khoảng ngừng nhận đặt vé trước giờ khởi hành |
+| `VNP_TMN_CODE`, `VNP_HASH_SECRET`, `VNP_RETURN_URL` | Cấu hình merchant và URL trở về VNPay |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | API key và sender đã xác minh để gửi email |
+| `EMAIL_NOTIFICATIONS_ENABLED` | Bật/tắt gửi email |
+| `TRIP_CANCELLATION_REFUND_APPROVED` | Cờ chính sách hoàn khi nhà xe hủy chuyến |
 
-Hệ thống hiện sử dụng **Session Cookie** để quản lý phiên đăng nhập.
+Xem đầy đủ tại [`.env.example`](.env.example). Giữ khóa VNPay/Brevo ở Backend và không commit `.env`.
 
-**Thanh toán trực tuyến:** VNPay sandbox và cấu hình Backend được mô tả trong [payment-vnpay.md](docs/api/payment-vnpay.md). Kết quả hoàn tiền cần được tra cứu/đối soát; HTTP `202` chưa xác nhận tiền đã hoàn.
+Compose đọc `.env` ở root. Khi chạy Next.js riêng và cần đổi đích API, đặt biến trước khi chạy:
 
----
+```powershell
+$env:BACKEND_URL = "http://127.0.0.1:8080"
+npm run dev
+```
 
-## 🗄️ Database và API
+Sau khi đổi environment của Backend trong `.env`, áp dụng bằng `docker compose up -d --force-recreate backend`.
 
-### Database
+## Dữ liệu mẫu
 
-Hệ thống sử dụng PostgreSQL với các nhóm dữ liệu chính:
+Database có 18 migration theo phiên bản và ba file seed:
 
-- **Tài khoản:** Người dùng, nhà xe, nhân viên và phân công.
-- **Vận tải:** Tỉnh/thành, bến xe, tuyến, điểm dừng, xe, ghế và chuyến.
-- **Đặt vé:** Giữ chỗ, đơn đặt vé và vé xe.
-- **Thanh toán:** Giao dịch, phương thức thanh toán, khuyến mãi và chính sách hoàn.
-- **Đánh giá:** Đánh giá chuyến xe.
-
-**Tài liệu chi tiết:**
-
-- [Database Schema & Migration](docs/database/README.md)
-- [Diagrams](docs/diagrams/)
-
-### API Documentation
-
-Backend cung cấp các nhóm API:
-
-- Authentication & Authorization
-- Locations & Routes
-- Bus Operators & Vehicles
-- Trips & Seat Reservation
-- Booking & Tickets
-- Promotion & Payment
-- Refund & Check-in
-- Reviews & Reports
-
-**Tài liệu chi tiết:**
-
-- [API Documentation](docs/api/README.md)
-- [OpenAPI Specification](docs/api/openapi.yaml)
-- [Ticket refund API](docs/api/ticket-refund.md)
-- [Ticket refund OpenAPI subset](docs/api/ticket-refund-openapi.json)
-
-> Tài liệu API có thể bao gồm cả endpoint đang thiết kế. Cần đối chiếu với Servlet mapping để xác định các API đã triển khai.
-
----
-
-## 🌐 Deployment
-
-**Trạng thái:** [Chưa cập nhật môi trường triển khai chính thức.]
-
-Hiện dự án có cấu hình phát triển với Docker Compose cho PostgreSQL và Backend Tomcat; Frontend chạy bằng Next.js.
-
-Thông tin sẽ bổ sung sau:
-
-- **Frontend URL:** [Bổ sung sau]
-- **Backend API URL:** [Bổ sung sau]
-- **Hosting:** [Bổ sung sau]
-- **Hướng dẫn triển khai:** [Bổ sung sau]
-- **Backup & Restore:** [Bổ sung sau]
-
----
-
-## 📸 Screenshots
-
-**Trạng thái:** [Bổ sung ảnh khi các chức năng đã được triển khai và kiểm thử.]
-
-Dự kiến bổ sung:
-
-- Trang chủ và tìm kiếm chuyến.
-- Chi tiết chuyến và sơ đồ ghế.
-- Đặt vé và thanh toán.
-- Vé điện tử và mã QR.
-- Quản lý nhà xe.
-- Kiểm vé.
-- Dashboard và báo cáo.
-
----
-
-## 🤝 Contributing
-
-Dự án được phát triển theo nhóm, quản lý công việc bằng Plane và mã nguồn bằng GitHub.
-
-Quy trình chung:
-
-1. Nhận task trên Plane.
-2. Tạo branch từ nhánh phát triển.
-3. Triển khai và tự kiểm thử.
-4. Commit, push và tạo Pull Request.
-5. Reviewer kiểm tra trước khi merge.
-6. Cập nhật trạng thái công việc.
-
-Xem hướng dẫn chi tiết tại [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## 👥 Team
-
-### Development Team
-
-| Thành viên | Phạm vi phụ trách chính |
+| File seed | Dữ liệu |
 |---|---|
-| **Minh Hiếu** | Kiến trúc, Backend nền tảng, xác thực, phân quyền, tài khoản và nhà xe |
-| **Thanh Hiền** | Danh mục, tuyến xe, xe, ghế, lịch trình và vận hành |
-| **Thế Ân** | Giữ ghế, đặt vé, đơn nhiều vé và nghiệp vụ đặt chỗ |
-| **Gia Bảo** | API contract, khuyến mãi, thanh toán, giao dịch và báo cáo |
-| **Kim Cương** | Nhân viên, phân công, hoàn vé, kiểm vé và kiểm thử |
+| `001_catalog.sql` | Danh mục nhà xe, địa điểm, loại xe và phương thức thanh toán |
+| `002_accounts_staff_fleet.sql` | Tài khoản, nhân viên, phương tiện và ghế |
+| `003_routes_trips.sql` | Tuyến, điểm đón/trả, lịch chuyến và nhân sự chuyến |
 
----
+Hibernate dùng chế độ `validate`, không tự sửa schema. Khi có migration mới, chạy `docker compose run --rm migrate`; giữ nguyên migration đã áp dụng vì hệ thống kiểm tra checksum.
 
-### 📌 Thông tin dự án
+| Tài khoản demo | Email |
+|---|---|
+| Khách hàng | `khach1@datvexe.test` |
+| Quản trị | `admin1@datvexe.test` |
+| Quản lý nhà xe | `dieuhanh.futa@datvexe.test` |
+| Tài xế | `tx1.futa@datvexe.test` |
+| Phụ xe | `px1.futa@datvexe.test` |
 
-- **Tên dự án:** Hệ thống đặt vé xe khách trực tuyến
-- **Loại dự án:** Web Application
-- **Môn học:** Lập trình Web
-- **Đơn vị:** Trường Đại học Công nghệ Kỹ thuật TP. Hồ Chí Minh
-- **Số thành viên:** 5
-- **Repository:** [HE_THONG_DAT_VE_XE_KHACH](https://github.com/minhhiu1586/HE_THONG_DAT_VE_XE_KHACH)
-- **Giấy phép:** [Chưa được nhóm quyết định; bổ sung file `LICENSE` sau]
+Mật khẩu khởi tạo: `DatVeXe2026!`. Nếu tài khoản đã đổi mật khẩu, sử dụng mật khẩu mới.
 
----
+Chọn ngày có chuyến mẫu đang mở bán khi thử tìm chuyến. Lịch và giá seed phục vụ demo, không đại diện hoạt động vận tải thực tế.
 
-**🚌 Hệ thống đặt vé xe khách trực tuyến — Giải pháp quản lý và đặt vé hiện đại.**
+Chi tiết: [database](database/README.md), [danh sách tài khoản mẫu](database/tai-khoan-mau.md).
+
+## Kiểm thử
+
+Chạy tại root:
+
+```powershell
+mvn -B verify
+npm run typecheck
+npm run lint
+npm run build
+python tests/use-cases/check_matrix.py
+node tests/frontend/management_options_check.cjs
+node tests/frontend/trip_search_check.cjs
+```
+
+Java test nằm trong `members/*/backend/src/test/java`, fixture chung trong `shared/backend/src/test/java`. Báo cáo Maven sinh tại `apps/backend/target/surefire-reports/`.
+
+Các script HTTP cần Backend/database đang chạy; bài kiểm thử PostgreSQL và trình duyệt có điều kiện môi trường riêng. `check_matrix.py` kiểm tra tính nhất quán của ma trận, không thực thi toàn bộ test case nghiệp vụ.
+
+Hướng dẫn và kết quả: [kiểm thử Backend](tests/backend/README.md), [test case theo use case](tests/use-cases/README.md).
+
+## Khắc phục lỗi thường gặp
+
+| Hiện tượng | Cách kiểm tra |
+|---|---|
+| PowerShell chặn `npm.ps1` | Dùng `npm.cmd ci` và `npm.cmd run dev` |
+| Không nhận lệnh `next` | Chạy `npm ci` tại root repository |
+| Không tải địa điểm hoặc `ECONNREFUSED` | Kiểm tra Backend health, log Tomcat và `BACKEND_URL` |
+| Health trả 404 hoặc `Empty reply` | Chờ deploy; nếu lỗi tiếp tục, kiểm tra WAR và log khởi động ứng dụng |
+| Hibernate báo thiếu bảng/cột | Chạy migration còn thiếu rồi khởi động lại Backend |
+| Không tìm thấy chuyến | Kiểm tra loader đã mở bán, đúng ngày/chiều và chưa quá giờ nhận đặt vé |
+| API trả 401/403 | Kiểm tra phiên đăng nhập, vai trò, phạm vi dữ liệu và CSRF |
+| VNPay chưa được cấu hình | Cập nhật merchant sandbox và recreate Backend |
+| Không nhận email | Kiểm tra địa chỉ nhận, sender Brevo đã xác minh, cấu hình và trạng thái/log gửi |
+
+```powershell
+docker compose ps
+docker compose logs --tail=120 backend
+curl.exe -i http://localhost:8080/api/health
+```
+
+## Tài liệu
+
+- [Hợp đồng API và OpenAPI](docs/api/README.md).
+- [Tài khoản và xác thực](docs/api/tai-khoan-va-xac-thuc.md).
+- [Giữ chỗ và đơn đặt vé](docs/api/giu-cho-va-don-dat-ve.md).
+- [Thanh toán VNPay](docs/api/thanh-toan-vnpay.md).
+- [Email xác nhận](docs/api/email-xac-nhan-dat-ve.md).
+- [Hủy vé và hoàn tiền](docs/api/huy-ve-va-hoan-tien.md).
+- [Sơ đồ lớp](docs/diagrams/class-diagram/CLASS_DIAGRAM.drawio).
+- [Hướng dẫn đóng góp](CONTRIBUTING.md).
+
+Cấu hình hiện tại phục vụ phát triển và demo local. Thanh toán sandbox, email và các bài kiểm thử tích hợp cần môi trường phù hợp; chưa thay thế cấu hình triển khai production.

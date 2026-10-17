@@ -1,0 +1,299 @@
+{
+  "summary": {
+    "tests": 268,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 63,
+    "executed": 205
+  },
+  "suites": [
+    {
+      "class": "com.datvexe.email.BrevoClientTest",
+      "owner": "NguyenGiaBao",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.email.BrevoClientTest.xml"
+    },
+    {
+      "class": "com.datvexe.email.EmailDispatcherTest",
+      "owner": "NguyenGiaBao",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.email.EmailDispatcherTest.xml"
+    },
+    {
+      "class": "com.datvexe.email.ReceiptTemplateTest",
+      "owner": "NguyenGiaBao",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.email.ReceiptTemplateTest.xml"
+    },
+    {
+      "class": "com.datvexe.payment.VNPayClientTest",
+      "owner": "NguyenGiaBao",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.payment.VNPayClientTest.xml"
+    },
+    {
+      "class": "com.datvexe.payment.VNPayRefundClientTest",
+      "owner": "NguyenGiaBao",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.payment.VNPayRefundClientTest.xml"
+    },
+    {
+      "class": "com.datvexe.repository.GiuChoRepositoryTest",
+      "owner": "NguyenTheAn",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.repository.GiuChoRepositoryTest.xml"
+    },
+    {
+      "class": "com.datvexe.security.AccessControlTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.security.AccessControlTest.xml"
+    },
+    {
+      "class": "com.datvexe.security.HealthPolicyTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.security.HealthPolicyTest.xml"
+    },
+    {
+      "class": "com.datvexe.security.PaymentPolicyTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.security.PaymentPolicyTest.xml"
+    },
+    {
+      "class": "com.datvexe.security.PostgresAccessControlTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.security.PostgresAccessControlTest.xml"
+    },
+    {
+      "class": "com.datvexe.security.PostgresT06AccessControlTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.security.PostgresT06AccessControlTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.AccountServiceTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.AccountServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.AssignmentRulesTest",
+      "owner": "TranDangThiKimCuong",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.AssignmentRulesTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.BookingServiceExpiryTest",
+      "owner": "NguyenTheAn",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.BookingServiceExpiryTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.ChinhSachHoanVeServiceTest",
+      "owner": "NguyenGiaBao",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.ChinhSachHoanVeServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.EmployeeServiceTest",
+      "owner": "TranDangThiKimCuong",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.EmployeeServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.HoanVeServicePostgresTest",
+      "owner": "NguyenGiaBao",
+      "tests": 25,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 25,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.HoanVeServicePostgresTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.OperatorServiceTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.OperatorServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.OrderCodeTest",
+      "owner": "NguyenTheAn",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.OrderCodeTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.PostgresTask10Test",
+      "owner": "LeNguyenThanhHien",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.PostgresTask10Test.xml"
+    },
+    {
+      "class": "com.datvexe.service.PostgresTripTest",
+      "owner": "LeNguyenThanhHien",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.PostgresTripTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.PostgresVehicleTest",
+      "owner": "LeNguyenThanhHien",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.PostgresVehicleTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.PriceCalculatorTest",
+      "owner": "NguyenGiaBao",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.PriceCalculatorTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.ReviewServicePostgresTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 24,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 24,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.ReviewServicePostgresTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.ReviewServiceTest",
+      "owner": "NguyenMinhHieu",
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.ReviewServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.RouteTripServiceTest",
+      "owner": "LeNguyenThanhHien",
+      "tests": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.RouteTripServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.ThanhToanServiceTest",
+      "owner": "NguyenGiaBao",
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.ThanhToanServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.TicketCodeTest",
+      "owner": "NguyenGiaBao",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.TicketCodeTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.TripServiceTest",
+      "owner": "LeNguyenThanhHien",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.TripServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.VehicleServiceTest",
+      "owner": "LeNguyenThanhHien",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.VehicleServiceTest.xml"
+    },
+    {
+      "class": "com.datvexe.service.VehicleTask10Test",
+      "owner": "LeNguyenThanhHien",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.service.VehicleTask10Test.xml"
+    },
+    {
+      "class": "com.datvexe.ticket.TicketQrTest",
+      "owner": "NguyenGiaBao",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "apps/backend/target/surefire-reports/TEST-com.datvexe.ticket.TicketQrTest.xml"
+    }
+  ]
+}

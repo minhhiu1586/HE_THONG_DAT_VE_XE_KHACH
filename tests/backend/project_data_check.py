@@ -27,12 +27,13 @@ def main():
                                 input=statement, encoding='utf-8', text=True, capture_output=True, check=True)
         return result.stdout.strip()
 
-    expected = {'nha_xe': 5, 'nhan_vien': 37, 'nguoi_dung': 49, 'xe': 10, 'ghe': 320, 'tuyen_xe': 20, 'diem_dung': 40}
-    assert sql("SELECT count(*) FROM nhan_vien WHERE loai_nhan_vien='KIEM_VE'") == '2'
-    assert sql("SELECT count(*) FROM nhan_vien WHERE loai_nhan_vien='KIEM_VE' AND ma_nha_xe IS NULL") == '2'
+    expected = {'nha_xe': 5, 'nhan_vien': 35, 'nguoi_dung': 47, 'xe': 10, 'ghe': 320, 'tuyen_xe': 20, 'diem_dung': 40}
+    assert sql("SELECT count(*) FROM nguoi_dung u JOIN nhan_vien n USING(ma_nhan_vien) WHERE n.loai_nhan_vien='KIEM_VE' AND u.trang_thai<>'KHOA'") == '0'
     assert sql("SELECT count(*) FROM nhan_vien WHERE loai_nhan_vien='TAI_XE'") == '20'
     for table, count in expected.items():
-        actual = int(sql(f'SELECT count(*) FROM {table}'))
+        where = " WHERE loai_nhan_vien<>'KIEM_VE'" if table=='nhan_vien' else (
+            " WHERE NOT EXISTS (SELECT 1 FROM nhan_vien n WHERE n.ma_nhan_vien=nguoi_dung.ma_nhan_vien AND n.loai_nhan_vien='KIEM_VE')" if table=='nguoi_dung' else '')
+        actual = int(sql(f'SELECT count(*) FROM {table}'+where))
         assert actual == count, (table, actual, count)
     assert sql("SELECT count(*) FROM nguoi_dung WHERE mat_khau NOT LIKE 'pbkdf2-sha256$600000$%'") == '0'
     assert sql("SELECT count(*) FROM phan_cong_chuyen_xe p JOIN nhan_vien n USING(ma_nhan_vien) JOIN chuyen_xe c USING(ma_chuyen) JOIN tuyen_xe t USING(ma_tuyen) WHERE n.ma_nha_xe<>t.ma_nha_xe") == '0'
@@ -73,7 +74,7 @@ def main():
                 time.sleep(delay)
 
     password = os.environ.get('PROJECT_ADMIN_PASSWORD', 'DatVeXe2026!')
-    accounts = json.loads(sql("SELECT json_agg(json_build_object('email',email,'role',loai_tai_khoan,'employee',ma_nhan_vien,'owner',ma_nha_xe) ORDER BY email) FROM nguoi_dung"))
+    accounts = json.loads(sql("SELECT json_agg(json_build_object('email',email,'role',loai_tai_khoan,'employee',ma_nhan_vien,'owner',ma_nha_xe) ORDER BY email) FROM nguoi_dung WHERE trang_thai='HOAT_DONG'"))
     for index, account in enumerate([] if args.skip_logins else accounts, 1):
         session = call('POST', '/auth/dang-nhap', {'email': account['email'], 'matKhau': password})
         csrf = session['csrfToken']

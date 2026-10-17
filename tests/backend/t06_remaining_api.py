@@ -98,7 +98,7 @@ def main():
             except AssertionError as error:
                 if error.args[0][2] != 404:
                     raise
-    output = Path(__file__).resolve().parents[2] / 'src/backend/target/t06_remaining_api.json'
+    output = Path(__file__).resolve().parents[2] / 'apps/backend/target/t06_remaining_api.json'
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(results, indent=2), encoding='utf-8')
     print(f'PASS: {len(results)} remaining transport matrix cases; test records cleaned.')

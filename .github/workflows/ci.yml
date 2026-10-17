@@ -27,8 +27,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-          cache-dependency-path: src/backend/pom.xml
-      - run: mvn --batch-mode --no-transfer-progress -f src/backend/pom.xml verify
+          cache-dependency-path: apps/backend/pom.xml
+      - run: mvn --batch-mode --no-transfer-progress -f apps/backend/pom.xml verify
 
   frontend:
     name: Frontend lint and build
@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: src/frontend
+        working-directory: .
     env:
       NEXT_TELEMETRY_DISABLED: '1'
       NEXT_PUBLIC_API_URL: http://localhost:8080/api
@@ -48,8 +48,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
+        working-directory: .
       - run: npm run lint
       - run: npm run build
 

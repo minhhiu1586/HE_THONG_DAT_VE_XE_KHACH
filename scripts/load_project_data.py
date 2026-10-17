@@ -42,7 +42,7 @@ def main():
     sql("CREATE TABLE IF NOT EXISTS schema_migrations (version varchar(16) PRIMARY KEY, "
         "filename varchar(255) NOT NULL, checksum char(64) NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())")
     migrations = []
-    for file in sorted((ROOT / 'docs/database/schema').glob('[0-9][0-9][0-9]_*.sql')):
+    for file in sorted((ROOT / 'database/migrations').glob('[0-9][0-9][0-9]_*.sql')):
         version = file.name.split('_', 1)[0]
         raw = file.read_bytes()
         checksum = hashlib.sha256(raw.replace(b'\r\n', b'\n')).hexdigest()
@@ -54,7 +54,7 @@ def main():
         migrations.append(raw.decode('utf-8') +
                           f"\nINSERT INTO schema_migrations(version,filename,checksum) VALUES ('{version}','{file.name}','{checksum}');")
     schema = '\n'.join(migrations)
-    data = '\n'.join((ROOT / 'docs/database/seed' / file).read_text(encoding='utf-8') for file in SEEDS)
+    data = '\n'.join((ROOT / 'database/seed' / file).read_text(encoding='utf-8') for file in SEEDS)
     data = re.sub(r'^(BEGIN|COMMIT);\s*$', '', data, flags=re.M)
     sql('BEGIN;\n' + schema + '\n' + data + '\nCOMMIT;')
     print('Loaded project schema/data; existing rows and account passwords preserved.', flush=True)
@@ -63,7 +63,7 @@ def main():
     if args.activate:
         env_path = ROOT / '.env'
         content = env_path.read_text(encoding='utf-8') if env_path.exists() else ''
-        backup = ROOT / 'src/backend/target/project-data.env.previous'
+        backup = ROOT / 'apps/backend/target/project-data.env.previous'
         backup.parent.mkdir(parents=True, exist_ok=True)
         if not backup.exists():
             backup.write_text(content, encoding='utf-8')

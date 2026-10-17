@@ -2,9 +2,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const frontend = path.resolve(__dirname, '../../src/frontend');
-const ts = require(path.join(frontend, 'node_modules/typescript'));
-const compiled = ts.transpileModule(fs.readFileSync(path.join(frontend, 'lib/api.ts'), 'utf8'), {
+const frontend = path.resolve(__dirname, '../../apps/frontend');
+const ts = require('typescript');
+const compiled = ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '../../members/NguyenTheAn/frontend/src/booking/lib/api.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText;
 const mod = { exports: {} };
