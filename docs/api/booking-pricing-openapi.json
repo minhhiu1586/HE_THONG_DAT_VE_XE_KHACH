@@ -3,7 +3,7 @@
   "info": {
     "title": "Booking pricing API",
     "version": "0.1.0",
-    "description": "T17 quote and freeze-price contract. This module reuses T16 orders and session passengers; it does not create ticket rows or modify the class diagram. Promotions are global because the diagram has no operator or route scope fields. T17 stores order aggregates and snapshot lines; it does not add per-ticket price columns. Passenger data is session-only, so a T18 payment callback cannot assume the session still exists. Original ticket rows and order aggregates survive partial refunds. See booking-pricing.md."
+    "description": "T17 quote and freeze-price contract. This module reuses T16 orders and session passengers; it does not create ticket rows or modify the class diagram. Promotions are global because the diagram has no operator or route scope fields. T17 stores order aggregates and snapshot lines; it does not add per-ticket price columns. Passenger data is session-only, so a T18 payment callback cannot assume the session still exists. Original ticket rows and order aggregates survive partial refunds. See bao-gia-va-chot-gia.md."
   },
   "servers": [
     {

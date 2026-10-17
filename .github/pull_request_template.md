@@ -8,8 +8,8 @@
 
 ## Verification
 
-- [ ] Backend: `mvn -B -f src/backend/pom.xml verify`
-- [ ] Frontend: `npm ci`, `npm run lint`, `npm run build` in `src/frontend`
+- [ ] Backend: `mvn -B -f apps/backend/pom.xml verify`
+- [ ] Frontend: `npm ci`, `npm run lint`, `npm run build` in `apps/frontend`
 - [ ] Relevant API or UI smoke test (name and result below)
 
 ## Review checklist

@@ -7,7 +7,7 @@ from pathlib import Path
 def main():
     data = json.loads(Path(__file__).with_name('test-cases.json').read_text(encoding='utf-8'))
     registry = {uc['id']: uc for uc in data['use_cases']}
-    assert set(registry) == {f'UC-{i:02}' for i in range(1, 24)}, 'Expected UC-01 through UC-23'
+    assert set(registry) == {f'UC-{i:02}' for i in range(1, 24) if i!=21}, 'UC-21 was removed with ticket inspection'
     cases = data['test_cases']
     ids = [case['test_case_id'] for case in cases]
     assert len(ids) == len(set(ids)), 'Duplicate test case ID'
@@ -31,7 +31,7 @@ def main():
     for uc in registry:
         groups = {case['group'] for case in cases if case['use_case_id'] == uc}
         assert groups == {'Positive', 'Negative', 'Boundary'}, f'Incomplete coverage: {uc}'
-    print(f'PASS: 23 use cases, {len(cases)} unique cases, all three groups covered.')
+    print(f'PASS: {len(registry)} use cases, {len(cases)} unique cases, all three groups covered.')
     print(dict(Counter(case['status'] for case in cases)))
 
 

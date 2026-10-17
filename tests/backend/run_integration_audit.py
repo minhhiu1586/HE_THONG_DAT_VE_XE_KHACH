@@ -12,7 +12,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'src/backend/target/integration-audit'
+OUT = ROOT / 'apps/backend/target/integration-audit'
 SUITES = [
     ('accounts', 'account_auth_smoke.py'),
     ('employees', 'employee_assignment_smoke.py'),
@@ -23,7 +23,6 @@ SUITES = [
     ('pricing', 'booking_pricing_smoke.py'),
     ('promotions-paymethods', 'paymethod_discount_smoke.py'),
     ('payment', 'payment_vnpay_smoke.py'),
-    ('inspection', 'ticket_inspection_smoke.py'),
     ('refund', 'ticket_refund_smoke.py'),
 ]
 

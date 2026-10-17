@@ -8,10 +8,10 @@ def run(args,**kw):return subprocess.run(args,check=True,text=True,capture_outpu
 def sql(s):return run(['docker','exec','-i',container,'psql','-U',user,'-d',db,'-v','ON_ERROR_STOP=1','-Atq'],input=s).stdout.strip()
 run(['docker','exec',container,'createdb','-U',user,db])
 try:
- for p in sorted((root/'docs/database/schema').glob('*.sql')):
+ for p in sorted((root/'database/migrations').glob('*.sql')):
   if p.name.startswith('017'):continue
   sql(p.read_text())
- seed=(root/'docs/database/seed/001_catalog.sql').read_text()
+ seed=(root/'database/seed/001_catalog.sql').read_text()
  sql(seed)
  sql("""INSERT INTO tinh_thanh SELECT 'DEMO_'||ma_tinh_thanh,ten_tinh_thanh,khu_vuc FROM tinh_thanh WHERE ma_tinh_thanh IN ('CT','HCM','KH','LD');
  INSERT INTO tinh_thanh SELECT 'T06_'||ma_tinh_thanh,ten_tinh_thanh,khu_vuc FROM tinh_thanh WHERE ma_tinh_thanh IN ('DN','HN');
@@ -20,7 +20,7 @@ try:
  INSERT INTO tinh_thanh VALUES ('OLD_X','Tỉnh riêng','X'),('X','Tỉnh riêng','X');
  """)
  before=sql('SELECT ma_ben_xe,ten_ben_xe,dia_chi FROM ben_xe ORDER BY ma_ben_xe;')
- migration=(root/'docs/database/schema/017_canonical_cities.sql').read_text()
+ migration=(root/'database/migrations/017_canonical_cities.sql').read_text()
  sql('BEGIN;'+migration+'COMMIT;')
  assert sql('SELECT count(*) FROM tinh_thanh;')=='8'
  assert sql("SELECT count(*) FROM ben_xe WHERE ma_tinh_thanh ~ '^(DEMO_|T06_)';")=='0'
@@ -36,7 +36,7 @@ try:
  assert sql("SELECT ma_tinh_thanh FROM tinh_thanh WHERE ten_tinh_thanh='Cần Thơ';")=='CT'
  sql(seed)
  for name in ('002_accounts_staff_fleet.sql','003_routes_trips.sql'):
-  sql((root/'docs/database/seed'/name).read_text())
+  sql((root/'database/seed'/name).read_text())
  # Có chuyến thật trong seed: chuyển bến sang mã cũ, rồi gộp lại.
  sql("DROP INDEX uq_tinh_thanh_name_key; INSERT INTO tinh_thanh SELECT 'DEMO_CT',ten_tinh_thanh,khu_vuc FROM tinh_thanh WHERE ma_tinh_thanh='CT'; UPDATE ben_xe SET ma_tinh_thanh='DEMO_CT' WHERE ma_tinh_thanh='CT';")
  snapshot="SELECT row_to_json(c)::text FROM chuyen_xe c ORDER BY ma_chuyen;"

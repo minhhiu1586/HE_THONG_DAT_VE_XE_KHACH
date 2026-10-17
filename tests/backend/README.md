@@ -2,7 +2,7 @@
 
 ## T10 — Quản lý xe và sơ đồ ghế
 
-Hướng dẫn mới: [t10-vscode-guide.md](../../docs/plans/t10-vscode-guide.md), [ma trận T10](../../docs/tasks/T10-test-matrix.md), [API/helper T10](../../docs/api/t10-vehicle-management.md).
+Hướng dẫn mới: [t10-vscode-guide.md](../../members/LeNguyenThanhHien/docs/huong-dan-demo.md#section-1), [ma trận T10](../../members/LeNguyenThanhHien/testing/existing/t10-ma-tran-kiem-thu-xe-va-ghe.md), [API/helper T10](../../docs/api/t10-quan-ly-xe-va-ghe.md).
 
 ```bash
 python3 tests/backend/vehicle_management_smoke.py
@@ -13,7 +13,7 @@ Chạy ở thư mục gốc với WAR T10 vừa build và PostgreSQL phát tri�
 Chạy test nghiệp vụ từ thư mục gốc repository:
 
 ```bash
-mvn -f src/backend/pom.xml -B verify
+mvn -f apps/backend/pom.xml -B verify
 ```
 
 JUnit dùng H2 để kiểm tra transaction, validation, mapping và quy tắc nghiệp vụ. Kiểm tra HTTP dùng Tomcat 10.1 và PostgreSQL 16 thật, nên cần WAR vừa build và stack Compose đang chạy:
@@ -26,7 +26,7 @@ docker compose restart backend
 python3 tests/backend/api_smoke.py
 ```
 
-Script HTTP chỉ dùng thư viện chuẩn Python và Docker CLI. Nó tạo dữ liệu với tiền tố ngẫu nhiên, chuẩn bị xe tham chiếu bằng SQL, gọi API rồi dọn đúng dữ liệu của lượt chạy trong `finally`. Không xóa bảng hay dữ liệu có sẵn. Nếu volume PostgreSQL có từ trước, áp dụng các schema theo thứ tự trong `src/backend/README.md` trước khi chạy. Có thể đặt `API_BASE_URL` và `DB_CONTAINER` để kiểm tra một stack riêng; mặc định lần lượt là `http://localhost:8080/api` và container `datvexe-postgres`.
+Script HTTP chỉ dùng thư viện chuẩn Python và Docker CLI. Nó tạo dữ liệu với tiền tố ngẫu nhiên, chuẩn bị xe tham chiếu bằng SQL, gọi API rồi dọn đúng dữ liệu của lượt chạy trong `finally`. Không xóa bảng hay dữ liệu có sẵn. Nếu volume PostgreSQL có từ trước, áp dụng các schema theo thứ tự trong `apps/backend/README.md` trước khi chạy. Có thể đặt `API_BASE_URL` và `DB_CONTAINER` để kiểm tra một stack riêng; mặc định lần lượt là `http://localhost:8080/api` và container `datvexe-postgres`.
 
 | Yêu cầu | Bằng chứng kiểm tra |
 | --- | --- |
@@ -63,6 +63,6 @@ Kiểm tra trình duyệt: cài Playwright ngoài thư mục ứng dụng hoặc
 NODE_PATH=/duong/dan/node_modules node tests/frontend/account_smoke.cjs
 ```
 
-Yêu cầu frontend localhost:3000, backend localhost:8080, Chromium `/usr/bin/chromium` (hoặc `CHROMIUM_PATH`), PostgreSQL container phát triển. Có thể thay `FRONTEND_URL`, `API_BASE_URL`, `DB_CONTAINER`. Test chỉ tạo/xóa tài khoản riêng. Xem [ma trận](../../docs/tasks/T07-test-matrix.md) và [hướng dẫn tích hợp](../../docs/tasks/T07.1-integration.md).
+Yêu cầu frontend localhost:3000, backend localhost:8080, Chromium `/usr/bin/chromium` (hoặc `CHROMIUM_PATH`), PostgreSQL container phát triển. Có thể thay `FRONTEND_URL`, `API_BASE_URL`, `DB_CONTAINER`. Test chỉ tạo/xóa tài khoản riêng. Xem [ma trận](../../members/NguyenMinhHieu/testing/existing/t07-ma-tran-kiem-thu-tai-khoan.md) và [hướng dẫn tích hợp](../../members/NguyenMinhHieu/testing/existing/t07-1-tich-hop-phan-quyen.md).
 
-T12: `python3 tests/backend/trip_sale_smoke.py`; cấu hình `API_BASE_URL` và `DB_NAME` phải trỏ cùng database. Hướng dẫn: `docs/plans/t12-vscode-guide.md`.
+T12: `python3 tests/backend/trip_sale_smoke.py`; cấu hình `API_BASE_URL` và `DB_NAME` phải trỏ cùng database. Hướng dẫn: `members/LeNguyenThanhHien/docs/huong-dan-demo.md`.

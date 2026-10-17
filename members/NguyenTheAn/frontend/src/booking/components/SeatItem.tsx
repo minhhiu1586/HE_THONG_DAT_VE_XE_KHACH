@@ -1,0 +1,34 @@
+import type { Seat } from "@shared/types/index";
+
+export default function SeatItem({
+  seat,
+  selected,
+  onClick,
+  disabled = false,
+}: {
+  seat: Seat;
+  selected: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  const unavailable =
+    (seat.trangThaiSuDung ?? seat.trangThai) !== "HOAT_DONG" ||
+    (seat.tinhTrangKhaDung !== "TRONG" &&
+      seat.tinhTrangKhaDung !== undefined);
+
+  return (
+    <button
+      className={`seat ${selected ? "selected" : ""} ${
+        unavailable ? "unavailable" : ""
+      }`}
+      disabled={unavailable || disabled}
+      type="button"
+      aria-pressed={selected}
+      aria-label={`Ghế ${typeof seat.viTri === 'string' ? seat.viTri : seat.maGhe}${unavailable ? ', không khả dụng' : ''}`}
+      onClick={onClick}
+      title={unavailable ? "Ghế đã được chọn" : seat.maGhe}
+    >
+      <span>{typeof seat.viTri === 'string' ? seat.viTri : seat.maGhe}</span>
+    </button>
+  );
+}

@@ -45,3 +45,6 @@ temp/
 # Python test runners
 __pycache__/
 *.pyc
+
+# Generated TypeScript build cache
+*.tsbuildinfo

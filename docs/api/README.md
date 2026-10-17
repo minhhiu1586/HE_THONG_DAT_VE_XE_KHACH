@@ -6,23 +6,23 @@
 
 **Trạng thái:** Bản báo cáo để nhóm xem xét và thống nhất trước khi triển khai.
 
-Mục tiêu: thống nhất cách frontend gửi yêu cầu, backend trả dữ liệu và xử lý lỗi. Phạm vi gồm 31 API thuộc nhóm A–F; không bổ sung chức năng quản trị khuyến mãi hoặc báo cáo kinh doanh. Tài liệu mô tả thiết kế mục tiêu; tình trạng triển khai và kiểm thử được ghi riêng trong tài liệu từng module.
+Mục tiêu: thống nhất cách frontend gửi yêu cầu, backend trả dữ liệu và xử lý lỗi. Phạm vi gồm 28 API thuộc nhóm A–E; không bổ sung chức năng quản trị khuyến mãi hoặc báo cáo kinh doanh. Tài liệu mô tả thiết kế mục tiêu; tình trạng triển khai và kiểm thử được ghi riêng trong tài liệu từng module.
 
 Bộ tài liệu gồm:
 
-- **[t10-vehicle-management.md](t10-vehicle-management.md)**: quản lý loại xe, xe, đăng kiểm, ghế vật lý và helper điều kiện khai thác T10.
+- **[t10-quan-ly-xe-va-ghe.md](t10-quan-ly-xe-va-ghe.md)**: quản lý loại xe, xe, đăng kiểm, ghế vật lý và helper điều kiện khai thác T10.
 
-- **[account-auth.md](account-auth.md)** và **[account-openapi.yaml](account-openapi.yaml)**: hợp đồng tài khoản/xác thực đã triển khai trong T07.
-- **[T07.1-integration.md](../tasks/T07.1-integration.md)**: guard, helper và phạm vi quyền dùng chung.
-- **[t08-route-management.md](t08-route-management.md)**: API quản lý tỉnh/thành, bến xe, tuyến và điểm dừng thuộc T08.
-- **[t09-operator-management.md](t09-operator-management.md)**: API quản lý nhà xe, trạng thái và tài khoản quản lý thuộc T09.
-- **[t13-trip-search-availability.md](t13-trip-search-availability.md)**: dữ liệu Backend/database cho trang chủ, tìm chuyến và số ghế còn trống.
-- **[payment-discount.md](payment-discount.md)** và **[payment-discount-openapi.json](payment-discount-openapi.json)**: API khuyến mãi, phương thức thanh toán và báo cáo kiểm thử T14.
-- **[booking-order.md](booking-order.md)** và **[booking-order-openapi.json](booking-order-openapi.json)**: hợp đồng chi tiết cho luồng giữ chỗ và đơn đặt vé T16; tài liệu này có thẩm quyền với B01–B08 đã triển khai.
-- **[booking-pricing.md](booking-pricing.md)** và **[booking-pricing-openapi.json](booking-pricing-openapi.json)**: hợp đồng T17 cho báo giá, chốt giá và phân bổ giảm giá; C01/C02 dùng chung đơn T16.
-- **[payment-vnpay.md](payment-vnpay.md)** và **[payment-vnpay-openapi.json](payment-vnpay-openapi.json)**: thanh toán VNPay, xác minh QueryDR và phát hành vé T18; D01–D07.
+- **[tai-khoan-va-xac-thuc.md](tai-khoan-va-xac-thuc.md)** và **[account-openapi.yaml](account-openapi.yaml)**: hợp đồng tài khoản/xác thực đã triển khai trong T07.
+- **[t07-1-tich-hop-phan-quyen.md](../../members/NguyenMinhHieu/testing/existing/t07-1-tich-hop-phan-quyen.md)**: guard, helper và phạm vi quyền dùng chung.
+- **[t08-quan-ly-tuyen-va-ben-xe.md](t08-quan-ly-tuyen-va-ben-xe.md)**: API quản lý tỉnh/thành, bến xe, tuyến và điểm dừng thuộc T08.
+- **[t09-quan-ly-nha-xe.md](t09-quan-ly-nha-xe.md)**: API quản lý nhà xe, trạng thái và tài khoản quản lý thuộc T09.
+- **[t13-tim-chuyen-va-cho-con.md](t13-tim-chuyen-va-cho-con.md)**: dữ liệu Backend/database cho trang chủ, tìm chuyến và số ghế còn trống.
+- **[khuyen-mai-va-phuong-thuc-thanh-toan.md](khuyen-mai-va-phuong-thuc-thanh-toan.md)** và **[payment-discount-openapi.json](payment-discount-openapi.json)**: API khuyến mãi, phương thức thanh toán và báo cáo kiểm thử T14.
+- **[giu-cho-va-don-dat-ve.md](giu-cho-va-don-dat-ve.md)** và **[booking-order-openapi.json](booking-order-openapi.json)**: hợp đồng chi tiết cho luồng giữ chỗ và đơn đặt vé T16; tài liệu này có thẩm quyền với B01–B08 đã triển khai.
+- **[bao-gia-va-chot-gia.md](bao-gia-va-chot-gia.md)** và **[booking-pricing-openapi.json](booking-pricing-openapi.json)**: hợp đồng T17 cho báo giá, chốt giá và phân bổ giảm giá; C01/C02 dùng chung đơn T16.
+- **[thanh-toan-vnpay.md](thanh-toan-vnpay.md)** và **[payment-vnpay-openapi.json](payment-vnpay-openapi.json)**: thanh toán VNPay, xác minh QueryDR và phát hành vé T18; D01–D07.
 - **README.md**: quy ước chung, cách xử lý lỗi và các điểm cần thống nhất.
-- **[api-contract.md](api-contract.md)**: danh sách API, request/response và dữ liệu mẫu ngay trong từng nhóm.
+- **[danh-sach-api.md](danh-sach-api.md)**: danh sách API, request/response và dữ liệu mẫu ngay trong từng nhóm.
 - **[openapi.yaml](openapi.yaml)**: kiểu dữ liệu, trường bắt buộc, giá trị null và ví dụ chi tiết để xem bằng công cụ hỗ trợ OpenAPI/Swagger. https://editor.swagger.io/
 
 ## 1. Danh sách API
@@ -34,7 +34,6 @@ Bộ tài liệu gồm:
 | C | Báo giá, chốt giá và phương thức thanh toán | 3 |
 | D | Thanh toán và vé điện tử | 7 |
 | E | Hủy vé và hoàn tiền | 5 |
-| F | Xác minh vé và xác nhận lên xe | 3 |
 
 Luồng chính: tìm chuyến → chọn ghế → giữ ghế và tạo đơn nháp → cập nhật liên hệ/hành khách → báo giá → chốt giá → thanh toán → xem vé.
 
@@ -109,7 +108,7 @@ Timeout hoặc 5xx không đủ để kết luận thanh toán thất bại. N�
 
 `code`, `message`, `timestamp`, `traceId` là chuỗi; `details` là object, có thể rỗng. Lỗi validation dùng `details.fieldErrors`, ví dụ `[{"field":"maChuyen","code":"REQUIRED","message":"Vui lòng chọn chuyến."}]`. Không trả stack trace, SQL hoặc thông tin người đang giữ ghế.
 
-Header chung: `Content-Type: application/json`; các API liệt kê tại mục 8 cần `Idempotency-Key`; server trả `X-Trace-Id` để tra log. Cấu hình CORS theo frontend thực tế. T07 dùng phiên cookie `datvexe_session` và CSRF theo [account-auth.md](account-auth.md).
+Header chung: `Content-Type: application/json`; các API liệt kê tại mục 8 cần `Idempotency-Key`; server trả `X-Trace-Id` để tra log. Cấu hình CORS theo frontend thực tế. T07 dùng phiên cookie `datvexe_session` và CSRF theo [tai-khoan-va-xac-thuc.md](tai-khoan-va-xac-thuc.md).
 
 ## 7. Backend quyết định dữ liệu nghiệp vụ
 
@@ -132,11 +131,11 @@ Khóa này không thay cho transaction hoặc ràng buộc chống đặt trùng
 
 Backend kiểm tra chữ ký, tham chiếu giao dịch, số tiền/tiền tệ, kết quả cổng, trạng thái đơn và hạn giữ. Có URL thanh toán hoặc trình duyệt quay về trang thành công chưa chứng minh đã thu tiền hay được phát hành vé.
 
-D04 dùng VNPay IPN qua GET, kiểm tra HMACSHA512 và trả ACK theo cổng. ReturnURL D07 chỉ thông báo; D06 xác minh qua QueryDR khi chạy localhost. Thanh toán thành công sau hết hạn hoặc khi mất dữ liệu hành khách tạm vẫn được ghi nhận, không phát hành vé và trả `canDoiSoat: true`; xử lý hoàn/đối soát thuộc bước sau. Xem giới hạn demo và kết quả thực chạy trong [payment-vnpay.md](payment-vnpay.md).
+D04 dùng VNPay IPN qua GET, kiểm tra HMACSHA512 và trả ACK theo cổng. ReturnURL D07 chỉ thông báo; D06 xác minh qua QueryDR khi chạy localhost. Thanh toán thành công sau hết hạn hoặc khi mất dữ liệu hành khách tạm vẫn được ghi nhận, không phát hành vé và trả `canDoiSoat: true`; xử lý hoàn/đối soát thuộc bước sau. Xem giới hạn demo và kết quả thực chạy trong [thanh-toan-vnpay.md](thanh-toan-vnpay.md).
 
 ## 10. Dữ liệu mẫu và những điểm cần thống nhất
 
-Các JSON trong [api-contract.md](api-contract.md) là dữ liệu giả để frontend tham khảo, chưa phải mock server có trạng thái. Dùng mẫu lỗi chung tại mục 6 và lỗi nghiệp vụ tại từng nhóm, tránh lặp cùng một JSON cho mọi API.
+Các JSON trong [danh-sach-api.md](danh-sach-api.md) là dữ liệu giả để frontend tham khảo, chưa phải mock server có trạng thái. Dùng mẫu lỗi chung tại mục 6 và lỗi nghiệp vụ tại từng nhóm, tránh lặp cùng một JSON cho mọi API.
 
 Các điểm cần nhóm xác nhận:
 
@@ -145,13 +144,13 @@ Các điểm cần nhóm xác nhận:
 | Trạng thái | Bảng chuyển trạng thái đơn, giữ, vé, thanh toán và hoàn; cách biểu diễn đơn hết hạn. |
 | Đăng nhập và quyền | T07 đã triển khai phiên cookie và helper phạm vi; nhóm đối chiếu T01, xác nhận quyền nghiệp vụ và việc hỗ trợ khách không tài khoản. |
 | Đơn nháp | T16 dùng liên hệ bắt buộc trong B01–B08; T17 cần đọc và xác thực danh sách hành khách hiện có trong HTTP session trước khi chốt giá. |
-| Giá và khuyến mãi | T17 đã chốt làm tròn, giữ/trả lượt và sửa/chốt lại trong [booking-pricing.md](booking-pricing.md). Phạm vi mã theo nhà xe/tuyến chưa được mô hình hỗ trợ. |
+| Giá và khuyến mãi | T17 đã chốt làm tròn, giữ/trả lượt và sửa/chốt lại trong [bao-gia-va-chot-gia.md](bao-gia-va-chot-gia.md). Phạm vi mã theo nhà xe/tuyến chưa được mô hình hỗ trợ. |
 | Chuyến chưa gán xe | Đề xuất chi tiết cho phép null, từ chối giữ ghế; chưa có xe thì từ chối trả sơ đồ ghế. |
 | Hoàn tiền | Chính sách/phí hoàn, xử lý các giao dịch cần đối soát và thời điểm bán lại ghế. |
 
 Các điểm này cần nhóm thống nhất trước triển khai phần liên quan; không tự bổ sung enum hay thay sơ đồ lớp theo ví dụ.
 
-Các nhóm tương lai cần tiếp tục hoàn thiện snapshot giá theo ghế, yêu cầu hoàn và thời điểm kiểm vé. T16 đã dùng khóa chuyến và ràng buộc DB cho tranh ghế; hành khách hiện chỉ tồn tại trong HTTP session và không được lưu thành dữ liệu nháp. Tổng các lần hoàn không được vượt số tiền thực thu của vé; đổi khóa chống lặp không được bỏ qua giới hạn này.
+Các nhóm tương lai cần tiếp tục hoàn thiện snapshot giá theo ghế và yêu cầu hoàn. T16 đã dùng khóa chuyến và ràng buộc DB cho tranh ghế; hành khách hiện chỉ tồn tại trong HTTP session và không được lưu thành dữ liệu nháp. Tổng các lần hoàn không được vượt số tiền thực thu của vé; đổi khóa chống lặp không được bỏ qua giới hạn này.
 
 ## 11. Thay đổi hợp đồng
 
@@ -161,4 +160,4 @@ Kết quả bàn giao là danh sách API, cấu trúc dữ liệu, quy tắc x�
 
 Backend hiện có còn trả tiền dạng JSON number, một số danh sách dạng array và lỗi `{"error":"..."}`. Việc áp dụng hợp đồng cần được phối hợp với frontend/backend khi triển khai; báo cáo này chưa thay đổi ứng dụng.
 
-- [T12 — Quản lý chuyến và mở bán](t12-trip-management.md).
+- [T12 — Quản lý chuyến và mở bán](t12-quan-ly-chuyen-xe.md).

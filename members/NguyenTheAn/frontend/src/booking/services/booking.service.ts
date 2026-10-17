@@ -1,0 +1,1 @@
+export { api as bookingService } from "@members/NguyenTheAn/booking/services/api";

@@ -1,0 +1,25 @@
+{
+  "name": "vexexin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev apps/frontend",
+    "build": "next build apps/frontend",
+    "start": "next start apps/frontend",
+    "lint": "eslint --config eslint.config.mjs apps/frontend \"members/*/frontend/src/**/*.{ts,tsx}\" \"shared/frontend/src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --project apps/frontend/tsconfig.json --noEmit --incremental false"
+  },
+  "dependencies": {
+    "next": "16.3.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.8",
+    "typescript": "^5"
+  }
+}
