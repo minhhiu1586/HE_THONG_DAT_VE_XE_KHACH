@@ -99,3 +99,39 @@ mvn -B -f apps/backend/pom.xml clean verify
 
 Các bài HTTP phải trỏ vào backend và CSDL thử riêng, cùng cấu hình `API_BASE_URL`,
 `DB_CONTAINER`, `DB_NAME`. Không chạy các fixture trên CSDL đang chứa dữ liệu cần giữ.
+
+## Kiểm tra lại toàn dự án sau bổ sung chú thích — 18/10/2026
+
+Đợt này bổ sung 53 dòng chú thích tiếng Việt trong 12 file Java, không sửa mã
+thực thi. Các kết quả dưới đây là lần chạy mới, bổ sung cho giới hạn của lần trước.
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Maven/JDK 21 `clean verify` trên toàn backend | BUILD SUCCESS; 209 test thực thi đạt, 63 test PostgreSQL tạm bỏ qua ở lượt mặc định |
+| Bật riêng toàn bộ nhóm PostgreSQL trên CSDL fixture độc lập | 75/75 đạt, không bỏ qua |
+| 10 bộ HTTP tích hợp: tài khoản, nhân viên, tuyến, xe, mở bán, đặt vé, giá, khuyến mãi/phương thức thanh toán, thanh toán, hoàn vé | 10/10 bộ đạt; ảnh chụp dữ liệu nền trước/sau trùng nhau |
+| Thanh toán chạy bổ sung với cấu hình ký callback thử cục bộ | 13 ca đạt, 86 xác nhận HTTP, không bỏ qua |
+| Frontend lint và TypeScript sau build | Đạt |
+| Build production Next.js bằng Webpack | Đạt |
+| Kiểm tra Node cho tìm chuyến và danh mục quản lý | Đạt |
+| Trình duyệt: tìm kiếm/bộ lọc, quản lý tuyến, đánh giá T22 | Đạt |
+| Trình duyệt: quản lý xe T10 và mở bán T12 | Đạt sau điều chỉnh bộ chọn menu trong bản chạy tạm |
+
+Google Fonts bị chặn trong môi trường kiểm thử nên build Turbopack mặc định
+không hoàn tất. Lượt Webpack dùng bộ nhớ đệm Inter thật lấy từ gói
+`@fontsource/inter`, không đổi cấu hình hay mã frontend trong Git.
+
+Các bài trình duyệt cũ có bộ chọn không khớp giao diện hiện tại: liên kết
+“Quản trị”, thông báo có thêm liên kết, vùng menu di động và nhãn nút menu.
+Các điều chỉnh phục vụ chạy lại chỉ nằm trong `/tmp`, không sửa ứng dụng hoặc
+làm yếu kiểm tra nghiệp vụ. Bài quản lý xe dùng nhà xe `NX_FUTA` có trong
+seed hiện tại thay cho `DEMO_NX`; chờ menu cập nhật sau điều hướng/đổi kích thước.
+Bài tài khoản đi qua đăng ký, đăng nhập, hồ sơ,
+đổi mật khẩu, phân quyền và khóa/mở khóa; chưa đạt bước cuối do đăng xuất
+chuyển về `/dang-nhap?next=...` thay vì `/` như bài kiểm tra mong đợi.
+Đây là hành vi của frontend dùng chung, không thay đổi trong đợt bổ sung chú thích.
+
+CSDL PostgreSQL và Tomcat thử chạy riêng, không đặt lại dữ liệu đang dùng.
+Callback VNPay được ký và gửi cục bộ; không xác nhận giao dịch sandbox,
+QueryDR, hoàn tiền qua ngân hàng hoặc gửi email thật. Các kết quả này không
+phải cam kết không còn lỗi ở mọi tình huống.

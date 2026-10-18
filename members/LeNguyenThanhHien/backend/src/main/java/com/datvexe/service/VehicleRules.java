@@ -17,6 +17,7 @@ public final class VehicleRules {
         return LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
     }
 
+    // Đăng kiểm phải bao phủ từ ngày khởi hành đến ngày đến, kể cả chuyến đi qua nửa đêm.
     public static boolean inspection(Xe vehicle, LocalDate start, LocalDate end) {
         return vehicle.ngayDangKiem != null
                 && vehicle.hanDangKiem != null
@@ -24,6 +25,7 @@ public final class VehicleRules {
                 && !vehicle.hanDangKiem.isBefore(end);
     }
 
+    // Số ghế phải khớp sức chứa; từng vị trí phải duy nhất và thuộc tầng hợp lệ của loại xe.
     public static boolean layoutValid(Xe vehicle) {
         if (vehicle.loaiXe == null
                 || vehicle.soChoNgoi <= 0
@@ -71,6 +73,7 @@ public final class VehicleRules {
         return vehicle;
     }
 
+    // Tính cả vé/giữ chỗ đã kết thúc để bảo vệ lịch sử khi sửa hoặc xóa chuyến.
     public static boolean hasTicketsOrHolds(EntityManager em, ChuyenXe trip) {
         return em.createQuery("select count(v) from VeXe v where v.chuyenXe = :trip", Long.class)
                                 .setParameter("trip", trip)
@@ -84,6 +87,7 @@ public final class VehicleRules {
                         > 0;
     }
 
+    // Xét theo thứ tự ghế ngừng bán, vé hiệu lực, giữ chỗ còn hạn rồi mới kết luận còn trống.
     public static String availability(
             EntityManager em, ChuyenXe trip, Ghe seat, LocalDateTime now) {
         if (seat.trangThai != TrangThaiGhe.HOAT_DONG) {

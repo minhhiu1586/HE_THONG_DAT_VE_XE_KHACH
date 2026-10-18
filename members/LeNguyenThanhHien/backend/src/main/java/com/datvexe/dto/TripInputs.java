@@ -9,6 +9,7 @@ import java.time.LocalTime;
 public final class TripInputs {
     private TripInputs() {}
 
+    // Record đóng gói dữ liệu tạo/sửa chuyến; các trường này không tự tạo thêm cột trong CSDL.
     public record Draft(
             String maChuyen,
             String maTuyen,

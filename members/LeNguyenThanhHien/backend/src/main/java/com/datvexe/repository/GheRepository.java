@@ -15,6 +15,7 @@ public final class GheRepository extends JpaRepository<Ghe> {
     public Ghe lock(String id) {
         Ghe g = super.lock(id);
         if (g != null) {
+            // Lấy đối tượng xe thật từ proxy Hibernate trước khi đọc các thuộc tính của xe.
             g.xe = (com.datvexe.domain.Entities.Xe) org.hibernate.Hibernate.unproxy(g.xe);
         }
         return g;

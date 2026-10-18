@@ -22,6 +22,7 @@ public final class ChuyenXeRepository extends JpaRepository<ChuyenXe> {
     public ChuyenXe lock(String id) {
         ChuyenXe trip = super.lock(id);
         if (trip != null) {
+            // Đọc lại trạng thái mới nhất sau khi chờ khóa, tránh dùng chuyến đã nạp trước đó.
             em.refresh(trip, LockModeType.PESSIMISTIC_WRITE);
             trip = (ChuyenXe) org.hibernate.Hibernate.unproxy(trip);
         }
@@ -50,6 +51,7 @@ public final class ChuyenXeRepository extends JpaRepository<ChuyenXe> {
         return query.setFirstResult(offset).setMaxResults(size).getResultList();
     }
 
+    // Dùng cùng điều kiện với truy vấn danh sách để tổng số bản ghi phân trang không bị lệch.
     public long count(Filters filters) {
         TypedQuery<Long> query =
                 em.createQuery("select count(c) from ChuyenXe c" + where(filters), Long.class);
@@ -99,6 +101,7 @@ public final class ChuyenXeRepository extends JpaRepository<ChuyenXe> {
                 .getResultList();
     }
 
+    // Ghép giá trị với tên tham số JPQL, không nối trực tiếp dữ liệu người dùng vào câu truy vấn.
     private static Map<String, Object> parameters(Filters f) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (f.nhaXe() != null) {
@@ -122,6 +125,7 @@ public final class ChuyenXeRepository extends JpaRepository<ChuyenXe> {
         return result;
     }
 
+    // Chỉ thêm điều kiện có giá trị; nhiều điều kiện được kết hợp bằng AND.
     private static String where(Filters f) {
         List<String> clauses = new ArrayList<>();
         if (f.nhaXe() != null) {

@@ -27,6 +27,7 @@ public final class VehicleService {
         return sortableSeatPosition(first.viTri).compareTo(sortableSeatPosition(second.viTri));
     }
 
+    // Thêm số 0 vào đầu phần số khi so sánh chuỗi để G2 đứng trước G10.
     private static String sortableSeatPosition(String position) {
         java.util.regex.Matcher numbers =
                 java.util.regex.Pattern.compile("[0-9]+")
@@ -72,6 +73,7 @@ public final class VehicleService {
         return false;
     }
 
+    // Khi lọc theo nhà xe, cả chuyến lẫn nhân viên của phân công đều phải thuộc nhà xe đó.
     private static boolean assignmentInScope(PhanCongChuyenXe assignment, String operatorId) {
         if (operatorId == null) {
             return true;
@@ -124,6 +126,7 @@ public final class VehicleService {
         return value;
     }
 
+    // Giữ nguyên kiểu của kết quả truy vấn và chuyển trường hợp không tìm thấy thành lỗi 404.
     private static <T> T found(T value) {
         if (value == null) {
             throw new DomainException(404, "Không tìm thấy dữ liệu");
@@ -402,6 +405,7 @@ public final class VehicleService {
                 vehicle.bienSo = plate;
                 vehicle.loaiXe = type;
                 vehicle.nhaXe = owner;
+                // Sức chứa lấy từ loại xe để thông tin xe và số ghế sinh ra luôn dùng cùng cấu hình.
                 vehicle.soChoNgoi = type.soChoNgoi;
                 vehicle.namSanXuat = input.namSanXuat();
                 vehicle.ngayDangKiem = input.ngayDangKiem();
@@ -431,6 +435,7 @@ public final class VehicleService {
             seat.maGhe = UUID.randomUUID().toString();
             seat.xe = vehicle;
             seat.viTri = String.format(Locale.ROOT, "G%03d", i + 1);
+            // Chia các ghế liên tiếp thành nhóm theo số tầng của loại xe.
             seat.tang = 1 + i * vehicle.loaiXe.soTang / vehicle.soChoNgoi;
             vehicle.danhSachGhe.add(seat);
             new GheRepository(em).save(seat);
@@ -586,6 +591,7 @@ public final class VehicleService {
         }
     }
 
+    // Chuyến nháp, mở bán hoặc đang chạy đều được tính khi bảo vệ việc sửa xe và sơ đồ ghế.
     public static boolean active(ChuyenXe trip) {
         return TripSaleRules.scheduled(trip) || trip.trangThai == TrangThaiChuyen.DANG_CHAY;
     }
@@ -636,6 +642,7 @@ public final class VehicleService {
         return value;
     }
 
+    // Hai khoảng thời gian trùng khi mỗi chuyến bắt đầu trước lúc chuyến kia kết thúc.
     private static boolean overlapsAnotherTrip(Xe vehicle, ChuyenXe trip) {
         LocalDateTime departure = LocalDateTime.of(trip.ngayKhoiHanh, trip.gioKhoiHanh);
         for (ChuyenXe other : vehicle.danhSachChuyenXe) {
@@ -784,6 +791,7 @@ public final class VehicleService {
         }
     }
 
+    // Kiểm tra toàn bộ sơ đồ trước khi thay đổi để một ghế sai không làm lưu dở các ghế còn lại.
     public List<Map<String, Object>> saveLayout(String id, VehicleInputs.SoDoGhe input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -979,6 +987,7 @@ public final class VehicleService {
                 if (input.ghiChu() != null && input.ghiChu().length() > 1000) {
                     throw new DomainException(400, "Ghi chú quá dài");
                 }
+                // Bỏ dấu xác nhận kế hoạch lái/nghỉ cũ trước khi ghi nhận người xác nhận lần này.
                 String note =
                         input.ghiChu() == null
                                 ? ""

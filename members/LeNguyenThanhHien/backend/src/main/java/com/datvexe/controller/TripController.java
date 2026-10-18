@@ -24,6 +24,7 @@ public class TripController extends HttpServlet {
                     .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
                     .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
 
+    // Không tự đổi số hoặc boolean thành chuỗi để tránh chấp nhận dữ liệu request sai kiểu.
     public TripController() {
         json.coercionConfigFor(com.fasterxml.jackson.databind.type.LogicalType.Textual)
                 .setCoercion(

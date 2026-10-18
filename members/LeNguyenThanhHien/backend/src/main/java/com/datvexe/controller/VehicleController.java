@@ -30,6 +30,7 @@ public class VehicleController extends HttpServlet {
                     .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
                     .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
 
+    // Từ chối giá trị số/boolean ở trường chuỗi, giữ việc kiểm tra kiểu dữ liệu đầu vào chặt chẽ.
     public VehicleController() {
         json.coercionConfigFor(com.fasterxml.jackson.databind.type.LogicalType.Textual)
                 .setCoercion(

@@ -23,6 +23,7 @@ public final class VehicleInputs {
             BigDecimal tocDo,
             BigDecimal dungTichXang,
             Integer soChoNgoi) {
+        // Các hàm tạo rút gọn nhận lời gọi cũ và để những trường không truyền vào ở giá trị null.
         public Xe(
                 String maXe,
                 String bienSo,

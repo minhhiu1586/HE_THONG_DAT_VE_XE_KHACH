@@ -80,6 +80,7 @@ public class RouteTripController extends HttpServlet {
         }
     }
 
+    // Class<T> cho Jackson biết cần chuyển JSON thành loại DTO nào khi đọc nội dung request.
     private <T> T body(HttpServletRequest request, Class<T> type) throws IOException {
         T value = json.readValue(request.getInputStream(), type);
         if (value == null) {
@@ -88,6 +89,7 @@ public class RouteTripController extends HttpServlet {
         return value;
     }
 
+    // Chuyển chuỗi bộ lọc sang enum và trả lỗi 400 rõ ràng nếu giá trị không nằm trong danh mục.
     private static <E extends Enum<E>> E enumQuery(String value, Class<E> type) {
         if (value == null || value.isBlank()) {
             return null;

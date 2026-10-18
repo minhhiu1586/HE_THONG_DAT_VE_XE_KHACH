@@ -26,6 +26,7 @@ public final class TripService {
         this.clock = clock;
     }
 
+    // Dùng Clock để lấy giờ Việt Nam và cho phép kiểm thử đúng tại thời điểm hết hạn đặt vé.
     private LocalDateTime now() {
         return LocalDateTime.ofInstant(clock.instant(), TripSaleRules.ZONE);
     }
@@ -49,6 +50,7 @@ public final class TripService {
         }
     }
 
+    // Tài khoản nhà xe chỉ được thao tác trong nhà xe của mình, không tin mã nhà xe từ request.
     private static void scope(EntityManager em, NhaXe owner) {
         var context = RequestIdentity.get();
         if (context != null) {
@@ -105,6 +107,7 @@ public final class TripService {
         }
     }
 
+    // Dùng chung khi tạo/sửa chuyến; lần sửa còn kiểm tra lại lịch xe và nhân viên.
     private void apply(EntityManager em, ChuyenXe trip, TripInputs.Draft input, boolean updating) {
         if (input == null) {
             throw new DomainException(400, "Thiếu thông tin chuyến.");
@@ -131,6 +134,7 @@ public final class TripService {
         }
         LocalDateTime start = LocalDateTime.of(input.ngayKhoiHanh(), departure),
                 arrival = input.gioDenDuKien();
+        // Không nhập giờ đến thì tính từ giờ đi và thời lượng tuyến, làm tròn tới phút gần nhất.
         if (arrival == null) {
             if (route.thoiGianDuKien == null || route.thoiGianDuKien.signum() <= 0) {
                 throw new DomainException(400, "Tuyến chưa có thời lượng hợp lệ.");
@@ -229,6 +233,7 @@ public final class TripService {
         }
     }
 
+    // Đếm tổng và lấy đúng trang sau khi áp dụng phạm vi nhà xe cùng các điều kiện lọc.
     public Map<String, Object> list(
             String owner,
             String route,
@@ -326,6 +331,7 @@ public final class TripService {
                 AccessPolicy.guard(em);
                 ChuyenXe trip = locked(em, code);
                 TripSaleRules.ensureOpenable(em, trip, now());
+                // Kiểm tra lại đồng hồ sau bước kiểm tra điều kiện vì lúc chờ khóa có thể đã hết hạn.
                 require(
                         now().isBefore(TripSaleRules.cutoff(trip)),
                         "Đã đến thời điểm ngừng nhận đặt vé trong khi kiểm tra điều kiện.");
@@ -399,6 +405,7 @@ public final class TripService {
                 throw error;
             }
         }
+        // Chỉ xử lý hoàn và thông báo sau khi trạng thái hủy cùng công việc liên quan đã commit.
         if (target == TrangThaiChuyen.DA_HUY) {
             processReadyCancellationRefunds(code);
             processCancellationNotifications(code);
@@ -406,6 +413,7 @@ public final class TripService {
         return result;
     }
 
+    // Duyệt các công việc chờ hoàn; một đơn lỗi vẫn được lưu để đối soát và xử lý tiếp đơn khác.
     private void processReadyCancellationRefunds(String tripId) {
         try (EntityManager em = factory.createEntityManager()) {
             List<?> ids =
@@ -451,6 +459,7 @@ public final class TripService {
         }
     }
 
+    // Thử lại công việc của chuyến đã hủy; không tạo lại lần hủy hoặc tự bỏ qua kiểm tra hoàn trùng.
     public Map<String, Object> retryCancellationWork(String code) {
         List<String> orders;
         try (EntityManager em = factory.createEntityManager()) {
@@ -500,6 +509,7 @@ public final class TripService {
         return lifecycleReport(code);
     }
 
+    // Giữ công việc lỗi ở trạng thái cần đối soát để có thể thử lại mà không hủy chuyến lần nữa.
     private void markCancellationReconciliation(
             String orderId, String tripId, RuntimeException failure) {
         try (EntityManager em = factory.createEntityManager()) {
@@ -558,6 +568,7 @@ public final class TripService {
         return transition(code, TrangThaiChuyen.DA_HUY, reason);
     }
 
+    // Quản trị/nhà xe có quyền theo phạm vi; tài xế được phân công chỉ bắt đầu hoặc hoàn tất chuyến.
     private void authorizeLifecycle(EntityManager em, ChuyenXe trip, TrangThaiChuyen target) {
         var request = RequestIdentity.get();
         if (request == null || request.user() == null) {
@@ -634,6 +645,7 @@ public final class TripService {
     }
 
     private void cancelAffectedOrders(EntityManager em, ChuyenXe trip, String reason) {
+        // TreeSet loại đơn trùng và giữ thứ tự khóa đơn thống nhất khi nhiều giao dịch cùng xử lý.
         Set<String> orderIds = new TreeSet<>();
         orderIds.addAll(
                 em.createQuery(
@@ -785,6 +797,7 @@ public final class TripService {
         }
     }
 
+    // Ghép lịch sử chuyến, đơn bị ảnh hưởng, yêu cầu hoàn và thông báo để quản lý theo dõi xử lý.
     public Map<String, Object> lifecycleReport(String code) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();

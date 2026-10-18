@@ -36,6 +36,7 @@ public class RouteTripService {
         return result;
     }
 
+    // T giữ kiểu của đối tượng cần tìm; không có bản ghi thì báo lỗi 404.
     private static <T> T found(EntityManager em, Class<T> type, String id) {
         T item = em.find(type, text(id, "Mã", 40, true));
         if (item == null) {
@@ -57,6 +58,7 @@ public class RouteTripService {
         return value;
     }
 
+    // Giới hạn phần nguyên và số lẻ bằng BigDecimal để giá trị lưu xuống CSDL không bị mất chính xác.
     private static BigDecimal decimal(
             BigDecimal value, String field, int integerDigits, boolean zeroAllowed) {
         amount(value, field, zeroAllowed);
@@ -141,6 +143,7 @@ public class RouteTripService {
 
     private record SearchPoint(String kind, String code) {}
 
+    // CITY là tỉnh, STATION là bến; mã không có tiền tố vẫn được nhận theo cách gọi cũ.
     private static SearchPoint searchPoint(String value, String field) {
         String input = required(value, field);
         int separator = input.indexOf(':');
@@ -153,6 +156,7 @@ public class RouteTripService {
         return new SearchPoint("ANY", text(input, field, 40, true));
     }
 
+    // Quy đổi cả mã bến và mã tỉnh về tỉnh tương ứng để kiểm tra điểm đi/đến cùng tỉnh.
     private static String cityOf(EntityManager em, SearchPoint point) {
         if (point.kind().equals("CITY")) {
             if (em.find(TinhThanh.class, point.code()) == null) {
@@ -178,6 +182,7 @@ public class RouteTripService {
         throw new DomainException(400, "Điểm tìm kiếm không tồn tại: " + point.code());
     }
 
+    // Ghép dữ liệu chuyến với tuyến, nhà xe, bến và ghế thành kết quả frontend cần hiển thị.
     private static Map<String, Object> searchView(
             EntityManager em, ChuyenXe trip, LocalDateTime now) {
         TuyenXe route = trip.tuyenXe;
@@ -232,6 +237,7 @@ public class RouteTripService {
                     em.createQuery("select count(g) from Ghe g where g.xe = :vehicle", Long.class)
                             .setParameter("vehicle", trip.xe)
                             .getSingleResult();
+            // Chỉ đếm ghế hoạt động, chưa có vé hiệu lực và không bị giữ còn hạn trên chuyến này.
             Long available =
                     em.createQuery(
                                     "select count(g) from Ghe g where g.xe = :vehicle and"
@@ -832,6 +838,7 @@ public class RouteTripService {
                         .getResultList());
     }
 
+    // Sau khi đưa thứ tự về vùng tạm, đánh lại liên tiếp từ 1 theo danh sách đã sắp xếp.
     private static void renumber(EntityManager em, List<DiemDung> items) {
         park(em, items);
         for (int i = 0; i < items.size(); i++) {
@@ -840,6 +847,7 @@ public class RouteTripService {
         em.flush();
     }
 
+    // Chuyển thứ tự điểm dừng sang vùng số tạm để sắp xếp lại không bị trùng khóa.
     private static void park(EntityManager em, List<DiemDung> items) {
         int maxPosition = 0;
         if (!items.isEmpty()) {
@@ -969,6 +977,7 @@ public class RouteTripService {
         }
     }
 
+    // Chỉ nhận danh sách chứa đủ mỗi điểm dừng đúng một lần để không mất hoặc nhân đôi điểm.
     public List<Map<String, Object>> reorderDiemDung(String routeId, Inputs.SapXepDiemDung input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -1017,6 +1026,7 @@ public class RouteTripService {
         }
     }
 
+    // Đổi thời lượng tuyến từ giờ sang phút rồi cộng vào ngày giờ đi, kể cả khi đến vào hôm sau.
     private static LocalDateTime expectedArrival(TuyenXe route, LocalDate date, LocalTime time) {
         if (date == null || time == null) {
             throw new DomainException(400, "Ngày và giờ khởi hành là bắt buộc");
@@ -1074,6 +1084,7 @@ public class RouteTripService {
         }
     }
 
+    // Kiểm tra xe và lịch trước khi gán; lịch sử vé/giữ chỗ đã có sẽ chặn việc đổi xe.
     private static void assignVehicle(EntityManager em, ChuyenXe trip, String xeId) {
         if (!TripSaleRules.scheduled(trip)) {
             throw new DomainException(409, "Chỉ gán xe cho chuyến chưa khởi hành");
@@ -1220,6 +1231,7 @@ public class RouteTripService {
         }
     }
 
+    // Lấy ứng viên từ Repository rồi loại từng chuyến không còn đủ điều kiện nhận đặt vé.
     public List<Map<String, Object>> searchChuyenXe(String from, String to, LocalDate date) {
         SearchPoint origin = searchPoint(from, "Điểm đi");
         SearchPoint destination = searchPoint(to, "Điểm đến");

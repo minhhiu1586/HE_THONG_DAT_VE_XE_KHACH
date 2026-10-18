@@ -24,6 +24,7 @@ public final class TripSaleRules {
             OffsetDateTime serverTime,
             List<Check> dieuKien) {}
 
+    // Ưu tiên cấu hình Java, sau đó biến môi trường; không cấu hình thì ngừng nhận trước 60 phút.
     public static long cutoffMinutes() {
         long minutes =
                 Long.parseLong(
@@ -53,6 +54,7 @@ public final class TripSaleRules {
         return start(trip).minusMinutes(cutoffMinutes());
     }
 
+    // Bỏ số 0 thập phân thừa để nhận giá như 100000.00 nhưng vẫn từ chối số tiền lẻ VND.
     public static boolean validPrice(BigDecimal price) {
         if (price == null || price.signum() < 0) {
             return false;
@@ -95,6 +97,7 @@ public final class TripSaleRules {
     }
 
     public static Result inspect(EntityManager em, ChuyenXe trip, LocalDateTime now) {
+        // Kiểm tra riêng từng điều kiện để trả đủ lý do chưa đạt, thay vì dừng ở lỗi đầu tiên.
         reloadRouteAndStations(em, trip);
         List<Check> checks = new ArrayList<>();
         try {
@@ -204,6 +207,7 @@ public final class TripSaleRules {
                 List.copyOf(checks));
     }
 
+    // Bảng điều kiện giữ đủ lỗi, còn API thao tác trả lý do chưa đạt đầu tiên cho người gọi.
     public static void ensureOpenable(EntityManager em, ChuyenXe trip, LocalDateTime now) {
         Result result = inspect(em, trip, now);
         if (result.duDieuKien()) {
