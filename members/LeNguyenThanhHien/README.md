@@ -55,3 +55,75 @@ Tỉnh/thành, bến, tuyến, phương tiện, ghế, tìm kiếm backend và v
 | [t10-vscode-guide.md](docs/huong-dan-demo.md#section-1) |
 | [t12-vscode-guide.md](docs/huong-dan-demo.md#section-2) |
 | [t13-vscode-guide.md](docs/huong-dan-demo.md#section-3) |
+
+## Cách đọc backend sau khi viết lại
+
+Giữ cấu trúc thư mục và hợp đồng API đang sử dụng. Source nằm trong
+`backend/src/main/java/com/datvexe/` bên dưới thư mục thành viên này.
+
+| Lớp | Vai trò |
+|---|---|
+| `controller/RouteTripController.java` | Chọn handler tỉnh, bến, tuyến, chuyến; đọc request và trả JSON |
+| `controller/TripController.java` | Chọn thao tác tạo/sửa/xóa, mở bán, bắt đầu/hoàn tất/hủy chuyến |
+| `controller/VehicleController.java` | Nhận yêu cầu loại xe, xe, ghế, sơ đồ và phân công |
+| `service/RouteTripService.java` | Kiểm tra đầu vào, xử lý tỉnh/bến/tuyến và tổng hợp kết quả tìm chuyến |
+| `repository/ChuyenXeRepository.java` | Truy vấn lọc/phân trang quản lý và `findForSearch` tìm chuyến đang mở bán |
+| `service/TripSaleRules.java` | Kiểm tra lần lượt từng điều kiện mở bán và trả đầy đủ lý do chưa đạt |
+| `service/TripService.java` | Tạo/cập nhật chuyến, chuyển trạng thái, ghi lịch sử và xử lý công việc hủy |
+| `service/VehicleService.java` | Xử lý phương tiện, sơ đồ ghế và phân công bằng các bước/vòng lặp rõ ràng |
+| `service/VehicleRules.java` | Kiểm tra đăng kiểm, sơ đồ, lịch sử sử dụng và khả năng bán ghế |
+| `service/TripPassengerService.java` | Kiểm tra quyền rồi tạo danh sách hành khách và đếm trạng thái vé |
+
+### Ví dụ luồng tìm chuyến
+
+```text
+RouteTripController.handleTrips
+  → RouteTripService.searchChuyenXe
+    → Kiểm tra điểm đi, điểm đến và ngày
+    → Bắt đầu transaction, kiểm tra quyền
+    → ChuyenXeRepository.findForSearch
+    → Duyệt từng chuyến, gọi TripSaleRules.ensureSellable
+    → searchView lấy thông tin và số ghế còn
+    → Commit, trả danh sách
+  → Ghi JSON vào response
+```
+
+`findForSearch` thêm điều kiện bằng `StringBuilder` và các nhánh `if/else`.
+Vẫn nhận mã tỉnh (`CITY:`), mã bến (`STATION:`) và mã cũ không có tiền tố.
+Các kiểm tra về xe, nhân sự, hạn đặt vé vẫn thuộc Service/quy tắc nghiệp vụ.
+
+### Transaction và dữ liệu trả về
+
+Trong từng thao tác Service, thứ tự được thể hiện trực tiếp:
+
+```java
+try (EntityManager em = factory.createEntityManager()) {
+    EntityTransaction transaction = em.getTransaction();
+    transaction.begin();
+    try {
+        AccessPolicy.guard(em);
+        // Kiểm tra đầu vào/quyền, truy vấn và xử lý nghiệp vụ.
+        // Tạo dữ liệu response trước khi commit.
+        transaction.commit();
+        // Trả kết quả.
+    } catch (RuntimeException error) {
+        if (transaction.isActive()) {
+            transaction.rollback();
+        }
+        throw error;
+    }
+}
+```
+
+Không còn callback transaction bằng `Function<EntityManager,T>` trong các Service
+của thành viên. Repository dùng cùng EntityManager, không tự mở transaction riêng.
+Khóa nhà xe/chuyến/bến/xe và thứ tự refresh được giữ trong luồng đang sử dụng.
+
+Danh sách được tạo bằng `ArrayList` và vòng `for`. Response giữ tên trường cũ,
+được dựng bằng DTO đang có hoặc từng lệnh `put`, không đổi sang phong bì JSON của Cinema.
+Generic trong Repository dùng chung, DTO dạng record và các phép so sánh sắp xếp
+ngắn vẫn được giữ để tương thích các phần khác của hệ thống.
+
+Khi hủy chuyến, công việc hoàn và thông báo vẫn được lưu trong transaction hủy.
+Gọi bộ xử lý hoàn tiền/gửi thông báo sau commit; lỗi của bộ xử lý không làm mất
+bản ghi công việc để thử lại. Không đổi chính sách hoàn tiền hay tự đánh dấu vé đã lên xe.
