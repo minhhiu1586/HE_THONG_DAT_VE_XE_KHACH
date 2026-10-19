@@ -22,6 +22,7 @@ public final class TripPassengerService {
         this.factory = factory;
     }
 
+    // Kiểm tra quyền xem chuyến và trả danh sách hành khách, thông tin vé cùng số lượng theo trạng thái.
     public PassengerListResponse list(String tripId) {
         if (tripId == null || tripId.isBlank()) {
             throw new DomainException(400, "Mã chuyến là bắt buộc.");
@@ -30,25 +31,23 @@ public final class TripPassengerService {
             EntityTransaction tx = em.getTransaction();
             tx.begin();
             try {
-                var identity = RequestIdentity.get();
+                RequestIdentity.Context identity = RequestIdentity.get();
                 if (identity == null) {
                     throw new AccountException(401, "UNAUTHENTICATED", "Vui lòng đăng nhập.");
                 }
                 NguoiDung user = AccessControl.authenticated(em, identity.user(), Instant.now());
-                AccessControl.role(
-                        user, LoaiTaiKhoan.ADMIN, LoaiTaiKhoan.NHA_XE, LoaiTaiKhoan.NHAN_VIEN);
+                AccessControl.role(user, LoaiTaiKhoan.ADMIN, LoaiTaiKhoan.NHA_XE, LoaiTaiKhoan.NHAN_VIEN);
                 if (user.loaiTaiKhoan == LoaiTaiKhoan.NHAN_VIEN) {
                     AccessControl.assigned(em, user, tripId);
-                } else AccessControl.trip(em, user, tripId);
+                } else {
+                    AccessControl.trip(em, user, tripId);
+                }
                 ChuyenXe trip = AccessControl.resource(em, ChuyenXe.class, tripId);
                 HoanVeRepository refunds = new HoanVeRepository(em);
-                List<VeXe> tickets =
-                        em.createQuery(
-                                        "select v from VeXe v where v.chuyenXe.maChuyen=:trip order"
-                                                + " by v.ghe.maGhe",
-                                        VeXe.class)
-                                .setParameter("trip", tripId)
-                                .getResultList();
+                List<VeXe> tickets = em.createQuery("select v from VeXe v where v.chuyenXe.maChuyen=:trip order" + " by v.ghe.maGhe",
+                    VeXe.class)
+                    .setParameter("trip", tripId)
+                    .getResultList();
                 List<PassengerItem> passengers = new ArrayList<>();
                 int issued = 0;
                 int refunded = 0;
@@ -59,17 +58,8 @@ public final class TripPassengerService {
                     if (ticket.trangThai == TrangThaiVe.DA_LEN_XE) {
                         status = TrangThaiVe.DA_XUAT_VE.name();
                     }
-                    PassengerItem passenger =
-                            new PassengerItem(
-                                    ticket.maVe,
-                                    ticket.maTraCuu,
-                                    ticket.maGhe,
-                                    ticket.hoTenKhachHang,
-                                    ticket.soDienThoaiKhachHang,
-                                    ticket.cccdHanhKhach,
-                                    status,
-                                    ticket.giaVe,
-                                    refunds.ticketBlocked(ticket.maVe));
+                    PassengerItem passenger = new PassengerItem(ticket.maVe, ticket.maTraCuu, ticket.maGhe, ticket.hoTenKhachHang,
+                        ticket.soDienThoaiKhachHang, ticket.cccdHanhKhach, status, ticket.giaVe, refunds.ticketBlocked(ticket.maVe));
                     passengers.add(passenger);
                     if (status.equals("DA_XUAT_VE")) {
                         issued++;
@@ -81,19 +71,13 @@ public final class TripPassengerService {
                         cancelled++;
                     }
                 }
-                PassengerListResponse result =
-                        new PassengerListResponse(
-                                trip.maChuyen,
-                                trip.tuyenXe.tenTuyen,
-                                trip.tuyenXe.nhaXe.tenNhaXe,
-                                trip.xe == null ? "Chưa gán xe" : trip.xe.bienSo,
-                                trip.ngayKhoiHanh.toString(),
-                                trip.gioKhoiHanh.toString(),
-                                passengers.size(),
-                                issued,
-                                refunded,
-                                cancelled,
-                                passengers);
+                String licensePlate = "Chưa gán xe";
+                if (trip.xe != null) {
+                    licensePlate = trip.xe.bienSo;
+                }
+                PassengerListResponse result = new PassengerListResponse(trip.maChuyen, trip.tuyenXe.tenTuyen, trip.tuyenXe.nhaXe.tenNhaXe,
+                    licensePlate, trip.ngayKhoiHanh.toString(), trip.gioKhoiHanh.toString(), passengers.size(), issued, refunded, cancelled,
+                    passengers);
                 tx.commit();
                 return result;
             } catch (RuntimeException e) {

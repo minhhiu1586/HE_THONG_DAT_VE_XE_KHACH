@@ -29,9 +29,9 @@ public final class VehicleService {
 
     // Thêm số 0 vào đầu phần số khi so sánh chuỗi để G2 đứng trước G10.
     private static String sortableSeatPosition(String position) {
-        java.util.regex.Matcher numbers =
-                java.util.regex.Pattern.compile("[0-9]+")
-                        .matcher(position.toUpperCase(Locale.ROOT));
+        String uppercasePosition = position.toUpperCase(Locale.ROOT);
+        java.util.regex.Pattern numberPattern = java.util.regex.Pattern.compile("[0-9]+");
+        java.util.regex.Matcher numbers = numberPattern.matcher(uppercasePosition);
         StringBuilder result = new StringBuilder();
         while (numbers.find()) {
             java.math.BigInteger number = new java.math.BigInteger(numbers.group());
@@ -60,8 +60,8 @@ public final class VehicleService {
         return false;
     }
 
-    private static boolean duplicateSeatPosition(
-            Xe vehicle, String position, String ignoredSeatId) {
+    // Kiểm tra vị trí ghế có trùng trong cùng xe hay không, bỏ qua ghế đang được sửa.
+    private static boolean duplicateSeatPosition(Xe vehicle, String position, String ignoredSeatId) {
         for (Ghe seat : vehicle.danhSachGhe) {
             if (ignoredSeatId != null && seat.maGhe.equals(ignoredSeatId)) {
                 continue;
@@ -80,12 +80,13 @@ public final class VehicleService {
         }
         NhaXe tripOperator = assignment.chuyenXe.tuyenXe.nhaXe;
         NhaXe employeeOperator = assignment.nhanVien.nhaXe;
-        return tripOperator != null
-                && tripOperator.maNhaXe.equals(operatorId)
-                && employeeOperator != null
-                && employeeOperator.maNhaXe.equals(operatorId);
+        if (tripOperator == null || !tripOperator.maNhaXe.equals(operatorId)) {
+            return false;
+        }
+        return employeeOperator != null && employeeOperator.maNhaXe.equals(operatorId);
     }
 
+    // Sắp xếp ghế theo tầng và vị trí rồi chuyển thành danh sách dữ liệu trả về.
     private static List<Map<String, Object>> seatResponses(Collection<Ghe> seats) {
         List<Ghe> ordered = new ArrayList<>(seats);
         ordered.sort(SEAT_ORDER);
@@ -116,11 +117,13 @@ public final class VehicleService {
         return n;
     }
 
+    // Cho phép bỏ trống tốc độ hoặc dung tích, còn giá trị nhập phải dương và đúng giới hạn số.
     private static BigDecimal optionalPositiveDecimal(BigDecimal value) {
-        if (value != null
-                && (value.signum() <= 0
-                        || value.precision() - value.scale() > 8
-                        || value.scale() > 2)) {
+        if (value == null) {
+            return null;
+        }
+        int integerDigits = value.precision() - value.scale();
+        if (value.signum() <= 0 || integerDigits > 8 || value.scale() > 2) {
             throw new DomainException(400, "Tốc độ hoặc dung tích không hợp lệ");
         }
         return value;
@@ -140,6 +143,7 @@ public final class VehicleService {
         }
     }
 
+    // Chuyển thông tin loại xe thành dữ liệu trả về gồm mã, tên, sức chứa, số tầng và mô tả.
     private static Map<String, Object> view(LoaiXe vehicleType) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("maLoaiXe", vehicleType.maLoaiXe);
@@ -150,12 +154,21 @@ public final class VehicleService {
         return result;
     }
 
+    // Ghép thông tin xe, số ghế và tình trạng sơ đồ ghế để giao diện hiển thị.
     private static Map<String, Object> view(Xe vehicle) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("maXe", vehicle.maXe);
         result.put("bienSo", vehicle.bienSo);
-        result.put("maLoaiXe", vehicle.loaiXe == null ? null : vehicle.loaiXe.maLoaiXe);
-        result.put("maNhaXe", vehicle.nhaXe == null ? null : vehicle.nhaXe.maNhaXe);
+        if (vehicle.loaiXe == null) {
+            result.put("maLoaiXe", null);
+        } else {
+            result.put("maLoaiXe", vehicle.loaiXe.maLoaiXe);
+        }
+        if (vehicle.nhaXe == null) {
+            result.put("maNhaXe", null);
+        } else {
+            result.put("maNhaXe", vehicle.nhaXe.maNhaXe);
+        }
         result.put("soChoNgoi", vehicle.soChoNgoi);
         result.put("tocDo", vehicle.tocDoGio);
         result.put("dungTichXang", vehicle.dungTichXang);
@@ -165,14 +178,13 @@ public final class VehicleService {
         result.put("trangThai", vehicle.trangThai);
         result.put("soGheThucTe", vehicle.danhSachGhe.size());
         result.put("soDoHopLe", VehicleRules.layoutValid(vehicle));
-        result.put(
-                "dangKiemConHieuLuc",
-                VehicleRules.inspection(vehicle, VehicleRules.today(), VehicleRules.today()));
+        result.put("dangKiemConHieuLuc", VehicleRules.inspection(vehicle, VehicleRules.today(), VehicleRules.today()));
         boolean editable = !hasActiveTrip(vehicle) && !hasSeatHistory(vehicle.danhSachGhe);
         result.put("coTheSuaSoDo", editable);
         return result;
     }
 
+    // Chuyển thông tin vị trí, tầng và trạng thái ghế thành dữ liệu trả về.
     private static Map<String, Object> view(Ghe seat) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("maGhe", seat.maGhe);
@@ -183,6 +195,7 @@ public final class VehicleService {
         return result;
     }
 
+    // Chuyển thông tin phân công chuyến, nhân viên, vai trò và ghi chú thành dữ liệu trả về.
     private static Map<String, Object> view(PhanCongChuyenXe x) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("maPhanCong", x.maPhanCong);
@@ -193,6 +206,7 @@ public final class VehicleService {
         return result;
     }
 
+    // Lấy danh sách loại xe, xe hoặc phân công theo quyền và phạm vi nhà xe của người đăng nhập.
     public List<Map<String, Object>> list(String kind) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -207,9 +221,7 @@ public final class VehicleService {
                     }
                 } else if (kind.equals("xe")) {
                     for (Xe vehicle : new XeRepository(em).list()) {
-                        if (operatorId != null
-                                && (vehicle.nhaXe == null
-                                        || !vehicle.nhaXe.maNhaXe.equals(operatorId))) {
+                        if (operatorId != null && (vehicle.nhaXe == null || !vehicle.nhaXe.maNhaXe.equals(operatorId))) {
                             continue;
                         }
                         results.add(view(vehicle));
@@ -239,6 +251,7 @@ public final class VehicleService {
         }
     }
 
+    // Tìm một loại xe, xe hoặc phân công theo mã và chuyển thành dữ liệu trả về cho giao diện.
     public Map<String, Object> get(String kind, String id) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -253,8 +266,7 @@ public final class VehicleService {
                     Xe vehicle = found(new XeRepository(em).find(text(id, 40)));
                     result = view(vehicle);
                 } else if (kind.equals("phan-cong")) {
-                    PhanCongChuyenXe assignment =
-                            found(new PhanCongChuyenXeRepository(em).find(text(id, 40)));
+                    PhanCongChuyenXe assignment = found(new PhanCongChuyenXeRepository(em).find(text(id, 40)));
                     result = view(assignment);
                 } else {
                     throw new DomainException(404, "API không tồn tại");
@@ -271,6 +283,7 @@ public final class VehicleService {
         }
     }
 
+    // Tạo hoặc sửa loại xe và chặn đổi cấu trúc ghế khi loại xe đã được sử dụng.
     public Map<String, Object> saveType(String id, VehicleInputs.LoaiXe input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -278,18 +291,21 @@ public final class VehicleService {
             try {
                 AccessPolicy.guard(em);
                 LoaiXeRepository repo = new LoaiXeRepository(em);
-                LoaiXe vehicleType = id == null ? new LoaiXe() : found(repo.lock(text(id, 40)));
+                LoaiXe vehicleType;
+                if (id == null) {
+                    vehicleType = new LoaiXe();
+                } else {
+                    vehicleType = found(repo.lock(text(id, 40)));
+                }
                 if (id == null) {
                     vehicleType.maLoaiXe = text(input.maLoaiXe(), 40);
                     check(repo.find(vehicleType.maLoaiXe) == null, "Mã loại xe đã tồn tại");
                 }
-                int seats = positive(input.soChoNgoi()), floors = positive(input.soTang());
+                int seats = positive(input.soChoNgoi());
+                int floors = positive(input.soTang());
                 check(floors <= seats, "Số tầng không được lớn hơn số ghế");
-                if (id != null
-                        && (seats != vehicleType.soChoNgoi || floors != vehicleType.soTang)) {
-                    check(
-                            vehicleType.danhSachXe.isEmpty(),
-                            "Loại xe đang được sử dụng; không thể đổi cấu trúc ghế");
+                if (id != null && (seats != vehicleType.soChoNgoi || floors != vehicleType.soTang)) {
+                    check(vehicleType.danhSachXe.isEmpty(), "Loại xe đang được sử dụng; không thể đổi cấu trúc ghế");
                 }
                 vehicleType.tenLoaiXe = text(input.tenLoaiXe(), 120);
                 vehicleType.soChoNgoi = seats;
@@ -314,6 +330,7 @@ public final class VehicleService {
         }
     }
 
+    // Tạo hoặc sửa xe sau khi kiểm tra nhà xe, loại xe, biển số, đăng kiểm và lịch chuyến liên quan.
     public Map<String, Object> saveVehicle(String id, VehicleInputs.Xe input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -321,7 +338,12 @@ public final class VehicleService {
             try {
                 AccessPolicy.guard(em);
                 XeRepository repo = new XeRepository(em);
-                Xe vehicle = id == null ? new Xe() : found(repo.lock(text(id, 40)));
+                Xe vehicle;
+                if (id == null) {
+                    vehicle = new Xe();
+                } else {
+                    vehicle = found(repo.lock(text(id, 40)));
+                }
                 if (id == null) {
                     vehicle.maXe = text(input.maXe(), 40);
                     if (vehicle.maXe.equalsIgnoreCase("pham-vi")) {
@@ -331,15 +353,11 @@ public final class VehicleService {
                 }
                 LoaiXe type = found(new LoaiXeRepository(em).lock(text(input.maLoaiXe(), 40)));
                 String authenticatedOwner = RequestIdentity.operatorId();
-                NhaXe owner =
-                        found(
-                                em.find(
-                                        NhaXe.class,
-                                        text(
-                                                authenticatedOwner == null
-                                                        ? input.maNhaXe()
-                                                        : authenticatedOwner,
-                                                40)));
+                String ownerId = authenticatedOwner;
+                if (ownerId == null) {
+                    ownerId = input.maNhaXe();
+                }
+                NhaXe owner = found(em.find(NhaXe.class, text(ownerId, 40)));
                 if (id == null) {
                     AccessControl.businessAllowed(em, owner);
                 }
@@ -347,59 +365,41 @@ public final class VehicleService {
                     throw new DomainException(400, "Sức chứa phải khớp với loại xe.");
                 }
                 if (id != null) {
-                    check(
-                            vehicle.soChoNgoi == type.soChoNgoi,
-                            "Sức chứa hiện tại không khớp loại xe; không tự thay sức chứa khi sửa"
-                                    + " thông tin.");
-                    check(
-                            vehicle.loaiXe != null && vehicle.loaiXe.maLoaiXe.equals(type.maLoaiXe),
-                            "Không đổi loại xe đã tạo; tạo xe mới để giữ lịch sử ghế");
-                    check(
-                            vehicle.nhaXe != null && vehicle.nhaXe.maNhaXe.equals(owner.maNhaXe),
-                            "Không chuyển nhà xe của xe đã tạo");
+                    check(vehicle.soChoNgoi == type.soChoNgoi, "Sức chứa hiện tại không khớp loại xe; không tự thay sức chứa khi sửa"
+                        + " thông tin.");
+                    check(vehicle.loaiXe != null && vehicle.loaiXe.maLoaiXe.equals(type.maLoaiXe),
+                        "Không đổi loại xe đã tạo; tạo xe mới để giữ lịch sử ghế");
+                    check(vehicle.nhaXe != null && vehicle.nhaXe.maNhaXe.equals(owner.maNhaXe), "Không chuyển nhà xe của xe đã tạo");
                 }
-                if (input.ngayDangKiem() == null
-                        || input.hanDangKiem() == null
-                        || input.hanDangKiem().isBefore(input.ngayDangKiem())) {
+                if (input.ngayDangKiem() == null || input.hanDangKiem() == null || input.hanDangKiem().isBefore(input.ngayDangKiem())) {
                     throw new DomainException(400, "Ngày đăng kiểm và hạn đăng kiểm không hợp lệ");
                 }
-                if (input.namSanXuat() != null
-                        && (input.namSanXuat() <= 0
-                                || input.namSanXuat() > VehicleRules.today().getYear() + 1)) {
+                if (input.namSanXuat() != null && (input.namSanXuat() <= 0 || input.namSanXuat() > VehicleRules.today().getYear() + 1)) {
                     throw new DomainException(400, "Năm sản xuất không hợp lệ");
                 }
-                TrangThaiXe state =
-                        input.trangThai() == null ? TrangThaiXe.SAN_SANG : input.trangThai();
+                TrangThaiXe state;
+                if (input.trangThai() == null) {
+                    state = TrangThaiXe.SAN_SANG;
+                } else {
+                    state = input.trangThai();
+                }
                 if (id != null) {
                     for (ChuyenXe trip : vehicle.danhSachChuyenXe) {
                         if (active(trip)) {
-                            check(
-                                    state == TrangThaiXe.SAN_SANG,
-                                    "Xe đang có chuyến; cần xử lý lịch chuyến trước khi đổi trạng"
-                                            + " thái");
-                            check(
-                                    !input.ngayDangKiem().isAfter(trip.ngayKhoiHanh)
-                                            && !input.hanDangKiem()
-                                                    .isBefore(trip.gioDenDuKien.toLocalDate()),
-                                    "Đăng kiểm không bao phủ lịch chuyến");
+                            check(state == TrangThaiXe.SAN_SANG, "Xe đang có chuyến; cần xử lý lịch chuyến trước khi đổi trạng" + " thái");
+                            check(!input.ngayDangKiem().isAfter(trip.ngayKhoiHanh) && !input.hanDangKiem()
+                                .isBefore(trip.gioDenDuKien.toLocalDate()), "Đăng kiểm không bao phủ lịch chuyến");
                         }
                     }
                 }
                 vehicle.tocDoGio = optionalPositiveDecimal(input.tocDo());
                 vehicle.dungTichXang = optionalPositiveDecimal(input.dungTichXang());
-                String plate =
-                        text(input.bienSo(), 30).toUpperCase(Locale.ROOT).replaceAll("\\s+", "");
+                String plate = text(input.bienSo(), 30).toUpperCase(Locale.ROOT).replaceAll("\\s+", "");
                 if (!plate.matches("[A-Z0-9.-]{3,30}")) {
                     throw new DomainException(400, "Biển số không hợp lệ.");
                 }
-                if (em.createQuery(
-                                        "select count(v) from Xe v where upper(trim(v.bienSo)) ="
-                                                + " :plate and v.maXe <> :id",
-                                        Long.class)
-                                .setParameter("plate", plate)
-                                .setParameter("id", vehicle.maXe)
-                                .getSingleResult()
-                        > 0) {
+                if (em.createQuery("select count(v) from Xe v where upper(trim(v.bienSo)) =" + " :plate and v.maXe <> :id", Long.class)
+                    .setParameter("plate", plate) .setParameter("id", vehicle.maXe) .getSingleResult() > 0) {
                     throw new DomainException(409, "Biển số đã tồn tại.");
                 }
                 vehicle.bienSo = plate;
@@ -428,6 +428,7 @@ public final class VehicleService {
         }
     }
 
+    // Tạo đủ ghế mặc định theo sức chứa và chia tầng khi xe chưa có danh sách ghế.
     private static void generate(EntityManager em, Xe vehicle) {
         check(vehicle.danhSachGhe.isEmpty(), "Xe đã có ghế; không sinh lại danh sách");
         for (int i = 0; i < vehicle.soChoNgoi; i++) {
@@ -442,6 +443,7 @@ public final class VehicleService {
         }
     }
 
+    // Lấy danh sách ghế của xe và chỉ sinh ghế khi được yêu cầu và xe đáp ứng điều kiện.
     public List<Map<String, Object>> seats(String vehicle, boolean generate) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -454,8 +456,7 @@ public final class VehicleService {
                     generate(em, x);
                 }
 
-                List<Map<String, Object>> responseData =
-                        seatResponses(new GheRepository(em).byVehicle(x.maXe));
+                List<Map<String, Object>> responseData = seatResponses(new GheRepository(em).byVehicle(x.maXe));
                 transaction.commit();
                 return responseData;
             } catch (RuntimeException error) {
@@ -467,6 +468,7 @@ public final class VehicleService {
         }
     }
 
+    // Sửa thông tin ghế sau khi kiểm tra vị trí, tầng, lịch chuyến và trạng thái sử dụng.
     public Map<String, Object> updateSeat(String vehicle, String id, VehicleInputs.Ghe input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -476,9 +478,7 @@ public final class VehicleService {
                 found(new XeRepository(em).lock(text(vehicle, 40)));
                 Ghe seat = found(new GheRepository(em).lock(text(id, 40)));
                 check(seat.xe.maXe.equals(vehicle), "Ghế không thuộc xe");
-                check(
-                        seat.danhSachVe.isEmpty() && seat.danhSachGiuCho.isEmpty(),
-                        "Ghế đã có vé hoặc giữ chỗ; không thể thay đổi");
+                check(seat.danhSachVe.isEmpty() && seat.danhSachGiuCho.isEmpty(), "Ghế đã có vé hoặc giữ chỗ; không thể thay đổi");
                 check(!hasActiveTrip(seat.xe), "Xe đang có lịch chuyến; không thể sửa ghế");
                 int floor = positive(input.tang());
                 check(floor <= seat.xe.loaiXe.soTang, "Tầng vượt cấu hình loại xe");
@@ -486,9 +486,7 @@ public final class VehicleService {
                     throw new DomainException(400, "Thiếu trạng thái ghế");
                 }
                 String code = seatCode(input.viTri());
-                check(
-                        !duplicateSeatPosition(seat.xe, code, seat.maGhe),
-                        "Mã/vị trí ghế đã tồn tại trong xe.");
+                check(!duplicateSeatPosition(seat.xe, code, seat.maGhe), "Mã/vị trí ghế đã tồn tại trong xe.");
                 seat.viTri = code;
                 seat.tang = floor;
                 seat.trangThai = input.trangThai();
@@ -505,6 +503,7 @@ public final class VehicleService {
         }
     }
 
+    // Thêm ghế vào xe sau khi kiểm tra sức chứa, vị trí, tầng và điều kiện sửa sơ đồ.
     public Map<String, Object> createSeat(String vehicle, VehicleInputs.Ghe input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -513,10 +512,8 @@ public final class VehicleService {
                 AccessPolicy.guard(em);
                 Xe x = found(new XeRepository(em).lock(text(vehicle, 40)));
                 check(!hasActiveTrip(x), "Xe đang có lịch chuyến; không thể thêm ghế");
-                check(
-                        x.danhSachGhe.size() + 1 == x.soChoNgoi,
-                        "Thêm từng ghế chỉ được hoàn thiện đủ sức chứa; dùng API lưu toàn bộ sơ"
-                                + " đồ.");
+                check(x.danhSachGhe.size() + 1 == x.soChoNgoi, "Thêm từng ghế chỉ được hoàn thiện đủ sức chứa; dùng API lưu toàn bộ sơ"
+                    + " đồ.");
                 int floor = positive(input.tang());
                 check(x.loaiXe != null && floor <= x.loaiXe.soTang, "Tầng vượt cấu hình loại xe");
                 Ghe seat = new Ghe();
@@ -524,11 +521,12 @@ public final class VehicleService {
                 seat.xe = x;
                 seat.viTri = seatCode(input.viTri());
                 seat.tang = floor;
-                check(
-                        !duplicateSeatPosition(x, seat.viTri, null),
-                        "Mã/vị trí ghế đã tồn tại trong xe.");
-                seat.trangThai =
-                        input.trangThai() == null ? TrangThaiGhe.HOAT_DONG : input.trangThai();
+                check(!duplicateSeatPosition(x, seat.viTri, null), "Mã/vị trí ghế đã tồn tại trong xe.");
+                if (input.trangThai() == null) {
+                    seat.trangThai = TrangThaiGhe.HOAT_DONG;
+                } else {
+                    seat.trangThai = input.trangThai();
+                }
                 x.danhSachGhe.add(seat);
                 new GheRepository(em).save(seat);
 
@@ -544,6 +542,7 @@ public final class VehicleService {
         }
     }
 
+    // Kiểm tra ghế thuộc đúng xe rồi trả thông tin ghế theo mã.
     public Map<String, Object> getSeat(String vehicle, String id) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -565,6 +564,7 @@ public final class VehicleService {
         }
     }
 
+    // Xóa ghế khi các điều kiện về lịch chuyến và lịch sử sử dụng cho phép.
     public void deleteSeat(String vehicle, String id) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -574,14 +574,9 @@ public final class VehicleService {
                 Xe x = found(new XeRepository(em).lock(text(vehicle, 40)));
                 Ghe seat = found(new GheRepository(em).lock(text(id, 40)));
                 check(seat.xe.maXe.equals(x.maXe), "Ghế không thuộc xe");
-                check(
-                        seat.danhSachVe.isEmpty() && seat.danhSachGiuCho.isEmpty(),
-                        "Ghế đã có lịch sử vé hoặc giữ chỗ; không thể xóa");
+                check(seat.danhSachVe.isEmpty() && seat.danhSachGiuCho.isEmpty(), "Ghế đã có lịch sử vé hoặc giữ chỗ; không thể xóa");
                 check(!hasActiveTrip(x), "Xe đang có lịch chuyến; không thể xóa ghế");
-                throw new DomainException(
-                        409,
-                        "Không xóa riêng một ghế làm thiếu sức chứa; hãy lưu toàn bộ sơ đồ thay"
-                                + " thế.");
+                throw new DomainException(409, "Không xóa riêng một ghế làm thiếu sức chứa; hãy lưu toàn bộ sơ đồ thay" + " thế.");
             } catch (RuntimeException error) {
                 if (transaction.isActive()) {
                     transaction.rollback();
@@ -609,12 +604,9 @@ public final class VehicleService {
                 AssignmentRules.validateVehicleSchedule(em, c, x.maXe);
                 for (ChuyenXe other : x.danhSachChuyenXe) {
                     if (!other.maChuyen.equals(c.maChuyen) && active(other)) {
-                        check(
-                                !LocalDateTime.of(c.ngayKhoiHanh, c.gioKhoiHanh)
-                                                .isBefore(other.gioDenDuKien)
-                                        || !LocalDateTime.of(other.ngayKhoiHanh, other.gioKhoiHanh)
-                                                .isBefore(c.gioDenDuKien),
-                                "Xe đã có chuyến trùng thời gian");
+                        check(!LocalDateTime.of(c.ngayKhoiHanh, c.gioKhoiHanh).isBefore(other.gioDenDuKien)
+                            || !LocalDateTime.of(other.ngayKhoiHanh, other.gioKhoiHanh).isBefore(c.gioDenDuKien),
+                            "Xe đã có chuyến trùng thời gian");
                     }
                 }
 
@@ -636,8 +628,7 @@ public final class VehicleService {
     private static String seatCode(String code) {
         String value = text(code, 20).toUpperCase(Locale.ROOT);
         if (!value.matches("[A-Z0-9][A-Z0-9.-]{0,19}")) {
-            throw new DomainException(
-                    400, "Mã/vị trí ghế chỉ dùng chữ, số, dấu chấm hoặc gạch ngang.");
+            throw new DomainException(400, "Mã/vị trí ghế chỉ dùng chữ, số, dấu chấm hoặc gạch ngang.");
         }
         return value;
     }
@@ -650,22 +641,26 @@ public final class VehicleService {
                 continue;
             }
             LocalDateTime otherDeparture = LocalDateTime.of(other.ngayKhoiHanh, other.gioKhoiHanh);
-            if (departure.isBefore(other.gioDenDuKien)
-                    && otherDeparture.isBefore(trip.gioDenDuKien)) {
+            if (departure.isBefore(other.gioDenDuKien) && otherDeparture.isBefore(trip.gioDenDuKien)) {
                 return true;
             }
         }
         return false;
     }
 
-    public List<Map<String, Object>> filtered(
-            String kind, String search, String type, String owner, String state, String tripId) {
+    // Lọc loại xe, xe hoặc phân công theo từ khóa, trạng thái, nhà xe và điều kiện của chuyến.
+    public List<Map<String, Object>> filtered(String kind, String search, String type, String owner, String state, String tripId) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
             transaction.begin();
             try {
                 AccessPolicy.guard(em);
-                String term = search == null ? "" : search.strip().toLowerCase(Locale.ROOT);
+                String term;
+                if (search == null) {
+                    term = "";
+                } else {
+                    term = search.strip().toLowerCase(Locale.ROOT);
+                }
                 if (term.length() > 160) {
                     throw new DomainException(400, "Từ khóa quá dài.");
                 }
@@ -675,9 +670,7 @@ public final class VehicleService {
                     List<LoaiXe> types = new ArrayList<>(new LoaiXeRepository(em).list());
                     types.sort(Comparator.comparing(typeItem -> typeItem.maLoaiXe));
                     for (LoaiXe typeItem : types) {
-                        String searchable =
-                                (typeItem.maLoaiXe + " " + typeItem.tenLoaiXe)
-                                        .toLowerCase(Locale.ROOT);
+                        String searchable = (typeItem.maLoaiXe + " " + typeItem.tenLoaiXe).toLowerCase(Locale.ROOT);
                         if (term.isEmpty() || searchable.contains(term)) {
                             results.add(view(typeItem));
                         }
@@ -698,35 +691,22 @@ public final class VehicleService {
                         trip = found(em.find(ChuyenXe.class, tripId));
                     }
                     if (trip != null && operatorId != null) {
-                        AccessControl.trip(
-                                em,
-                                AccessControl.authenticated(
-                                        em, RequestIdentity.get().user(), Instant.now()),
-                                tripId);
+                        AccessControl.trip(em, AccessControl.authenticated(em, RequestIdentity.get().user(), Instant.now()), tripId);
                     }
                     for (Xe vehicle : new XeRepository(em).list()) {
-                        if (operatorId != null
-                                && (vehicle.nhaXe == null
-                                        || !operatorId.equals(vehicle.nhaXe.maNhaXe))) {
+                        if (operatorId != null && (vehicle.nhaXe == null || !operatorId.equals(vehicle.nhaXe.maNhaXe))) {
                             continue;
                         }
-                        if (owner != null
-                                && !owner.isBlank()
-                                && (vehicle.nhaXe == null
-                                        || !owner.equals(vehicle.nhaXe.maNhaXe))) {
+                        if (owner != null && !owner.isBlank() && (vehicle.nhaXe == null || !owner.equals(vehicle.nhaXe.maNhaXe))) {
                             continue;
                         }
-                        if (type != null
-                                && !type.isBlank()
-                                && (vehicle.loaiXe == null
-                                        || !type.equals(vehicle.loaiXe.maLoaiXe))) {
+                        if (type != null && !type.isBlank() && (vehicle.loaiXe == null || !type.equals(vehicle.loaiXe.maLoaiXe))) {
                             continue;
                         }
                         if (status != null && vehicle.trangThai != status) {
                             continue;
                         }
-                        String searchable =
-                                (vehicle.bienSo + " " + vehicle.maXe).toLowerCase(Locale.ROOT);
+                        String searchable = (vehicle.bienSo + " " + vehicle.maXe).toLowerCase(Locale.ROOT);
                         if (!term.isEmpty() && !searchable.contains(term)) {
                             continue;
                         }
@@ -758,6 +738,7 @@ public final class VehicleService {
         }
     }
 
+    // Lấy danh sách nhà xe để chọn khi quản lý xe, có giới hạn theo phạm vi tài khoản.
     public List<Map<String, Object>> operators() {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -766,9 +747,7 @@ public final class VehicleService {
                 AccessPolicy.guard(em);
                 String operatorId = RequestIdentity.operatorId();
                 List<Map<String, Object>> results = new ArrayList<>();
-                List<NhaXe> operators =
-                        em.createQuery("select n from NhaXe n order by n.tenNhaXe", NhaXe.class)
-                                .getResultList();
+                List<NhaXe> operators = em.createQuery("select n from NhaXe n order by n.tenNhaXe", NhaXe.class).getResultList();
                 for (NhaXe operator : operators) {
                     if (operatorId != null && !operatorId.equals(operator.maNhaXe)) {
                         continue;
@@ -801,13 +780,11 @@ public final class VehicleService {
                 Xe vehicle = found(new XeRepository(em).lock(text(id, 40)));
                 List<VehicleInputs.ViTriGhe> entries = input.danhSachGhe();
                 if (entries == null || entries.size() != vehicle.soChoNgoi) {
-                    throw new DomainException(
-                            400, "Sơ đồ phải có đúng " + vehicle.soChoNgoi + " ghế.");
+                    throw new DomainException(400, "Sơ đồ phải có đúng " + vehicle.soChoNgoi + " ghế.");
                 }
-                check(
-                        vehicle.loaiXe != null && vehicle.soChoNgoi == vehicle.loaiXe.soChoNgoi,
-                        "Sức chứa xe không khớp loại xe.");
-                Set<String> ids = new HashSet<>(), codes = new HashSet<>();
+                check(vehicle.loaiXe != null && vehicle.soChoNgoi == vehicle.loaiXe.soChoNgoi, "Sức chứa xe không khớp loại xe.");
+                Set<String> ids = new HashSet<>();
+                Set<String> codes = new HashSet<>();
                 Map<String, Ghe> existing = new HashMap<>();
                 for (Ghe seat : vehicle.danhSachGhe) {
                     existing.put(seat.maGhe, seat);
@@ -819,32 +796,25 @@ public final class VehicleService {
                     if (!codes.add(seatCode(entry.viTri()))) {
                         throw new DomainException(400, "Mã/vị trí ghế trùng trong xe.");
                     }
-                    if (entry.tang() == null
-                            || entry.tang() < 1
-                            || entry.tang() > vehicle.loaiXe.soTang) {
+                    if (entry.tang() == null || entry.tang() < 1 || entry.tang() > vehicle.loaiXe.soTang) {
                         throw new DomainException(400, "Tầng ghế không hợp lệ.");
                     }
-                    if (entry.maGhe() != null
-                            && (!ids.add(entry.maGhe()) || !existing.containsKey(entry.maGhe()))) {
+                    if (entry.maGhe() != null && (!ids.add(entry.maGhe()) || !existing.containsKey(entry.maGhe()))) {
                         throw new DomainException(400, "Mã ghế trùng hoặc không thuộc xe.");
                     }
                 }
                 boolean changed = ids.size() != existing.size();
                 for (VehicleInputs.ViTriGhe entry : entries) {
                     Ghe old = existing.get(entry.maGhe());
-                    if (old == null
-                            || !old.viTri.equals(seatCode(entry.viTri()))
-                            || old.tang != entry.tang()
-                            || old.trangThai != entry.trangThai()) {
+                    if (old == null || !old.viTri.equals(seatCode(entry.viTri())) || old.tang != entry.tang()
+                        || old.trangThai != entry.trangThai()) {
                         changed = true;
                         break;
                     }
                 }
                 if (changed) {
                     check(!hasActiveTrip(vehicle), "Xe đang có lịch chuyến; không sửa sơ đồ ghế.");
-                    check(
-                            !hasSeatHistory(existing.values()),
-                            "Sơ đồ đã có lịch sử vé/giữ chỗ; không được thay đổi.");
+                    check(!hasSeatHistory(existing.values()), "Sơ đồ đã có lịch sử vé/giữ chỗ; không được thay đổi.");
                     // Đổi nhãn tạm trước khi hoán đổi vị trí để không vi phạm khóa duy nhất của
                     // ghế.
                     Set<String> parked = new HashSet<>(codes);
@@ -854,12 +824,7 @@ public final class VehicleService {
                     for (Ghe g : existing.values()) {
                         String temporary;
                         do {
-                            temporary =
-                                    "TMP"
-                                            + UUID.randomUUID()
-                                                    .toString()
-                                                    .replace("-", "")
-                                                    .substring(0, 16);
+                            temporary = "TMP" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
                         } while (!parked.add(temporary));
                         g.viTri = temporary;
                     }
@@ -901,6 +866,7 @@ public final class VehicleService {
         }
     }
 
+    // Trả danh sách ghế của chuyến cùng trạng thái còn trống, đang giữ, đã bán hoặc ngừng bán.
     public Map<String, Object> tripSeats(String tripId) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -939,6 +905,7 @@ public final class VehicleService {
         }
     }
 
+    // Tạo hoặc sửa phân công sau khi kiểm tra nhân viên, lịch chuyến và kế hoạch lái nghỉ cần thiết.
     public Map<String, Object> saveAssignment(String id, VehicleInputs.PhanCong input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -946,15 +913,18 @@ public final class VehicleService {
             try {
                 AccessPolicy.guard(em);
                 PhanCongChuyenXeRepository repo = new PhanCongChuyenXeRepository(em);
-                PhanCongChuyenXe assignment =
-                        id == null ? new PhanCongChuyenXe() : found(repo.lock(text(id, 40)));
-                ChuyenXe previousTrip =
-                        id == null
-                                ? null
-                                : em.find(
-                                        ChuyenXe.class,
-                                        assignment.chuyenXe.maChuyen,
-                                        LockModeType.PESSIMISTIC_WRITE);
+                PhanCongChuyenXe assignment;
+                if (id == null) {
+                    assignment = new PhanCongChuyenXe();
+                } else {
+                    assignment = found(repo.lock(text(id, 40)));
+                }
+                ChuyenXe previousTrip;
+                if (id == null) {
+                    previousTrip = null;
+                } else {
+                    previousTrip = em.find(ChuyenXe.class, assignment.chuyenXe.maChuyen, LockModeType.PESSIMISTIC_WRITE);
+                }
                 if (previousTrip != null) {
                     previousTrip = (ChuyenXe) org.hibernate.Hibernate.unproxy(previousTrip);
                 }
@@ -963,52 +933,43 @@ public final class VehicleService {
                     check(repo.find(assignment.maPhanCong) == null, "Mã phân công đã tồn tại");
                 }
                 if (id != null) {
-                    check(
-                            TripSaleRules.scheduled(assignment.chuyenXe),
-                            "Không sửa phân công chuyến đã khởi hành");
+                    check(TripSaleRules.scheduled(assignment.chuyenXe), "Không sửa phân công chuyến đã khởi hành");
                 }
-                ChuyenXe trip =
-                        found(
-                                em.find(
-                                        ChuyenXe.class,
-                                        text(input.maChuyen(), 40),
-                                        LockModeType.PESSIMISTIC_WRITE));
+                ChuyenXe trip = found(em.find(ChuyenXe.class, text(input.maChuyen(), 40), LockModeType.PESSIMISTIC_WRITE));
                 trip = (ChuyenXe) org.hibernate.Hibernate.unproxy(trip);
                 trip.tuyenXe = (TuyenXe) org.hibernate.Hibernate.unproxy(trip.tuyenXe);
                 check(TripSaleRules.scheduled(trip), "Chỉ phân công chuyến chưa khởi hành");
-                NhanVien employee =
-                        found(
-                                em.find(
-                                        NhanVien.class,
-                                        text(input.maNhanVien(), 40),
-                                        LockModeType.PESSIMISTIC_WRITE));
+                NhanVien employee = found(em.find(NhanVien.class, text(input.maNhanVien(), 40), LockModeType.PESSIMISTIC_WRITE));
                 employee = (NhanVien) org.hibernate.Hibernate.unproxy(employee);
                 AssignmentRules.validate(em, trip, employee, input.vaiTro(), assignment.maPhanCong);
                 if (input.ghiChu() != null && input.ghiChu().length() > 1000) {
                     throw new DomainException(400, "Ghi chú quá dài");
                 }
                 // Bỏ dấu xác nhận kế hoạch lái/nghỉ cũ trước khi ghi nhận người xác nhận lần này.
-                String note =
-                        input.ghiChu() == null
-                                ? ""
-                                : input.ghiChu().replaceFirst("^\\[T11_PLAN:[^\\]]*\\]\\s*", "");
+                String note;
+                if (input.ghiChu() == null) {
+                    note = "";
+                } else {
+                    note = input.ghiChu().replaceFirst("^\\[T11_PLAN:[^\\]]*\\]\\s*", "");
+                }
                 if (AssignmentRules.needsDrivingPlan(trip)) {
-                    check(
-                            Boolean.TRUE.equals(input.xacNhanKeHoachLaiNghi()),
-                            "Chuyến dài cần xác nhận kế hoạch lái/nghỉ; hệ thống chưa tự kiểm chứng"
-                                    + " giờ nghỉ.");
-                    var identity = RequestIdentity.get();
-                    String reviewer = identity == null ? "INTERNAL" : identity.user().maNguoiDung();
-                    note =
-                            AssignmentRules.reviewPrefix(trip)
-                                    + reviewer
-                                    + "/"
-                                    + Instant.now()
-                                    + "] "
-                                    + note;
+                    check(Boolean.TRUE.equals(input.xacNhanKeHoachLaiNghi()),
+                        "Chuyến dài cần xác nhận kế hoạch lái/nghỉ; hệ thống chưa tự kiểm chứng" + " giờ nghỉ.");
+                    RequestIdentity.Context identity = RequestIdentity.get();
+                    String reviewer;
+                    if (identity == null) {
+                        reviewer = "INTERNAL";
+                    } else {
+                        reviewer = identity.user().maNguoiDung();
+                    }
+                    note = AssignmentRules.reviewPrefix(trip) + reviewer + "/" + Instant.now() + "] " + note;
                 }
                 check(note.length() <= 1000, "Ghi chú quá dài sau khi ghi nhận xác nhận.");
-                assignment.ghiChu = note.isEmpty() ? null : note;
+                if (note.isEmpty()) {
+                    assignment.ghiChu = null;
+                } else {
+                    assignment.ghiChu = note;
+                }
                 assignment.chuyenXe = trip;
                 assignment.nhanVien = employee;
                 assignment.vaiTro = input.vaiTro();
@@ -1016,14 +977,11 @@ public final class VehicleService {
                     repo.save(assignment);
                 }
                 em.flush();
-                if (trip.trangThai == TrangThaiChuyen.DANG_MO_BAN
-                        || VehicleRules.hasTicketsOrHolds(em, trip)) {
+                if (trip.trangThai == TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em, trip)) {
                     AssignmentRules.readyForOperation(em, trip);
                 }
-                if (previousTrip != null
-                        && !previousTrip.maChuyen.equals(trip.maChuyen)
-                        && (previousTrip.trangThai == TrangThaiChuyen.DANG_MO_BAN
-                                || VehicleRules.hasTicketsOrHolds(em, previousTrip))) {
+                if (previousTrip != null && !previousTrip.maChuyen.equals(trip.maChuyen)
+                    && (previousTrip.trangThai == TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em, previousTrip))) {
                     AssignmentRules.readyForOperation(em, previousTrip);
                 }
 
@@ -1039,6 +997,7 @@ public final class VehicleService {
         }
     }
 
+    // Xóa loại xe, xe hoặc phân công sau khi kiểm tra lịch sử sử dụng và các ràng buộc liên quan.
     public void delete(String kind, String id) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -1055,23 +1014,15 @@ public final class VehicleService {
                     Xe vehicle = found(repository.lock(text(id, 40)));
                     check(vehicle.danhSachChuyenXe.isEmpty(), "Xe đã có lịch sử chuyến");
                     for (Ghe seat : vehicle.danhSachGhe) {
-                        check(
-                                seat.danhSachVe.isEmpty() && seat.danhSachGiuCho.isEmpty(),
-                                "Ghế đã được sử dụng");
+                        check(seat.danhSachVe.isEmpty() && seat.danhSachGiuCho.isEmpty(), "Ghế đã được sử dụng");
                     }
                     repository.delete(vehicle);
                 } else if (kind.equals("phan-cong")) {
                     PhanCongChuyenXeRepository repository = new PhanCongChuyenXeRepository(em);
                     PhanCongChuyenXe assignment = found(repository.lock(text(id, 40)));
                     check(TripSaleRules.scheduled(assignment.chuyenXe), "Chuyến đã khởi hành");
-                    ChuyenXe trip =
-                            em.find(
-                                    ChuyenXe.class,
-                                    assignment.chuyenXe.maChuyen,
-                                    LockModeType.PESSIMISTIC_WRITE);
-                    boolean sold =
-                            trip.trangThai == TrangThaiChuyen.DANG_MO_BAN
-                                    || VehicleRules.hasTicketsOrHolds(em, trip);
+                    ChuyenXe trip = em.find(ChuyenXe.class, assignment.chuyenXe.maChuyen, LockModeType.PESSIMISTIC_WRITE);
+                    boolean sold = trip.trangThai == TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em, trip);
                     repository.delete(assignment);
                     em.flush();
                     if (sold) {

@@ -33,15 +33,17 @@ public final class TripService {
 
     private static String id(String value) {
         if (value == null || !value.matches("[A-Za-z0-9_-]{1,40}")) {
-            throw new DomainException(
-                    400,
-                    "Mã phải gồm chữ không dấu, số, gạch ngang hoặc gạch dưới, tối đa 40 ký tự.");
+            throw new DomainException(400, "Mã phải gồm chữ không dấu, số, gạch ngang hoặc gạch dưới, tối đa 40 ký tự.");
         }
         return value;
     }
 
     private static String optional(String value) {
-        return value == null || value.isBlank() ? null : id(value);
+        if (value == null || value.isBlank()) {
+            return null;
+        } else {
+            return id(value);
+        }
     }
 
     private static void require(boolean condition, String message) {
@@ -52,9 +54,9 @@ public final class TripService {
 
     // Tài khoản nhà xe chỉ được thao tác trong nhà xe của mình, không tin mã nhà xe từ request.
     private static void scope(EntityManager em, NhaXe owner) {
-        var context = RequestIdentity.get();
+        RequestIdentity.Context context = RequestIdentity.get();
         if (context != null) {
-            var caller = AccessControl.authenticated(em, context.user(), Instant.now());
+            NguoiDung caller = AccessControl.authenticated(em, context.user(), Instant.now());
             if (caller.loaiTaiKhoan == LoaiTaiKhoan.NHA_XE) {
                 AccessControl.operator(caller, owner);
             }
@@ -75,6 +77,7 @@ public final class TripService {
         return new ChuyenXeRepository(em).lock(code);
     }
 
+    // Tạo chuyến nháp mới sau khi kiểm tra mã chuyến và dữ liệu tuyến, xe, ngày giờ khởi hành.
     public Map<String, Object> create(TripInputs.Draft input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -120,32 +123,31 @@ public final class TripService {
         NhaXe owner = AccessControl.resource(em, NhaXe.class, route.nhaXe.maNhaXe);
         scope(em, owner);
         if (updating && trip.tuyenXe.nhaXe != null) {
-            require(
-                    trip.tuyenXe.nhaXe.maNhaXe.equals(owner.maNhaXe),
-                    "Không chuyển chuyến sang nhà xe khác.");
+            require(trip.tuyenXe.nhaXe.maNhaXe.equals(owner.maNhaXe), "Không chuyển chuyến sang nhà xe khác.");
         }
         if (input.ngayKhoiHanh() == null) {
             throw new DomainException(400, "Vui lòng nhập ngày khởi hành.");
         }
-        LocalTime departure =
-                input.gioKhoiHanh() == null ? route.thoiGianKhoiHanh : input.gioKhoiHanh();
+        LocalTime departure;
+        if (input.gioKhoiHanh() == null) {
+            departure = route.thoiGianKhoiHanh;
+        } else {
+            departure = input.gioKhoiHanh();
+        }
         if (departure == null) {
             throw new DomainException(400, "Vui lòng nhập giờ khởi hành.");
         }
-        LocalDateTime start = LocalDateTime.of(input.ngayKhoiHanh(), departure),
-                arrival = input.gioDenDuKien();
+        LocalDateTime start = LocalDateTime.of(input.ngayKhoiHanh(), departure);
+        LocalDateTime arrival = input.gioDenDuKien();
         // Không nhập giờ đến thì tính từ giờ đi và thời lượng tuyến, làm tròn tới phút gần nhất.
         if (arrival == null) {
             if (route.thoiGianDuKien == null || route.thoiGianDuKien.signum() <= 0) {
                 throw new DomainException(400, "Tuyến chưa có thời lượng hợp lệ.");
             }
             try {
-                arrival =
-                        start.plusMinutes(
-                                route.thoiGianDuKien
-                                        .multiply(BigDecimal.valueOf(60))
-                                        .setScale(0, RoundingMode.HALF_UP)
-                                        .longValueExact());
+                BigDecimal durationInMinutes = route.thoiGianDuKien.multiply(BigDecimal.valueOf(60));
+                long roundedMinutes = durationInMinutes.setScale(0, RoundingMode.HALF_UP).longValueExact();
+                arrival = start.plusMinutes(roundedMinutes);
             } catch (ArithmeticException | DateTimeException error) {
                 throw new DomainException(400, "Thời lượng tuyến vượt giới hạn.");
             }
@@ -154,25 +156,20 @@ public final class TripService {
             throw new DomainException(400, "Ngày giờ đến phải sau khởi hành.");
         }
         if (!TripSaleRules.validPrice(route.giaCoBan)) {
-            throw new DomainException(
-                    400, "Giá vé phải là số nguyên VND không âm, tối đa 12 chữ số.");
+            throw new DomainException(400, "Giá vé phải là số nguyên VND không âm, tối đa 12 chữ số.");
         }
-        if (input.giaVeDuKien() != null
-                && (input.giaVeDuKien().signum() < 0
-                        || input.giaVeDuKien().compareTo(route.giaCoBan) != 0)) {
-            throw new DomainException(
-                    400,
-                    "Giá dự kiến phải không âm và khớp giá tuyến; chuyến không lưu giá riêng.");
+        if (input.giaVeDuKien() != null && (input.giaVeDuKien().signum() < 0 || input.giaVeDuKien().compareTo(route.giaCoBan) != 0)) {
+            throw new DomainException(400, "Giá dự kiến phải không âm và khớp giá tuyến; chuyến không lưu giá riêng.");
         }
-        Xe vehicle =
-                input.maXe() == null || input.maXe().isBlank()
-                        ? null
-                        : AccessControl.resource(em, Xe.class, id(input.maXe()));
+        Xe vehicle;
+        if (input.maXe() == null || input.maXe().isBlank()) {
+            vehicle = null;
+        } else {
+            vehicle = AccessControl.resource(em, Xe.class, id(input.maXe()));
+        }
         if (vehicle != null) {
             scope(em, vehicle.nhaXe);
-            require(
-                    vehicle.nhaXe != null && vehicle.nhaXe.maNhaXe.equals(owner.maNhaXe),
-                    "Xe không thuộc nhà xe của tuyến.");
+            require(vehicle.nhaXe != null && vehicle.nhaXe.maNhaXe.equals(owner.maNhaXe), "Xe không thuộc nhà xe của tuyến.");
         }
         trip.tuyenXe = route;
         trip.xe = vehicle;
@@ -187,6 +184,7 @@ public final class TripService {
         }
     }
 
+    // Cập nhật chuyến còn ở trạng thái nháp và chưa có vé hoặc giữ chỗ cần bảo vệ.
     public Map<String, Object> update(String code, TripInputs.Draft input) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -194,12 +192,8 @@ public final class TripService {
             try {
                 AccessPolicy.guard(em);
                 ChuyenXe trip = locked(em, code);
-                require(
-                        TripSaleRules.draft(trip),
-                        "Chỉ sửa chuyến nháp hoặc chuyến cũ chưa mở bán.");
-                require(
-                        !VehicleRules.hasTicketsOrHolds(em, trip),
-                        "Chuyến đã có giữ chỗ/vé; không sửa hành trình hoặc lịch đã cam kết.");
+                require(TripSaleRules.draft(trip), "Chỉ sửa chuyến nháp hoặc chuyến cũ chưa mở bán.");
+                require(!VehicleRules.hasTicketsOrHolds(em, trip), "Chuyến đã có giữ chỗ/vé; không sửa hành trình hoặc lịch đã cam kết.");
                 apply(em, trip, input, true);
                 em.flush();
 
@@ -215,6 +209,7 @@ public final class TripService {
         }
     }
 
+    // Lấy thông tin một chuyến theo mã sau khi kiểm tra quyền truy cập.
     public Map<String, Object> get(String code) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -234,30 +229,22 @@ public final class TripService {
     }
 
     // Đếm tổng và lấy đúng trang sau khi áp dụng phạm vi nhà xe cùng các điều kiện lọc.
-    public Map<String, Object> list(
-            String owner,
-            String route,
-            String vehicle,
-            LocalDate from,
-            LocalDate to,
-            TrangThaiChuyen state,
-            int page,
-            int size) {
+    public Map<String,
+        Object> list(String owner, String route, String vehicle, LocalDate from, LocalDate to, TrangThaiChuyen state, int page, int size) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
             transaction.begin();
             try {
                 AccessPolicy.guard(em);
-                if (page < 1
-                        || size < 1
-                        || size > 100
-                        || ((long) page - 1) * size > Integer.MAX_VALUE) {
+                long offset = ((long) page - 1) * size;
+                if (page < 1 || size < 1 || size > 100 || offset > Integer.MAX_VALUE) {
                     throw new DomainException(400, "Phân trang không hợp lệ.");
                 }
                 if (from != null && to != null && from.isAfter(to)) {
                     throw new DomainException(400, "Khoảng ngày không hợp lệ.");
                 }
-                String scope = RequestIdentity.operatorId(), requested = optional(owner);
+                String scope = RequestIdentity.operatorId();
+                String requested = optional(owner);
                 if (scope != null && requested != null && !scope.equals(requested)) {
                     throw AccessControl.denied();
                 }
@@ -273,14 +260,12 @@ public final class TripService {
                     }
                     routeCodes = String.join(",", uniqueCodes);
                 }
-                ChuyenXeRepository.Filters filters =
-                        new ChuyenXeRepository.Filters(
-                                scope == null ? requested : scope,
-                                routeCodes,
-                                optional(vehicle),
-                                from,
-                                to,
-                                state);
+                String ownerFilter = requested;
+                if (scope != null) {
+                    ownerFilter = scope;
+                }
+                ChuyenXeRepository.Filters filters = new ChuyenXeRepository.Filters(ownerFilter, routeCodes, optional(vehicle), from, to,
+                    state);
                 ChuyenXeRepository repo = new ChuyenXeRepository(em);
                 long total = repo.count(filters);
                 List<Map<String, Object>> values = new ArrayList<>();
@@ -304,14 +289,14 @@ public final class TripService {
         }
     }
 
+    // Kiểm tra và trả danh sách điều kiện đã đạt hoặc chưa đạt để mở bán chuyến.
     public TripSaleRules.Result eligibility(String code) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
             transaction.begin();
             try {
                 AccessPolicy.guard(em);
-                TripSaleRules.Result responseData =
-                        TripSaleRules.inspect(em, locked(em, code), now());
+                TripSaleRules.Result responseData = TripSaleRules.inspect(em, locked(em, code), now());
                 transaction.commit();
                 return responseData;
             } catch (RuntimeException error) {
@@ -323,6 +308,7 @@ public final class TripService {
         }
     }
 
+    // Mở bán chuyến khi đủ điều kiện và không tạo thêm lần mở bán nếu chuyến đã mở bán.
     public Map<String, Object> open(String code) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -332,9 +318,7 @@ public final class TripService {
                 ChuyenXe trip = locked(em, code);
                 TripSaleRules.ensureOpenable(em, trip, now());
                 // Kiểm tra lại đồng hồ sau bước kiểm tra điều kiện vì lúc chờ khóa có thể đã hết hạn.
-                require(
-                        now().isBefore(TripSaleRules.cutoff(trip)),
-                        "Đã đến thời điểm ngừng nhận đặt vé trong khi kiểm tra điều kiện.");
+                require(now().isBefore(TripSaleRules.cutoff(trip)), "Đã đến thời điểm ngừng nhận đặt vé trong khi kiểm tra điều kiện.");
                 if (trip.trangThai != TrangThaiChuyen.DANG_MO_BAN) {
                     require(TripSaleRules.draft(trip), "Chuyến không thể chuyển sang mở bán.");
                     trip.trangThai = TrangThaiChuyen.DANG_MO_BAN;
@@ -353,6 +337,7 @@ public final class TripService {
         }
     }
 
+    // Kiểm tra quyền và trạng thái để bắt đầu, hoàn tất hoặc hủy chuyến theo quy trình.
     public Map<String, Object> transition(String code, TrangThaiChuyen target, String reason) {
         Map<String, Object> result;
         try (EntityManager em = factory.createEntityManager()) {
@@ -364,9 +349,7 @@ public final class TripService {
                 authorizeLifecycle(em, trip, target);
                 TrangThaiChuyen before = trip.trangThai;
                 if (target == TrangThaiChuyen.DANG_CHAY) {
-                    require(
-                            before == TrangThaiChuyen.DANG_MO_BAN,
-                            "Chỉ bắt đầu chuyến đang mở bán.");
+                    require(before == TrangThaiChuyen.DANG_MO_BAN, "Chỉ bắt đầu chuyến đang mở bán.");
                     require(trip.xe != null, "Chuyến chưa được gán xe.");
                     VehicleRules.ready(em, trip.xe.maXe, trip);
                     AssignmentRules.readyForOperation(em, trip);
@@ -377,23 +360,27 @@ public final class TripService {
                     trip.trangThai = TrangThaiChuyen.HOAN_TAT;
                     history(em, trip, before, target, null);
                 } else if (target == TrangThaiChuyen.DA_HUY) {
-                    String clean = reason == null ? "" : reason.strip();
+                    String clean;
+                    if (reason == null) {
+                        clean = "";
+                    } else {
+                        clean = reason.strip();
+                    }
                     if (clean.isEmpty()) {
                         throw new DomainException(400, "Vui lòng nhập lý do hủy chuyến.");
                     }
                     if (clean.length() > 1000) {
                         throw new DomainException(400, "Lý do hủy không được vượt quá 1000 ký tự.");
                     }
-                    require(
-                            before == TrangThaiChuyen.NHAP
-                                    || before == TrangThaiChuyen.DANG_MO_BAN
-                                    || before == TrangThaiChuyen.CHUA_KHOI_HANH,
-                            "Không hủy chuyến đang chạy, đã hoàn tất hoặc đã hủy.");
+                    require(before == TrangThaiChuyen.NHAP || before == TrangThaiChuyen.DANG_MO_BAN
+                        || before == TrangThaiChuyen.CHUA_KHOI_HANH, "Không hủy chuyến đang chạy, đã hoàn tất hoặc đã hủy.");
                     cancelAffectedOrders(em, trip, clean);
                     trip.trangThai = TrangThaiChuyen.DA_HUY;
                     history(em, trip, before, target, clean);
                     em.flush();
-                } else throw new DomainException(400, "Trạng thái đích không hợp lệ.");
+                } else {
+                    throw new DomainException(400, "Trạng thái đích không hợp lệ.");
+                }
                 em.flush();
                 result = view(em, trip);
 
@@ -416,42 +403,33 @@ public final class TripService {
     // Duyệt các công việc chờ hoàn; một đơn lỗi vẫn được lưu để đối soát và xử lý tiếp đơn khác.
     private void processReadyCancellationRefunds(String tripId) {
         try (EntityManager em = factory.createEntityManager()) {
-            List<?> ids =
-                    em.createNativeQuery(
-                                    "select ma_don from trip_cancellation_work where"
-                                            + " ma_chuyen=:trip and trang_thai='CHO_XU_LY' order by"
-                                            + " ma_don")
-                            .setParameter("trip", tripId)
-                            .getResultList();
+            List<?> ids = em.createNativeQuery("select ma_don from trip_cancellation_work where"
+                + " ma_chuyen=:trip and trang_thai='CHO_XU_LY' order by" + " ma_don")
+                .setParameter("trip", tripId)
+                .getResultList();
             for (Object value : ids)
                 try {
-                    new HoanVeService(factory)
-                            .processTripCancellation(
-                                    value.toString(), tripId, "Nhà xe hủy chuyến", null);
+                    new HoanVeService(factory).processTripCancellation(value.toString(), tripId, "Nhà xe hủy chuyến", null);
                 } catch (RuntimeException failure) {
                     markCancellationReconciliation(value.toString(), tripId, failure);
                 }
         }
     }
 
+    // Gửi các thông báo hủy chuyến đang chờ và giữ lại công việc nếu gửi chưa thành công.
     private void processCancellationNotifications(String tripId) {
         try (EntityManager em = factory.createEntityManager()) {
-            boolean pending =
-                    !em.createNativeQuery(
-                                    "select ma_don from trip_cancellation_notification where"
-                                            + " ma_chuyen=:trip and status='PENDING'")
-                            .setParameter("trip", tripId)
-                            .setMaxResults(1)
-                            .getResultList()
-                            .isEmpty();
+            boolean pending = !em.createNativeQuery("select ma_don from trip_cancellation_notification where"
+                + " ma_chuyen=:trip and status='PENDING'")
+                .setParameter("trip", tripId)
+                .setMaxResults(1)
+                .getResultList()
+                .isEmpty();
             if (pending) {
-                var client =
-                        new com.datvexe.email.BrevoClient(
-                                com.datvexe.email.BrevoClient.Config.fromEnvironment());
+                com.datvexe.email.BrevoClient.Config emailConfig = com.datvexe.email.BrevoClient.Config.fromEnvironment();
+                com.datvexe.email.BrevoClient client = new com.datvexe.email.BrevoClient(emailConfig);
                 if (client.ready()) {
-                    new com.datvexe.email.TripCancellationEmailDispatcher(
-                                    factory, client::send, clock)
-                            .runOnce();
+                    new com.datvexe.email.TripCancellationEmailDispatcher(factory, client::send, clock).runOnce();
                 }
             }
         } catch (RuntimeException ignored) {
@@ -472,21 +450,16 @@ public final class TripService {
                 if (trip.trangThai != TrangThaiChuyen.DA_HUY) {
                     throw new DomainException(409, "Chỉ xử lý hoàn cho chuyến đã hủy.");
                 }
-                em.createNativeQuery(
-                                "update trip_cancellation_notification set"
-                                    + " status='PENDING',next_attempt_at=:now where ma_chuyen=:trip"
-                                    + " and status='FAILED'")
-                        .setParameter("now", clock.instant())
-                        .setParameter("trip", trip.maChuyen)
-                        .executeUpdate();
+                em.createNativeQuery("update trip_cancellation_notification set"
+                    + " status='PENDING',next_attempt_at=:now where ma_chuyen=:trip" + " and status='FAILED'")
+                    .setParameter("now", clock.instant())
+                    .setParameter("trip", trip.maChuyen)
+                    .executeUpdate();
                 orders = new ArrayList<>();
-                List<?> orderRows =
-                        em.createNativeQuery(
-                                        "select ma_don from trip_cancellation_work where"
-                                                + " ma_chuyen=:trip and trang_thai in"
-                                                + " ('CHO_XU_LY','CAN_DOI_SOAT') order by ma_don")
-                                .setParameter("trip", trip.maChuyen)
-                                .getResultList();
+                List<?> orderRows = em.createNativeQuery("select ma_don from trip_cancellation_work where"
+                    + " ma_chuyen=:trip and trang_thai in" + " ('CHO_XU_LY','CAN_DOI_SOAT') order by ma_don")
+                    .setParameter("trip", trip.maChuyen)
+                    .getResultList();
                 for (Object orderRow : orderRows) {
                     orders.add(orderRow.toString());
                 }
@@ -500,8 +473,7 @@ public final class TripService {
         }
         for (String order : orders)
             try {
-                new HoanVeService(factory)
-                        .processTripCancellation(order, code, "Nhà xe hủy chuyến", null);
+                new HoanVeService(factory).processTripCancellation(order, code, "Nhà xe hủy chuyến", null);
             } catch (RuntimeException failure) {
                 markCancellationReconciliation(order, code, failure);
             }
@@ -510,25 +482,21 @@ public final class TripService {
     }
 
     // Giữ công việc lỗi ở trạng thái cần đối soát để có thể thử lại mà không hủy chuyến lần nữa.
-    private void markCancellationReconciliation(
-            String orderId, String tripId, RuntimeException failure) {
+    private void markCancellationReconciliation(String orderId, String tripId, RuntimeException failure) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction tx = em.getTransaction();
             tx.begin();
-            em.createNativeQuery(
-                            "update trip_cancellation_work set"
-                                    + " trang_thai='CAN_DOI_SOAT',last_error=:error,updated_at=:now"
-                                    + " where ma_don=:order and ma_chuyen=:trip and"
-                                    + " trang_thai<>'HOAN_TAT'")
-                    .setParameter("now", clock.instant())
-                    .setParameter(
-                            "error",
-                            failure instanceof AccountException e
-                                    ? e.code()
-                                    : "CANCELLATION_PROCESSING_FAILED")
-                    .setParameter("order", orderId)
-                    .setParameter("trip", tripId)
-                    .executeUpdate();
+            String errorCode = "CANCELLATION_PROCESSING_FAILED";
+            if (failure instanceof AccountException accountError) {
+                errorCode = accountError.code();
+            }
+            em.createNativeQuery("update trip_cancellation_work set" + " trang_thai='CAN_DOI_SOAT',last_error=:error,updated_at=:now"
+                + " where ma_don=:order and ma_chuyen=:trip and" + " trang_thai<>'HOAN_TAT'")
+                .setParameter("now", clock.instant())
+                .setParameter("error", errorCode)
+                .setParameter("order", orderId)
+                .setParameter("trip", tripId)
+                .executeUpdate();
             tx.commit();
         }
     }
@@ -544,12 +512,8 @@ public final class TripService {
             try {
                 AccessPolicy.guard(em);
                 ChuyenXe trip = locked(em, code);
-                require(
-                        TripSaleRules.scheduled(trip),
-                        "Không hủy chuyến đã chạy, hoàn tất hoặc đã hủy.");
-                require(
-                        !VehicleRules.hasTicketsOrHolds(em, trip),
-                        "Chuyến có giữ chỗ/vé; cần quy trình hủy chuyến có lý do.");
+                require(TripSaleRules.scheduled(trip), "Không hủy chuyến đã chạy, hoàn tất hoặc đã hủy.");
+                require(!VehicleRules.hasTicketsOrHolds(em, trip), "Chuyến có giữ chỗ/vé; cần quy trình hủy chuyến có lý do.");
                 trip.trangThai = TrangThaiChuyen.DA_HUY;
 
                 Map<String, Object> responseData = view(em, trip);
@@ -570,7 +534,7 @@ public final class TripService {
 
     // Quản trị/nhà xe có quyền theo phạm vi; tài xế được phân công chỉ bắt đầu hoặc hoàn tất chuyến.
     private void authorizeLifecycle(EntityManager em, ChuyenXe trip, TrangThaiChuyen target) {
-        var request = RequestIdentity.get();
+        RequestIdentity.Context request = RequestIdentity.get();
         if (request == null || request.user() == null) {
             return;
         } // Lời gọi nội bộ hoặc kiểm thử.
@@ -582,29 +546,18 @@ public final class TripService {
             AccessControl.operator(user, trip.tuyenXe.nhaXe);
             return;
         }
-        if (user.loaiTaiKhoan == LoaiTaiKhoan.NHAN_VIEN
-                && target != TrangThaiChuyen.DA_HUY
-                && user.nhanVien != null) {
-            long assigned =
-                    em.createQuery(
-                                    "select count(p) from PhanCongChuyenXe p where p.chuyenXe=:trip"
-                                            + " and p.nhanVien=:employee and p.vaiTro in :roles",
-                                    Long.class)
-                            .setParameter("trip", trip)
-                            .setParameter("employee", user.nhanVien)
-                            .setParameter(
-                                    "roles",
-                                    Set.of(
-                                            VaiTroChuyen.TAI_XE_CHINH,
-                                            VaiTroChuyen.TAI_XE_PHU,
-                                            VaiTroChuyen.TAI_XE))
-                            .getSingleResult();
+        if (user.loaiTaiKhoan == LoaiTaiKhoan.NHAN_VIEN && target != TrangThaiChuyen.DA_HUY && user.nhanVien != null) {
+            long assigned = em.createQuery("select count(p) from PhanCongChuyenXe p where p.chuyenXe=:trip"
+                + " and p.nhanVien=:employee and p.vaiTro in :roles", Long.class)
+                .setParameter("trip", trip)
+                .setParameter("employee", user.nhanVien)
+                .setParameter("roles", Set.of(VaiTroChuyen.TAI_XE_CHINH, VaiTroChuyen.TAI_XE_PHU, VaiTroChuyen.TAI_XE))
+                .getSingleResult();
             if (assigned == 0) {
                 throw AccessControl.denied();
             }
-            if (user.nhanVien.nhaXe == null
-                    || trip.tuyenXe.nhaXe == null
-                    || !user.nhanVien.nhaXe.maNhaXe.equals(trip.tuyenXe.nhaXe.maNhaXe)) {
+            if (user.nhanVien.nhaXe == null || trip.tuyenXe.nhaXe == null
+                || !user.nhanVien.nhaXe.maNhaXe.equals(trip.tuyenXe.nhaXe.maNhaXe)) {
                 throw AccessControl.denied();
             }
             if (user.nhanVien.nhaXe.trangThai != TrangThaiNhaXe.HOAT_DONG) {
@@ -618,73 +571,51 @@ public final class TripService {
         throw AccessControl.denied();
     }
 
-    private void history(
-            EntityManager em,
-            ChuyenXe trip,
-            TrangThaiChuyen before,
-            TrangThaiChuyen after,
-            String reason) {
-        var request = RequestIdentity.get();
-        var actor = request == null ? null : request.user();
+    // Ghi người thao tác, trạng thái trước sau, lý do và thời điểm thay đổi trạng thái chuyến.
+    private void history(EntityManager em, ChuyenXe trip, TrangThaiChuyen before, TrangThaiChuyen after, String reason) {
+        RequestIdentity.Context request = RequestIdentity.get();
+        if (request == null) {
+            return;
+        }
+        CurrentUser actor = request.user();
         if (actor == null) {
             return;
         }
-        em.createNativeQuery(
-                        "insert into"
-                            + " trip_lifecycle_history(id,ma_chuyen,trang_thai_cu,trang_thai_moi,ma_nguoi_thao_tac,vai_tro,ly_do,created_at)"
-                            + " values (:id,:trip,:before,:after,:actor,:role,:reason,:created)")
-                .setParameter("id", UUID.randomUUID().toString())
-                .setParameter("trip", trip.maChuyen)
-                .setParameter("before", before.name())
-                .setParameter("after", after.name())
-                .setParameter("actor", actor.maNguoiDung())
-                .setParameter("role", actor.loaiTaiKhoan().name())
-                .setParameter("reason", reason)
-                .setParameter("created", clock.instant())
-                .executeUpdate();
+        em.createNativeQuery("insert into"
+            + " trip_lifecycle_history(id,ma_chuyen,trang_thai_cu,trang_thai_moi,ma_nguoi_thao_tac,vai_tro,ly_do,created_at)"
+            + " values (:id,:trip,:before,:after,:actor,:role,:reason,:created)")
+            .setParameter("id", UUID.randomUUID().toString())
+            .setParameter("trip", trip.maChuyen)
+            .setParameter("before", before.name())
+            .setParameter("after", after.name())
+            .setParameter("actor", actor.maNguoiDung())
+            .setParameter("role", actor.loaiTaiKhoan().name())
+            .setParameter("reason", reason)
+            .setParameter("created", clock.instant())
+            .executeUpdate();
     }
 
+    // Hủy giữ chỗ và ghi công việc hoàn tiền hoặc đối soát cho các đơn bị ảnh hưởng khi hủy chuyến.
     private void cancelAffectedOrders(EntityManager em, ChuyenXe trip, String reason) {
         // TreeSet loại đơn trùng và giữ thứ tự khóa đơn thống nhất khi nhiều giao dịch cùng xử lý.
         Set<String> orderIds = new TreeSet<>();
-        orderIds.addAll(
-                em.createQuery(
-                                "select distinct h.donDatVe.maDon from GiuCho h where"
-                                        + " h.chuyenXe=:trip and h.donDatVe is not null",
-                                String.class)
-                        .setParameter("trip", trip)
-                        .getResultList());
-        orderIds.addAll(
-                em.createQuery(
-                                "select distinct v.donDatVe.maDon from VeXe v where"
-                                        + " v.chuyenXe=:trip",
-                                String.class)
-                        .setParameter("trip", trip)
-                        .getResultList());
-        em.createQuery(
-                        "update GiuCho h set h.trangThai=:cancelled where h.chuyenXe=:trip and"
-                                + " h.donDatVe is null and h.trangThai=:active")
-                .setParameter("cancelled", TrangThaiGiuCho.DA_HUY)
-                .setParameter("trip", trip)
-                .setParameter("active", TrangThaiGiuCho.DANG_GIU)
-                .executeUpdate();
+        orderIds.addAll(em.createQuery("select distinct h.donDatVe.maDon from GiuCho h where"
+            + " h.chuyenXe=:trip and h.donDatVe is not null", String.class).setParameter("trip", trip).getResultList());
+        orderIds.addAll(em.createQuery("select distinct v.donDatVe.maDon from VeXe v where" + " v.chuyenXe=:trip", String.class)
+            .setParameter("trip", trip).getResultList());
+        em.createQuery("update GiuCho h set h.trangThai=:cancelled where h.chuyenXe=:trip and"
+            + " h.donDatVe is null and h.trangThai=:active")
+            .setParameter("cancelled", TrangThaiGiuCho.DA_HUY)
+            .setParameter("trip", trip)
+            .setParameter("active", TrangThaiGiuCho.DANG_GIU)
+            .executeUpdate();
         for (String orderId : orderIds) {
-            DonDatVe order =
-                    (DonDatVe)
-                            org.hibernate.Hibernate.unproxy(
-                                    em.find(
-                                            DonDatVe.class,
-                                            orderId,
-                                            LockModeType.PESSIMISTIC_WRITE));
-            List<GiuCho> holds =
-                    em.createQuery(
-                                    "select h from GiuCho h where h.donDatVe=:order and"
-                                            + " h.chuyenXe=:trip",
-                                    GiuCho.class)
-                            .setParameter("order", order)
-                            .setParameter("trip", trip)
-                            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-                            .getResultList();
+            DonDatVe order = (DonDatVe) org.hibernate.Hibernate.unproxy(em.find(DonDatVe.class, orderId, LockModeType.PESSIMISTIC_WRITE));
+            List<GiuCho> holds = em.createQuery("select h from GiuCho h where h.donDatVe=:order and" + " h.chuyenXe=:trip", GiuCho.class)
+                .setParameter("order", order)
+                .setParameter("trip", trip)
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .getResultList();
             boolean hadActiveHold = false;
             for (GiuCho hold : holds) {
                 if (hold.trangThai == TrangThaiGiuCho.DANG_GIU) {
@@ -692,74 +623,51 @@ public final class TripService {
                     hold.trangThai = TrangThaiGiuCho.DA_HUY;
                 }
             }
-            List<VeXe> tickets =
-                    em.createQuery(
-                                    "select v from VeXe v where v.donDatVe=:order and"
-                                            + " v.chuyenXe=:trip",
-                                    VeXe.class)
-                            .setParameter("order", order)
-                            .setParameter("trip", trip)
-                            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-                            .getResultList();
+            List<VeXe> tickets = em.createQuery("select v from VeXe v where v.donDatVe=:order and" + " v.chuyenXe=:trip", VeXe.class)
+                .setParameter("order", order)
+                .setParameter("trip", trip)
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .getResultList();
             boolean hasLiveTicket = false;
             for (VeXe ticket : tickets) {
-                if (ticket.trangThai == TrangThaiVe.DA_XUAT_VE
-                        || ticket.trangThai == TrangThaiVe.DA_LEN_XE) {
+                if (ticket.trangThai == TrangThaiVe.DA_XUAT_VE || ticket.trangThai == TrangThaiVe.DA_LEN_XE) {
                     hasLiveTicket = true;
                     break;
                 }
             }
             boolean refundableWithoutTicket = tickets.isEmpty() && !holds.isEmpty();
-            List<ThanhToan> payments =
-                    em.createQuery(
-                                    "select p from ThanhToan p where p.donDatVe=:order",
-                                    ThanhToan.class)
-                            .setParameter("order", order)
-                            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-                            .getResultList();
+            List<ThanhToan> payments = em.createQuery("select p from ThanhToan p where p.donDatVe=:order", ThanhToan.class)
+                .setParameter("order", order)
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .getResultList();
             boolean captured = false;
             boolean uncertain = false;
             for (ThanhToan payment : payments) {
-                if (payment.trangThai == TrangThaiThanhToan.THANH_CONG
-                        || payment.trangThai == TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN
-                        || payment.trangThai == TrangThaiThanhToan.DA_HOAN_TIEN) {
+                if (payment.trangThai == TrangThaiThanhToan.THANH_CONG || payment.trangThai == TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN
+                    || payment.trangThai == TrangThaiThanhToan.DA_HOAN_TIEN) {
                     captured = true;
                 }
                 if (payment.trangThai == TrangThaiThanhToan.CHO_XU_LY) {
                     uncertain = true;
                 }
             }
-            boolean pendingOrder =
-                    Set.of(
-                                    TrangThaiDon.CHO_XU_LY,
-                                    TrangThaiDon.DA_XAC_NHAN,
-                                    TrangThaiDon.CHO_THANH_TOAN)
-                            .contains(order.trangThai);
+            boolean pendingOrder = Set.of(TrangThaiDon.CHO_XU_LY, TrangThaiDon.DA_XAC_NHAN, TrangThaiDon.CHO_THANH_TOAN)
+                .contains(order.trangThai);
             if (pendingOrder) {
                 order.trangThai = TrangThaiDon.DA_HUY;
             }
             if (hadActiveHold && !captured && !uncertain) {
                 order.maKhuyenMaiDaApDung = null;
             }
-            boolean isMixedOrder =
-                    em.createQuery(
-                                                    "select count(v) from VeXe v where"
-                                                            + " v.donDatVe=:order and"
-                                                            + " v.chuyenXe<>:trip",
-                                                    Long.class)
-                                            .setParameter("order", order)
-                                            .setParameter("trip", trip)
-                                            .getSingleResult()
-                                    > 0
-                            || em.createQuery(
-                                                    "select count(h) from GiuCho h where"
-                                                            + " h.donDatVe=:order and"
-                                                            + " h.chuyenXe<>:trip",
-                                                    Long.class)
-                                            .setParameter("order", order)
-                                            .setParameter("trip", trip)
-                                            .getSingleResult()
-                                    > 0;
+            boolean isMixedOrder = em.createQuery("select count(v) from VeXe v where" + " v.donDatVe=:order and" + " v.chuyenXe<>:trip",
+                Long.class)
+                .setParameter("order", order)
+                .setParameter("trip", trip)
+                .getSingleResult() > 0
+                    || em.createQuery("select count(h) from GiuCho h where" + " h.donDatVe=:order and" + " h.chuyenXe<>:trip", Long.class)
+                .setParameter("order", order)
+                .setParameter("trip", trip)
+                .getSingleResult() > 0;
             // Hoàn tiền theo đơn: đơn chứa chuyến khác cần đối soát, không tự hoàn toàn bộ.
             String work;
             if (uncertain || isMixedOrder) {
@@ -769,30 +677,22 @@ public final class TripService {
             } else {
                 work = "KHONG_CAN_HOAN";
             }
-            em.createNativeQuery(
-                            "insert into"
-                                + " trip_cancellation_work(ma_don,ma_chuyen,trang_thai,ly_do,created_at,updated_at)"
-                                + " values (:order,:trip,:state,:reason,:created,:created) on"
-                                + " conflict (ma_don,ma_chuyen) do nothing")
+            em.createNativeQuery("insert into" + " trip_cancellation_work(ma_don,ma_chuyen,trang_thai,ly_do,created_at,updated_at)"
+                + " values (:order,:trip,:state,:reason,:created,:created) on" + " conflict (ma_don,ma_chuyen) do nothing")
+                .setParameter("order", orderId)
+                .setParameter("trip", trip.maChuyen)
+                .setParameter("state", work)
+                .setParameter("reason", reason)
+                .setParameter("created", clock.instant())
+                .executeUpdate();
+            if ((hasLiveTicket || hadActiveHold) && order.khachDatEmail != null && !order.khachDatEmail.isBlank()) {
+                em.createNativeQuery("insert into" + " trip_cancellation_notification(ma_don,ma_chuyen,recipient,recipient_name)"
+                    + " values (:order,:trip,:email,:name) on conflict" + " (ma_don,ma_chuyen) do nothing")
                     .setParameter("order", orderId)
                     .setParameter("trip", trip.maChuyen)
-                    .setParameter("state", work)
-                    .setParameter("reason", reason)
-                    .setParameter("created", clock.instant())
+                    .setParameter("email", order.khachDatEmail)
+                    .setParameter("name", Objects.toString(order.khachDatTen, "Khách hàng"))
                     .executeUpdate();
-            if ((hasLiveTicket || hadActiveHold)
-                    && order.khachDatEmail != null
-                    && !order.khachDatEmail.isBlank()) {
-                em.createNativeQuery(
-                                "insert into"
-                                    + " trip_cancellation_notification(ma_don,ma_chuyen,recipient,recipient_name)"
-                                    + " values (:order,:trip,:email,:name) on conflict"
-                                    + " (ma_don,ma_chuyen) do nothing")
-                        .setParameter("order", orderId)
-                        .setParameter("trip", trip.maChuyen)
-                        .setParameter("email", order.khachDatEmail)
-                        .setParameter("name", Objects.toString(order.khachDatTen, "Khách hàng"))
-                        .executeUpdate();
             }
         }
     }
@@ -805,74 +705,44 @@ public final class TripService {
             try {
                 AccessPolicy.guard(em);
                 ChuyenXe trip = locked(em, code);
-                List<Object[]> history =
-                        em.createNativeQuery(
-                                        "select"
-                                            + " trang_thai_cu,trang_thai_moi,ma_nguoi_thao_tac,vai_tro,ly_do,created_at"
-                                            + " from trip_lifecycle_history where ma_chuyen=:trip"
-                                            + " order by created_at desc")
-                                .setParameter("trip", trip.maChuyen)
-                                .getResultList();
-                List<Object[]> works =
-                        em.createNativeQuery(
-                                        "select w.ma_don,w.trang_thai,w.ly_do,w.created_at,(select"
-                                            + " count(*) from ve_xe v where v.ma_don=w.ma_don and"
-                                            + " v.ma_chuyen=w.ma_chuyen and v.trang_thai in"
-                                            + " ('DA_XUAT_VE','DA_LEN_XE')),w.last_error from"
-                                            + " trip_cancellation_work w where w.ma_chuyen=:trip"
-                                            + " order by w.created_at,w.ma_don")
-                                .setParameter("trip", trip.maChuyen)
-                                .getResultList();
-                List<Object[]> notices =
-                        em.createNativeQuery(
-                                        "select status,count(*) from trip_cancellation_notification"
-                                                + " where ma_chuyen=:trip group by status")
-                                .setParameter("trip", trip.maChuyen)
-                                .getResultList();
-                Object[] refundTotals =
-                        (Object[])
-                                em.createNativeQuery(
-                                                "select count(*) filter(where"
-                                                    + " trang_thai='THANH_CONG'),count(*)"
-                                                    + " filter(where trang_thai in"
-                                                    + " ('CHO_XU_LY','CAN_DOI_SOAT','THAT_BAI')),coalesce(sum(so_tien_hoan),0),coalesce(sum(so_tien_hoan)"
-                                                    + " filter(where trang_thai='THANH_CONG'),0)"
-                                                    + " from refund_request where ma_don in (select"
-                                                    + " ma_don from trip_cancellation_work where"
-                                                    + " ma_chuyen=:trip) and ly_do like"
-                                                    + " 'NHA_XE_HUY_CHUYEN:%'")
-                                        .setParameter("trip", trip.maChuyen)
-                                        .getSingleResult();
-                Object[] ticketTotals =
-                        (Object[])
-                                em.createNativeQuery(
-                                                "select count(*),count(*) filter(where trang_thai"
-                                                    + " in ('DA_XUAT_VE','DA_LEN_XE')),count(*)"
-                                                    + " filter(where"
-                                                    + " trang_thai='DA_HOAN'),coalesce(sum(gia_ve)"
-                                                    + " filter(where trang_thai in"
-                                                    + " ('DA_XUAT_VE','DA_LEN_XE','DA_HOAN')),0)"
-                                                    + " from ve_xe where ma_chuyen=:trip")
-                                        .setParameter("trip", trip.maChuyen)
-                                        .getSingleResult();
+                List<Object[]> history = em.createNativeQuery("select"
+                    + " trang_thai_cu,trang_thai_moi,ma_nguoi_thao_tac,vai_tro,ly_do,created_at"
+                    + " from trip_lifecycle_history where ma_chuyen=:trip" + " order by created_at desc")
+                    .setParameter("trip", trip.maChuyen)
+                    .getResultList();
+                List<Object[]> works = em.createNativeQuery("select w.ma_don,w.trang_thai,w.ly_do,w.created_at,(select"
+                    + " count(*) from ve_xe v where v.ma_don=w.ma_don and" + " v.ma_chuyen=w.ma_chuyen and v.trang_thai in"
+                    + " ('DA_XUAT_VE','DA_LEN_XE')),w.last_error from" + " trip_cancellation_work w where w.ma_chuyen=:trip"
+                    + " order by w.created_at,w.ma_don")
+                    .setParameter("trip", trip.maChuyen)
+                    .getResultList();
+                List<Object[]> notices = em.createNativeQuery("select status,count(*) from trip_cancellation_notification"
+                    + " where ma_chuyen=:trip group by status")
+                    .setParameter("trip", trip.maChuyen)
+                    .getResultList();
+                Object[] refundTotals = (Object[]) em.createNativeQuery("select count(*) filter(where"
+                    + " trang_thai='THANH_CONG'),count(*)" + " filter(where trang_thai in"
+                    + " ('CHO_XU_LY','CAN_DOI_SOAT','THAT_BAI')),coalesce(sum(so_tien_hoan),0),coalesce(sum(so_tien_hoan)"
+                    + " filter(where trang_thai='THANH_CONG'),0)" + " from refund_request where ma_don in (select"
+                    + " ma_don from trip_cancellation_work where" + " ma_chuyen=:trip) and ly_do like" + " 'NHA_XE_HUY_CHUYEN:%'")
+                    .setParameter("trip", trip.maChuyen)
+                    .getSingleResult();
+                Object[] ticketTotals = (Object[]) em.createNativeQuery("select count(*),count(*) filter(where trang_thai"
+                    + " in ('DA_XUAT_VE','DA_LEN_XE')),count(*)" + " filter(where" + " trang_thai='DA_HOAN'),coalesce(sum(gia_ve)"
+                    + " filter(where trang_thai in" + " ('DA_XUAT_VE','DA_LEN_XE','DA_HOAN')),0)" + " from ve_xe where ma_chuyen=:trip")
+                    .setParameter("trip", trip.maChuyen)
+                    .getSingleResult();
                 List<Map<String, Object>> affected = new ArrayList<>();
                 for (Object[] row : works) {
-                    List<Object[]> refunds =
-                            em.createNativeQuery(
-                                            "select trang_thai,so_tien_hoan,ma_hoan_tien,ly_do_loi"
-                                                    + " from refund_request where ma_don=:order and"
-                                                    + " ly_do like 'NHA_XE_HUY_CHUYEN:%' order by"
-                                                    + " created_at")
-                                    .setParameter("order", row[0])
-                                    .getResultList();
-                    List<Object[]> affectedTickets =
-                            em.createNativeQuery(
-                                            "select ma_ve,trang_thai,gia_ve from ve_xe where"
-                                                    + " ma_don=:order and ma_chuyen=:trip order by"
-                                                    + " ma_ve")
-                                    .setParameter("order", row[0])
-                                    .setParameter("trip", trip.maChuyen)
-                                    .getResultList();
+                    List<Object[]> refunds = em.createNativeQuery("select trang_thai,so_tien_hoan,ma_hoan_tien,ly_do_loi"
+                        + " from refund_request where ma_don=:order and" + " ly_do like 'NHA_XE_HUY_CHUYEN:%' order by" + " created_at")
+                        .setParameter("order", row[0])
+                        .getResultList();
+                    List<Object[]> affectedTickets = em.createNativeQuery("select ma_ve,trang_thai,gia_ve from ve_xe where"
+                        + " ma_don=:order and ma_chuyen=:trip order by" + " ma_ve")
+                        .setParameter("order", row[0])
+                        .setParameter("trip", trip.maChuyen)
+                        .getResultList();
                     List<Map<String, Object>> ticketItems = new ArrayList<>();
                     for (Object[] ticket : affectedTickets) {
                         Map<String, Object> item = new LinkedHashMap<>();
@@ -945,6 +815,7 @@ public final class TripService {
         }
     }
 
+    // Xóa chuyến nháp khi chưa có vé, giữ chỗ hoặc đánh giá liên quan.
     public void delete(String code) {
         try (EntityManager em = factory.createEntityManager()) {
             EntityTransaction transaction = em.getTransaction();
@@ -953,9 +824,8 @@ public final class TripService {
                 AccessPolicy.guard(em);
                 ChuyenXe trip = locked(em, code);
                 require(TripSaleRules.draft(trip), "Chỉ xóa cứng chuyến nháp chưa được sử dụng.");
-                require(
-                        !VehicleRules.hasTicketsOrHolds(em, trip) && trip.danhSachDanhGia.isEmpty(),
-                        "Chuyến có dữ liệu liên quan; không xóa cứng.");
+                require(!VehicleRules.hasTicketsOrHolds(em, trip) && trip.danhSachDanhGia.isEmpty(),
+                    "Chuyến có dữ liệu liên quan; không xóa cứng.");
                 em.remove(trip);
                 transaction.commit();
                 return;
@@ -968,57 +838,50 @@ public final class TripService {
         }
     }
 
+    // Ghép thông tin chuyến, điều kiện mở bán và các quyền thao tác để giao diện hiển thị.
     private Map<String, Object> view(EntityManager em, ChuyenXe trip) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("maChuyen", trip.maChuyen);
         value.put("maTuyen", trip.tuyenXe.maTuyen);
         value.put("tenTuyen", trip.tuyenXe.tenTuyen);
-        value.put("maNhaXe", trip.tuyenXe.nhaXe == null ? null : trip.tuyenXe.nhaXe.maNhaXe);
-        value.put("tenNhaXe", trip.tuyenXe.nhaXe == null ? null : trip.tuyenXe.nhaXe.tenNhaXe);
-        value.put("maXe", trip.xe == null ? null : trip.xe.maXe);
-        value.put("bienSo", trip.xe == null ? null : trip.xe.bienSo);
+        if (trip.tuyenXe.nhaXe == null) {
+            value.put("maNhaXe", null);
+            value.put("tenNhaXe", null);
+        } else {
+            value.put("maNhaXe", trip.tuyenXe.nhaXe.maNhaXe);
+            value.put("tenNhaXe", trip.tuyenXe.nhaXe.tenNhaXe);
+        }
+        if (trip.xe == null) {
+            value.put("maXe", null);
+            value.put("bienSo", null);
+        } else {
+            value.put("maXe", trip.xe.maXe);
+            value.put("bienSo", trip.xe.bienSo);
+        }
         value.put("ngayKhoiHanh", trip.ngayKhoiHanh);
         value.put("gioKhoiHanh", trip.gioKhoiHanh);
         value.put("gioDenDuKien", trip.gioDenDuKien);
-        value.put(
-                "giaVeDuKien",
-                trip.tuyenXe.giaCoBan == null
-                        ? null
-                        : trip.tuyenXe.giaCoBan.stripTrailingZeros().toPlainString());
+        if (trip.tuyenXe.giaCoBan == null) {
+            value.put("giaVeDuKien", null);
+        } else {
+            value.put("giaVeDuKien", trip.tuyenXe.giaCoBan.stripTrailingZeros().toPlainString());
+        }
         value.put("trangThai", trip.trangThai);
-        value.put(
-                "ngungNhanDatVeLuc",
-                TripSaleRules.cutoff(trip).atZone(TripSaleRules.ZONE).toOffsetDateTime());
+        value.put("ngungNhanDatVeLuc", TripSaleRules.cutoff(trip).atZone(TripSaleRules.ZONE).toOffsetDateTime());
         value.put("phutDungNhanDatVe", TripSaleRules.cutoffMinutes());
         value.put("serverTime", now().atZone(TripSaleRules.ZONE).toOffsetDateTime());
         boolean expired = !now().isBefore(TripSaleRules.cutoff(trip));
         value.put("daHetHanDatVe", expired);
-        value.put(
-                "coTheDatVe",
-                trip.trangThai == TrangThaiChuyen.DANG_MO_BAN
-                        && !expired
-                        && TripSaleRules.inspect(em, trip, now()).duDieuKien());
-        value.put(
-                "coTheSua", TripSaleRules.draft(trip) && !VehicleRules.hasTicketsOrHolds(em, trip));
-        value.put(
-                "coTheXoa",
-                TripSaleRules.draft(trip)
-                        && !VehicleRules.hasTicketsOrHolds(em, trip)
-                        && trip.danhSachDanhGia.isEmpty());
-        value.put(
-                "coTheHuy",
-                Set.of(
-                                TrangThaiChuyen.NHAP,
-                                TrangThaiChuyen.DANG_MO_BAN,
-                                TrangThaiChuyen.CHUA_KHOI_HANH)
-                        .contains(trip.trangThai));
-        List<PhanCongChuyenXe> crew =
-                em.createQuery(
-                                "select p from PhanCongChuyenXe p where p.chuyenXe=:trip order by"
-                                        + " p.maPhanCong",
-                                PhanCongChuyenXe.class)
-                        .setParameter("trip", trip)
-                        .getResultList();
+        value.put("coTheDatVe", trip.trangThai == TrangThaiChuyen.DANG_MO_BAN && !expired && TripSaleRules.inspect(em, trip, now())
+            .duDieuKien());
+        value.put("coTheSua", TripSaleRules.draft(trip) && !VehicleRules.hasTicketsOrHolds(em, trip));
+        value.put("coTheXoa", TripSaleRules.draft(trip) && !VehicleRules.hasTicketsOrHolds(em, trip) && trip.danhSachDanhGia.isEmpty());
+        value.put("coTheHuy", Set.of(TrangThaiChuyen.NHAP, TrangThaiChuyen.DANG_MO_BAN, TrangThaiChuyen.CHUA_KHOI_HANH)
+            .contains(trip.trangThai));
+        List<PhanCongChuyenXe> crew = em.createQuery("select p from PhanCongChuyenXe p where p.chuyenXe=:trip order by" + " p.maPhanCong",
+            PhanCongChuyenXe.class)
+            .setParameter("trip", trip)
+            .getResultList();
         List<Map<String, Object>> crewItems = new ArrayList<>();
         for (PhanCongChuyenXe assignment : crew) {
             Map<String, Object> item = new LinkedHashMap<>();

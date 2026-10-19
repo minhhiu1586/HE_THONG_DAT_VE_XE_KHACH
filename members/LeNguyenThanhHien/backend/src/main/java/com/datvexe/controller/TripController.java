@@ -7,6 +7,10 @@ import com.datvexe.security.ApiErrors;
 import com.datvexe.service.*;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.cfg.MutableCoercionConfig;
+import com.fasterxml.jackson.databind.type.LogicalType;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
@@ -17,25 +21,18 @@ import java.time.LocalDate;
 @WebServlet(urlPatterns = {"/api/quan-ly/chuyen-xe", "/api/quan-ly/chuyen-xe/*"})
 public class TripController extends HttpServlet {
     private TripService service;
-    private final ObjectMapper json =
-            new ObjectMapper()
-                    .registerModule(new JavaTimeModule())
-                    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                    .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-                    .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
+    private final ObjectMapper json = new ObjectMapper();
 
     // Không tự đổi số hoặc boolean thành chuỗi để tránh chấp nhận dữ liệu request sai kiểu.
     public TripController() {
-        json.coercionConfigFor(com.fasterxml.jackson.databind.type.LogicalType.Textual)
-                .setCoercion(
-                        com.fasterxml.jackson.databind.cfg.CoercionInputShape.Integer,
-                        com.fasterxml.jackson.databind.cfg.CoercionAction.Fail)
-                .setCoercion(
-                        com.fasterxml.jackson.databind.cfg.CoercionInputShape.Float,
-                        com.fasterxml.jackson.databind.cfg.CoercionAction.Fail)
-                .setCoercion(
-                        com.fasterxml.jackson.databind.cfg.CoercionInputShape.Boolean,
-                        com.fasterxml.jackson.databind.cfg.CoercionAction.Fail);
+        json.registerModule(new JavaTimeModule());
+        json.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        json.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
+        json.enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
+        MutableCoercionConfig textCoercion = json.coercionConfigFor(LogicalType.Textual);
+        textCoercion.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail);
+        textCoercion.setCoercion(CoercionInputShape.Float, CoercionAction.Fail);
+        textCoercion.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail);
     }
 
     @Override
@@ -52,21 +49,34 @@ public class TripController extends HttpServlet {
     }
 
     private static LocalDate date(String value) {
-        return value == null || value.isBlank() ? null : LocalDate.parse(value);
+        if (value == null || value.isBlank()) {
+            return null;
+        } else {
+            return LocalDate.parse(value);
+        }
     }
 
     private static int number(String value, int fallback) {
-        return value == null ? fallback : Integer.parseInt(value);
+        if (value == null) {
+            return fallback;
+        } else {
+            return Integer.parseInt(value);
+        }
     }
 
+    // Phân loại yêu cầu quản lý chuyến theo đường dẫn và trả kết quả hoặc lỗi dạng JSON.
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse res) throws IOException {
         res.setCharacterEncoding("UTF-8");
         res.setContentType("application/json; charset=UTF-8");
         try {
             String path = req.getPathInfo();
-            String[] segments =
-                    path == null || path.equals("/") ? new String[0] : path.substring(1).split("/");
+            String[] segments;
+            if (path == null || path.equals("/")) {
+                segments = new String[0];
+            } else {
+                segments = path.substring(1).split("/");
+            }
             String method = req.getMethod();
             Object result;
             res.setStatus(200);
@@ -96,33 +106,25 @@ public class TripController extends HttpServlet {
                     constraint = true;
                 }
             }
-            ApiErrors.write(
-                    res,
-                    new DomainException(
-                            constraint ? 409 : 500,
-                            constraint
-                                    ? "Dữ liệu chuyến bị trùng hoặc vi phạm ràng buộc."
-                                    : "Không thể xử lý chuyến lúc này."));
+            if (constraint) {
+                ApiErrors.write(res, new DomainException(409, "Dữ liệu chuyến bị trùng hoặc vi phạm ràng buộc."));
+            } else {
+                ApiErrors.write(res, new DomainException(500, "Không thể xử lý chuyến lúc này."));
+            }
         }
     }
 
-    private Object handleCollection(HttpServletRequest req, HttpServletResponse res, String method)
-            throws IOException {
+    // Đọc bộ lọc danh sách chuyến hoặc nhận dữ liệu để tạo chuyến nháp mới.
+    private Object handleCollection(HttpServletRequest req, HttpServletResponse res, String method) throws IOException {
         if (method.equals("GET")) {
             String stateParameter = req.getParameter("trangThai");
             TrangThaiChuyen state = null;
             if (stateParameter != null && !stateParameter.isBlank()) {
                 state = TrangThaiChuyen.valueOf(stateParameter);
             }
-            return service.list(
-                    req.getParameter("maNhaXe"),
-                    req.getParameter("maTuyen"),
-                    req.getParameter("maXe"),
-                    date(req.getParameter("tuNgay")),
-                    date(req.getParameter("denNgay")),
-                    state,
-                    number(req.getParameter("page"), 1),
-                    number(req.getParameter("size"), 20));
+            return service.list(req.getParameter("maNhaXe"), req.getParameter("maTuyen"), req.getParameter("maXe"),
+                date(req.getParameter("tuNgay")), date(req.getParameter("denNgay")), state, number(req.getParameter("page"), 1),
+                number(req.getParameter("size"), 20));
         }
         if (method.equals("POST")) {
             TripInputs.Draft input = body(req);
@@ -133,9 +135,8 @@ public class TripController extends HttpServlet {
         throw new DomainException(404, "API không tồn tại.");
     }
 
-    private Object handleTrip(
-            HttpServletRequest req, HttpServletResponse res, String method, String tripId)
-            throws IOException {
+    // Xử lý yêu cầu xem, sửa hoặc xóa một chuyến theo mã chuyến.
+    private Object handleTrip(HttpServletRequest req, HttpServletResponse res, String method, String tripId) throws IOException {
         if (method.equals("GET")) {
             return service.get(tripId);
         }
@@ -151,8 +152,8 @@ public class TripController extends HttpServlet {
         throw new DomainException(404, "API không tồn tại.");
     }
 
-    private Object handleAction(HttpServletRequest req, String method, String tripId, String action)
-            throws IOException {
+    // Chuyển yêu cầu mở bán, bắt đầu, hoàn tất, hủy hoặc xem báo cáo chuyến đến đúng hàm xử lý.
+    private Object handleAction(HttpServletRequest req, String method, String tripId, String action) throws IOException {
         if (method.equals("GET")) {
             if (action.equals("dieu-kien-mo-ban")) {
                 return service.eligibility(tripId);
@@ -175,8 +176,7 @@ public class TripController extends HttpServlet {
                 return service.transition(tripId, TrangThaiChuyen.HOAN_TAT, null);
             }
             if (action.equals("huy")) {
-                TripInputs.Cancellation input =
-                        json.readValue(req.getInputStream(), TripInputs.Cancellation.class);
+                TripInputs.Cancellation input = json.readValue(req.getInputStream(), TripInputs.Cancellation.class);
                 if (input == null) {
                     throw new DomainException(400, "Thiếu lý do hủy chuyến.");
                 }
