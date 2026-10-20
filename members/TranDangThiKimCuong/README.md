@@ -2,6 +2,8 @@
 
 Hồ sơ nhân viên, điều kiện phân công, lịch cá nhân.
 
+API `/api/phan-cong` do AssignmentController/AssignmentService xử lý tại module này. Module chuyến của Hiền tiếp tục gọi AssignmentRules để kiểm tra vận hành.
+
 ## Tài liệu và kiểm thử
 
 - [Kiểm thử và kết quả chạy](testing/README.md)
@@ -17,6 +19,10 @@ Hồ sơ nhân viên, điều kiện phân công, lịch cá nhân.
 | File |
 |---|
 | [EmployeeController.java](backend/src/main/java/com/datvexe/controller/EmployeeController.java) |
+| [AssignmentController.java](backend/src/main/java/com/datvexe/controller/AssignmentController.java) |
+| [AssignmentInputs.java](backend/src/main/java/com/datvexe/dto/AssignmentInputs.java) |
+| [AssignmentService.java](backend/src/main/java/com/datvexe/service/AssignmentService.java) |
+| [AssignmentServiceTest.java](backend/src/test/java/com/datvexe/service/AssignmentServiceTest.java) |
 | [EmployeeInputs.java](backend/src/main/java/com/datvexe/dto/EmployeeInputs.java) |
 | [NhanVienRepository.java](backend/src/main/java/com/datvexe/repository/NhanVienRepository.java) |
 | [PhanCongChuyenXeRepository.java](backend/src/main/java/com/datvexe/repository/PhanCongChuyenXeRepository.java) |

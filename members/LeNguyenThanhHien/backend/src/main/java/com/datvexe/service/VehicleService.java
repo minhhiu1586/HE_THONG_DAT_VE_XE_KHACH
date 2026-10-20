@@ -56,18 +56,15 @@ public final class VehicleService {
         "soDoHopLe",VehicleRules.layoutValid(x),"dangKiemConHieuLuc",VehicleRules.inspection(x,VehicleRules.today(),VehicleRules.today()),
         "coTheSuaSoDo",x.danhSachChuyenXe.stream().noneMatch(VehicleService::active) && x.danhSachGhe.stream().allMatch(g -> g.danhSachVe.isEmpty() && g.danhSachGiuCho.isEmpty())); }
     private static Map<String,Object> view(Ghe x) { return view("maGhe",x.maGhe,"maXe",x.xe.maXe,"viTri",x.viTri,"tang",x.tang,"trangThai",x.trangThai); }
-    private static Map<String,Object> view(PhanCongChuyenXe x) { return view("maPhanCong",x.maPhanCong,"maChuyen",x.chuyenXe.maChuyen,"maNhanVien",x.nhanVien.maNhanVien,"vaiTro",x.vaiTro,"ghiChu",x.ghiChu); }
 
     public List<Map<String,Object>> list(String kind) { return tx(em -> switch(kind) {
         case "loai-xe" -> new LoaiXeRepository(em).list().stream().map(VehicleService::view).toList();
         case "xe" -> new XeRepository(em).list().stream().filter(x -> RequestIdentity.operatorId() == null || (x.nhaXe != null && x.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()))).map(VehicleService::view).toList();
-        case "phan-cong" -> new PhanCongChuyenXeRepository(em).list().stream().filter(x -> x.vaiTro!=VaiTroChuyen.KIEM_VE).filter(x -> RequestIdentity.operatorId() == null || (x.chuyenXe.tuyenXe.nhaXe != null && x.chuyenXe.tuyenXe.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()) && (x.nhanVien.nhaXe != null && x.nhanVien.nhaXe.maNhaXe.equals(RequestIdentity.operatorId())))).map(VehicleService::view).toList();
         default -> throw new DomainException(404,"API không tồn tại");
     }); }
     public Map<String,Object> get(String kind, String id) { return tx(em -> switch(kind) {
         case "loai-xe" -> view(found(new LoaiXeRepository(em).find(text(id,40))));
         case "xe" -> view(found(new XeRepository(em).find(text(id,40))));
-        case "phan-cong" -> view(found(new PhanCongChuyenXeRepository(em).find(text(id,40))));
         default -> throw new DomainException(404,"API không tồn tại");
     }); }
     public Map<String,Object> saveType(String id, VehicleInputs.LoaiXe input) { return tx(em -> {
@@ -191,13 +188,7 @@ public final class VehicleService {
             if(kind.equals("loai-xe")) return new LoaiXeRepository(em).list().stream()
                 .filter(x -> term.isEmpty() || (x.maLoaiXe+" "+x.tenLoaiXe).toLowerCase(Locale.ROOT).contains(term))
                 .sorted(Comparator.comparing(x -> x.maLoaiXe)).map(VehicleService::view).toList();
-            if(!kind.equals("xe")) {
-                if (!kind.equals("phan-cong")) throw new DomainException(404,"API không tồn tại");
-                return new PhanCongChuyenXeRepository(em).list().stream()
-                    .filter(x -> RequestIdentity.operatorId()==null || (x.chuyenXe.tuyenXe.nhaXe!=null
-                        && x.chuyenXe.tuyenXe.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()) && (x.nhanVien.nhaXe != null && x.nhanVien.nhaXe.maNhaXe.equals(RequestIdentity.operatorId()))))
-                    .map(VehicleService::view).toList();
-            }
+            if(!kind.equals("xe")) throw new DomainException(404,"API không tồn tại");
             TrangThaiXe status=state==null || state.isBlank()?null:TrangThaiXe.valueOf(state);
             ChuyenXe trip=tripId==null || tripId.isBlank()?null:found(em.find(ChuyenXe.class,tripId));
             if(trip!=null && RequestIdentity.operatorId()!=null) AccessControl.trip(em,
@@ -276,49 +267,10 @@ public final class VehicleService {
             "viTri",g.viTri,"tang",g.tang,"trangThaiSuDung",g.trangThai,"tinhTrangKhaDung",VehicleRules.availability(em,trip,g,now))).toList();
         return view("maChuyen",trip.maChuyen,"maXe",trip.xe.maXe,"serverTime",OffsetDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")),"danhSachGhe",seats);
     }); }
-    public Map<String,Object> saveAssignment(String id, VehicleInputs.PhanCong input) { return tx(em -> {
-        PhanCongChuyenXeRepository repo=new PhanCongChuyenXeRepository(em);
-        PhanCongChuyenXe p=id==null?new PhanCongChuyenXe():found(repo.lock(text(id,40)));
-        ChuyenXe previousTrip=id==null?null:em.find(ChuyenXe.class,p.chuyenXe.maChuyen,LockModeType.PESSIMISTIC_WRITE);
-        if(previousTrip!=null) previousTrip=(ChuyenXe)org.hibernate.Hibernate.unproxy(previousTrip);
-        if(id==null) { p.maPhanCong=text(input.maPhanCong(),40); check(repo.find(p.maPhanCong)==null,"Mã phân công đã tồn tại"); }
-        if(id!=null) check(TripSaleRules.scheduled(p.chuyenXe),"Không sửa phân công chuyến đã khởi hành");
-        ChuyenXe c=found(em.find(ChuyenXe.class,text(input.maChuyen(),40),LockModeType.PESSIMISTIC_WRITE));
-        c=(ChuyenXe)org.hibernate.Hibernate.unproxy(c);
-        c.tuyenXe=(TuyenXe)org.hibernate.Hibernate.unproxy(c.tuyenXe);
-        check(TripSaleRules.scheduled(c),"Chỉ phân công chuyến chưa khởi hành");
-        NhanVien n=found(em.find(NhanVien.class,text(input.maNhanVien(),40),LockModeType.PESSIMISTIC_WRITE));
-        n=(NhanVien)org.hibernate.Hibernate.unproxy(n);
-        AssignmentRules.validate(em,c,n,input.vaiTro(),p.maPhanCong);
-        if(input.ghiChu()!=null && input.ghiChu().length()>1000) throw new DomainException(400,"Ghi chú quá dài");
-        String note=input.ghiChu()==null?"":input.ghiChu().replaceFirst("^\\[T11_PLAN:[^\\]]*\\]\\s*","");
-        if(AssignmentRules.needsDrivingPlan(c)) {
-            check(Boolean.TRUE.equals(input.xacNhanKeHoachLaiNghi()),"Chuyến dài cần xác nhận kế hoạch lái/nghỉ; hệ thống chưa tự kiểm chứng giờ nghỉ.");
-            var identity=RequestIdentity.get();
-            String reviewer=identity==null?"INTERNAL":identity.user().maNguoiDung();
-            note=AssignmentRules.reviewPrefix(c)+reviewer+"/"+Instant.now()+"] "+note;
-        }
-        check(note.length()<=1000,"Ghi chú quá dài sau khi ghi nhận xác nhận.");
-        p.ghiChu=note.isEmpty()?null:note; p.chuyenXe=c; p.nhanVien=n; p.vaiTro=input.vaiTro();
-        if(id==null) repo.save(p);
-        em.flush();
-        if(c.trangThai==TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em,c)) AssignmentRules.readyForOperation(em,c);
-        if(previousTrip!=null && !previousTrip.maChuyen.equals(c.maChuyen) && (previousTrip.trangThai==TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em,previousTrip)))
-            AssignmentRules.readyForOperation(em,previousTrip);
-        return view(p);
-    }); }
     public void delete(String kind,String id) { tx(em -> {
         switch(kind) {
             case "loai-xe" -> { var r=new LoaiXeRepository(em); var x=found(r.lock(text(id,40))); check(x.danhSachXe.isEmpty(),"Loại xe đang được sử dụng"); r.delete(x); }
             case "xe" -> { var r=new XeRepository(em); var x=found(r.lock(text(id,40))); check(x.danhSachChuyenXe.isEmpty(),"Xe đã có lịch sử chuyến"); for(Ghe g:x.danhSachGhe) check(g.danhSachVe.isEmpty() && g.danhSachGiuCho.isEmpty(),"Ghế đã được sử dụng"); r.delete(x); }
-            case "phan-cong" -> {
-                var r=new PhanCongChuyenXeRepository(em); var x=found(r.lock(text(id,40)));
-                check(TripSaleRules.scheduled(x.chuyenXe),"Chuyến đã khởi hành");
-                ChuyenXe trip=em.find(ChuyenXe.class,x.chuyenXe.maChuyen,LockModeType.PESSIMISTIC_WRITE);
-                boolean sold=trip.trangThai==TrangThaiChuyen.DANG_MO_BAN || VehicleRules.hasTicketsOrHolds(em,trip);
-                r.delete(x); em.flush();
-                if(sold) AssignmentRules.readyForOperation(em,trip);
-            }
             default -> throw new DomainException(404,"API không tồn tại");
         } return null;
     }); }
