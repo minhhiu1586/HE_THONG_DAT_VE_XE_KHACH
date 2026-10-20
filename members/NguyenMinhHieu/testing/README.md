@@ -53,3 +53,14 @@ Nguồn: Surefire XML của lần Maven verify sau di chuyển. Giữ nguyên te
 | com.datvexe.service.ReviewServiceTest | 36 | 0 | 0 | 0 |
 
 PostgreSQL/HTTP/browser/provider thật chưa được chạy trong đợt này. Test bị bỏ qua không được tính đạt. Báo cáo chung: [ket-qua-kiem-thu-sau-tai-cau-truc.md](../../../docs/team/ket-qua-kiem-thu-sau-tai-cau-truc.md).
+
+## Refactor ngày 20/10/2026
+
+- Tham khảo cách tách Auth/User và handler của Cinema-main; giữ nguyên cơ chế session cookie, CSRF, PBKDF2 và các URL API.
+- `mvn -B clean verify -DforkCount=0`: build WAR đạt; toàn bộ báo cáo có 275 test, 212 thực thi đạt, 63 bỏ qua, không có failure/error. Các test PostgreSQL có điều kiện chưa được chạy.
+- Phần Nguyễn Minh Hiếu có 104 test: 73 thực thi đạt, 31 bỏ qua.
+- `AuthFlowTest` bổ sung request xuyên Filter → Controller → Service → JPA: đăng ký, đăng nhập, cookie/CSRF, hồ sơ, đăng xuất, JSON và origin không hợp lệ.
+- `LoginRateLimiterTest` kiểm tra giới hạn theo địa chỉ và thời điểm mở lại cửa sổ.
+- Chạy lại hai lớp mới sau chỉnh lý cuối và đóng gói WAR: đạt.
+- TypeScript, ESLint và Next.js production build đạt; ESLint còn hai cảnh báo img có sẵn ngoài phần này.
+- Chưa chạy lại E2E trên Docker/trình duyệt hoặc dịch vụ VNPay/Brevo thật.
