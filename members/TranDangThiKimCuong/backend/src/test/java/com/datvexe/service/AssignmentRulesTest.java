@@ -30,4 +30,11 @@ class AssignmentRulesTest {
         var next=trip("B","A",LocalDateTime.of(2030,1,2,6,0),LocalDateTime.of(2030,1,2,10,0));
         assertDoesNotThrow(()->AssignmentRules.connection(first,next));
     }
+    @Test void drivingPlanRequiredOnlyAboveFourHours() {
+        LocalDateTime departure = LocalDateTime.of(2030, 1, 1, 22, 0);
+        var trip = trip("A", "B", departure, departure.plusHours(4));
+        assertFalse(AssignmentRules.needsDrivingPlan(trip));
+        trip.gioDenDuKien = departure.plusHours(4).plusSeconds(1);
+        assertTrue(AssignmentRules.needsDrivingPlan(trip));
+    }
 }
