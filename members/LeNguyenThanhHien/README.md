@@ -7,6 +7,8 @@ Phân công nhân viên được xử lý tại module Kim Cương qua Assignmen
 ## Tài liệu và kiểm thử
 
 - [Hướng dẫn demo](docs/huong-dan-demo.md)
+- [Sơ đồ luồng nghiệp vụ, nhánh thành công và thất bại](docs/so-do-luong-nghiep-vu.md)
+- [Bảng truy vết chức năng tới code, Entity, bảng DB và test](docs/bang-truy-vet-chuc-nang.md)
 - [Kiểm thử và kết quả chạy](testing/README.md)
 - [Phân công và phần phối hợp](../../docs/team/phan-cong-thanh-vien.md)
 - [Hợp đồng API](../../docs/api/README.md)
