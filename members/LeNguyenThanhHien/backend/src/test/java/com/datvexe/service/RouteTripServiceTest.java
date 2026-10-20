@@ -401,4 +401,27 @@ class RouteTripServiceTest {
         }
         assertEquals("X", service.assignVehicle("C", "X").get("maXe"));
     }
+    @Test void searchAcceptsCityStationAndLegacyCodesWithoutChangingSaleRules() {
+        LocalDate day = LocalDate.of(2030, 1, 1);
+        service.createTuyenXe(route("SEARCH_ROUTE"));
+        service.createChuyenXe(new Inputs.ChuyenXe("SEARCH_TRIP", "SEARCH_ROUTE", day, LocalTime.of(8, 0), null));
+        PublishedTripFixture.open(factory, "SEARCH_TRIP");
+        for (String from : List.of("HCM", "CITY:HCM", "STATION:MD")) {
+            for (String to : List.of("LD", "CITY:LD", "STATION:DL")) {
+                List<Map<String, Object>> trips = service.searchChuyenXe(from, to, day);
+                assertEquals(1, trips.size(), from + " -> " + to);
+                Map<String, Object> trip = trips.getFirst();
+                assertEquals("SEARCH_TRIP", trip.get("maChuyen"));
+                assertEquals("MD", trip.get("maBenDi"));
+                assertEquals("DL", trip.get("maBenDen"));
+                assertEquals("CON_CHO", trip.get("trangThaiNhanDatVe"));
+                assertEquals(true, trip.get("coTheDatVe"));
+            }
+        }
+        service.transition("SEARCH_TRIP", TrangThaiChuyen.DANG_CHAY);
+        assertTrue(service.searchChuyenXe("CITY:HCM", "CITY:LD", day).isEmpty());
+        service.transition("SEARCH_TRIP", TrangThaiChuyen.HOAN_TAT);
+        assertTrue(service.searchChuyenXe("STATION:MD", "STATION:DL", day).isEmpty());
+    }
+
 }

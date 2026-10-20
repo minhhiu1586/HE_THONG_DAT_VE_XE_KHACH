@@ -1,77 +1,224 @@
 package com.datvexe.controller;
 
 import com.datvexe.config.Jpa;
-import com.datvexe.security.ApiErrors;
 import com.datvexe.dto.VehicleInputs;
-import com.datvexe.service.*;
-import com.fasterxml.jackson.databind.*;
+import com.datvexe.security.ApiErrors;
+import com.datvexe.service.DomainException;
+import com.datvexe.service.VehicleService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.cfg.MutableCoercionConfig;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.*;
-import java.io.IOException;
-import java.util.Map;
 
-@WebServlet(urlPatterns={"/api/loai-xe", "/api/loai-xe/*", "/api/xe", "/api/xe/*"})
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
+
+@WebServlet(urlPatterns = {
+    "/api/loai-xe", "/api/loai-xe/*",
+    "/api/xe", "/api/xe/*"
+})
 public class VehicleController extends HttpServlet {
     private VehicleService service;
-    private final ObjectMapper json=new ObjectMapper().registerModule(new JavaTimeModule())
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS).disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-        .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
+    private final ObjectMapper json = new ObjectMapper();
+
+    // Cấu hình JSON và từ chối dữ liệu sai kiểu trước khi chuyển vào DTO.
     public VehicleController() {
-        json.coercionConfigFor(com.fasterxml.jackson.databind.type.LogicalType.Textual)
-            .setCoercion(com.fasterxml.jackson.databind.cfg.CoercionInputShape.Integer, com.fasterxml.jackson.databind.cfg.CoercionAction.Fail)
-            .setCoercion(com.fasterxml.jackson.databind.cfg.CoercionInputShape.Float, com.fasterxml.jackson.databind.cfg.CoercionAction.Fail)
-            .setCoercion(com.fasterxml.jackson.databind.cfg.CoercionInputShape.Boolean, com.fasterxml.jackson.databind.cfg.CoercionAction.Fail);
+        json.registerModule(new JavaTimeModule());
+        json.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        json.disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
+        json.enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS);
+
+        MutableCoercionConfig textCoercion = json.coercionConfigFor(LogicalType.Textual);
+        textCoercion.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail);
+        textCoercion.setCoercion(CoercionInputShape.Float, CoercionAction.Fail);
+        textCoercion.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail);
     }
-    @Override public void init() { service=new VehicleService(Jpa.factory()); }
-    private <T> T body(HttpServletRequest req,Class<T> type) throws IOException {
-        T value=json.readValue(req.getInputStream(),type);
-        if(value==null) throw new DomainException(400,"Thiếu nội dung yêu cầu"); return value;
+
+    @Override
+    public void init() {
+        service = new VehicleService(Jpa.factory());
     }
-    @Override protected void service(HttpServletRequest req,HttpServletResponse res) throws IOException {
-        res.setCharacterEncoding("UTF-8"); res.setContentType("application/json; charset=UTF-8");
+
+    // Đọc JSON thành DTO được yêu cầu và báo lỗi nếu nội dung gửi lên bị thiếu.
+    private <T> T body(HttpServletRequest request, Class<T> type) throws IOException {
+        T value = json.readValue(request.getInputStream(), type);
+
+        if (value == null) {
+            throw new DomainException(400, "Thiếu nội dung yêu cầu");
+        }
+
+        return value;
+    }
+
+    // Phân loại yêu cầu về loại xe, xe và ghế để gọi đúng chức năng rồi trả kết quả JSON.
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json; charset=UTF-8");
+
         try {
-            String kind=req.getServletPath().substring("/api/".length());
-            String path=req.getPathInfo();
-            String[] p=path==null || path.equals("/")?new String[0]:path.substring(1).split("/");
-            String method=req.getMethod(); Object result; int status=200;
-            if(kind.equals("xe") && p.length==1 && p[0].equals("pham-vi") && method.equals("GET")) {
-                result=service.operators();
-            } else if(kind.equals("xe") && p.length==2 && p[1].equals("so-do-ghe") && method.equals("PUT")) {
-                result=service.saveLayout(p[0],body(req,VehicleInputs.SoDoGhe.class));
-            } else if(kind.equals("xe") && p.length==3 && p[1].equals("dieu-kien") && method.equals("GET")) {
-                result=service.vehicleEligibility(p[0],p[2]);
-            } else if(kind.equals("xe") && p.length>=2 && p[1].equals("ghe")) {
-                if(p.length==2 && method.equals("GET")) result=service.seats(p[0],false);
-                else if(p.length==2 && method.equals("POST")) { result=service.createSeat(p[0],body(req,VehicleInputs.Ghe.class)); status=201; }
-                else if(p.length==3 && p[2].equals("sinh") && method.equals("POST")) { result=service.seats(p[0],true); status=201; }
-                else if(p.length==3 && method.equals("GET")) result=service.getSeat(p[0],p[2]);
-                else if(p.length==3 && method.equals("DELETE")) { service.deleteSeat(p[0],p[2]); result=null; status=204; }
-                else if(p.length==3 && method.equals("PUT")) result=service.updateSeat(p[0],p[2],body(req,VehicleInputs.Ghe.class));
-                else throw new DomainException(404,"API không tồn tại");
-            } else if(p.length<=1) {
-                String id=p.length==0?null:p[0];
-                if(method.equals("GET")) result=id==null?service.filtered(kind,req.getParameter("q"),req.getParameter("maLoaiXe"),req.getParameter("maNhaXe"),req.getParameter("trangThai"),req.getParameter("maChuyen")):service.get(kind,id);
-                else if((method.equals("POST") && id==null) || (method.equals("PUT") && id!=null)) {
-                    result=switch(kind) {
-                        case "loai-xe" -> service.saveType(id,body(req,VehicleInputs.LoaiXe.class));
-                        case "xe" -> service.saveVehicle(id,body(req,VehicleInputs.Xe.class));
-                        default -> throw new DomainException(404,"API không tồn tại");
-                    }; if(id==null) status=201;
-                } else if(method.equals("DELETE") && id!=null) { service.delete(kind,id); result=null; status=204; }
-                else throw new DomainException(405,"Phương thức không được hỗ trợ");
-            } else throw new DomainException(404,"API không tồn tại");
-            res.setStatus(status); if(result!=null) json.writeValue(res.getOutputStream(),result);
-        } catch(DomainException e) { ApiErrors.write(res,e); }
-        catch(com.fasterxml.jackson.core.JsonProcessingException | IllegalArgumentException e) { error(res,400,"Dữ liệu yêu cầu không hợp lệ"); }
-        catch(jakarta.persistence.PersistenceException e) {
-            getServletContext().log("Vehicle database failure",e);
-            boolean constraint=false;
-            for(Throwable c=e;c!=null;c=c.getCause()) if(c instanceof org.hibernate.exception.ConstraintViolationException) constraint=true;
-            error(res,constraint?409:500,constraint?"Dữ liệu vi phạm ràng buộc database":"Không thể xử lý dữ liệu lúc này");
+            String kind = request.getServletPath().substring("/api/".length());
+            String path = request.getPathInfo();
+            String[] segments;
+
+            if (path == null || path.equals("/")) {
+                segments = new String[0];
+            } else {
+                segments = path.substring(1).split("/");
+            }
+
+            String method = request.getMethod();
+            Object result;
+            response.setStatus(200);
+
+            if (kind.equals("xe") && segments.length == 1
+                    && segments[0].equals("pham-vi") && method.equals("GET")) {
+                result = service.operators();
+            } else if (kind.equals("xe") && segments.length == 2
+                    && segments[1].equals("so-do-ghe") && method.equals("PUT")) {
+                VehicleInputs.SoDoGhe input = body(request, VehicleInputs.SoDoGhe.class);
+                result = service.saveLayout(segments[0], input);
+            } else if (kind.equals("xe") && segments.length == 3
+                    && segments[1].equals("dieu-kien") && method.equals("GET")) {
+                result = service.vehicleEligibility(segments[0], segments[2]);
+            } else if (kind.equals("xe") && segments.length >= 2 && segments[1].equals("ghe")) {
+                result = handleSeats(request, response, method, segments);
+            } else if (segments.length <= 1) {
+                String id = null;
+
+                if (segments.length == 1) {
+                    id = segments[0];
+                }
+
+                result = handleResource(request, response, method, kind, id);
+            } else {
+                throw new DomainException(404, "API không tồn tại");
+            }
+
+            if (result != null) {
+                json.writeValue(response.getOutputStream(), result);
+            }
+        } catch (DomainException e) {
+            ApiErrors.write(response, e);
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            error(response, 400, "Dữ liệu yêu cầu không hợp lệ");
+        } catch (jakarta.persistence.PersistenceException e) {
+            getServletContext().log("Vehicle database failure", e);
+
+            boolean constraint = false;
+            for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                if (cause instanceof org.hibernate.exception.ConstraintViolationException) {
+                    constraint = true;
+                }
+            }
+
+            if (constraint) {
+                error(response, 409, "Dữ liệu vi phạm ràng buộc database");
+            } else {
+                error(response, 500, "Không thể xử lý dữ liệu lúc này");
+            }
         }
     }
-    private void error(HttpServletResponse res,int status,String message) throws IOException {
-        ApiErrors.write(res, new DomainException(status, message));
+
+    private void error(HttpServletResponse response, int status, String message) throws IOException {
+        ApiErrors.write(response, new DomainException(status, message));
+    }
+
+    // Xử lý yêu cầu xem, tạo, sửa, xóa hoặc sinh danh sách ghế của một xe.
+    private Object handleSeats(HttpServletRequest request, HttpServletResponse response,
+            String method, String[] segments) throws IOException {
+        String vehicleId = segments[0];
+
+        if (segments.length == 2 && method.equals("GET")) {
+            return service.seats(vehicleId, false);
+        }
+
+        if (segments.length == 2 && method.equals("POST")) {
+            VehicleInputs.Ghe input = body(request, VehicleInputs.Ghe.class);
+            Object result = service.createSeat(vehicleId, input);
+            response.setStatus(201);
+            return result;
+        }
+
+        if (segments.length == 3 && segments[2].equals("sinh") && method.equals("POST")) {
+            Object result = service.seats(vehicleId, true);
+            response.setStatus(201);
+            return result;
+        }
+
+        if (segments.length == 3 && method.equals("GET")) {
+            return service.getSeat(vehicleId, segments[2]);
+        }
+
+        if (segments.length == 3 && method.equals("DELETE")) {
+            service.deleteSeat(vehicleId, segments[2]);
+            response.setStatus(204);
+            return null;
+        }
+
+        if (segments.length == 3 && method.equals("PUT")) {
+            VehicleInputs.Ghe input = body(request, VehicleInputs.Ghe.class);
+            return service.updateSeat(vehicleId, segments[2], input);
+        }
+
+        throw new DomainException(404, "API không tồn tại");
+    }
+
+    // Xử lý yêu cầu lọc danh sách, xem chi tiết, thêm, sửa hoặc xóa loại xe và xe.
+    private Object handleResource(HttpServletRequest request, HttpServletResponse response,
+            String method, String kind, String id) throws IOException {
+        if (method.equals("GET")) {
+            if (id != null) {
+                return service.get(kind, id);
+            }
+
+            String search = request.getParameter("q");
+            String type = request.getParameter("maLoaiXe");
+            String owner = request.getParameter("maNhaXe");
+            String state = request.getParameter("trangThai");
+            String tripId = request.getParameter("maChuyen");
+
+            return service.filtered(kind, search, type, owner, state, tripId);
+        }
+
+        boolean creating = method.equals("POST") && id == null;
+        boolean updating = method.equals("PUT") && id != null;
+
+        if (creating || updating) {
+            Object result;
+
+            if (kind.equals("loai-xe")) {
+                VehicleInputs.LoaiXe input = body(request, VehicleInputs.LoaiXe.class);
+                result = service.saveType(id, input);
+            } else if (kind.equals("xe")) {
+                VehicleInputs.Xe input = body(request, VehicleInputs.Xe.class);
+                result = service.saveVehicle(id, input);
+            } else {
+                throw new DomainException(404, "API không tồn tại");
+            }
+
+            if (creating) {
+                response.setStatus(201);
+            }
+
+            return result;
+        }
+
+        if (method.equals("DELETE") && id != null) {
+            service.delete(kind, id);
+            response.setStatus(204);
+            return null;
+        }
+
+        throw new DomainException(405, "Phương thức không được hỗ trợ");
     }
 }
