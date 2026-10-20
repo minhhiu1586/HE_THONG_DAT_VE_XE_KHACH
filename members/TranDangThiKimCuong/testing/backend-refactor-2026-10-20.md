@@ -1,6 +1,24 @@
 # Bàn giao backend Kim Cương — 20/10/2026
 
-Nhánh `fix/backend-tran-dang-thi-kim-cuong`; so với `de53e13`. Chưa commit/push.
+Đợt tách module: nhánh `fix/backend-tran-dang-thi-kim-cuong`, so với `de53e13`; đã lưu trong commit `792b86f`.
+
+## Đợt làm rõ code tiếp theo
+
+Nhánh `fix/backend-kim-cuong-readability`, so với `792b86f`. Chưa commit/push.
+
+- `EmployeeService`: lọc nhân viên và sắp lịch theo từng bước bằng vòng lặp.
+- `AssignmentService`: gom xử lý danh sách vào `assignmentViews()`, giữ cách lọc cũ của từng hàm.
+- `AssignmentRules`: đặt tên điều kiện vai trò/trùng lịch/chuyến liền kề; kiểm tra tổ lái bằng vòng lặp; đặt hằng mốc 4 giờ và làm rõ dấu xác nhận kế hoạch.
+- Hai Repository: tách biến JPQL, trình bày tham số rõ ràng; không thay đổi nội dung truy vấn.
+- Thêm test đúng 4 giờ và vượt 1 giây. Giữ API, nghiệp vụ, transaction, khóa dữ liệu; không đổi frontend, shared, database, .env.
+
+Phạm vi đợt này: sửa 5 file backend, 1 file test và tài liệu này; không thêm/xóa file. Đây là cải tiến khả năng đọc và bảo trì, chưa đo tăng tốc độ.
+
+Kiểm chứng: toàn backend 217 đạt/63 bỏ qua (280 tổng); sau chỉnh cuối chạy lại 44 test nhân viên/phân công/xe/chuyến đạt, WAR build thành công. Log: `apps/backend/target/readability-verify.log`, `readability-final-tests.log`.
+
+Chưa chạy lại HTTP/UI đợt này: Docker daemon không hoạt động khi thử khởi động backend. Kết quả bên dưới thuộc đợt tách module trước.
+
+## Đợt tách module trước
 
 ## Cải tiến
 

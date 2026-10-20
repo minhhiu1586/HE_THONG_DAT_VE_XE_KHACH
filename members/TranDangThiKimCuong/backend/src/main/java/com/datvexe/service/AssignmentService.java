@@ -13,6 +13,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -46,11 +47,7 @@ public final class AssignmentService {
     }
 
     public List<Map<String, Object>> list() {
-        return tx(em -> new PhanCongChuyenXeRepository(em).list().stream()
-            .filter(assignment -> assignment.vaiTro != VaiTroChuyen.KIEM_VE)
-            .filter(AssignmentService::inOperatorScope)
-            .map(AssignmentService::view)
-            .toList());
+        return tx(em -> assignmentViews(em, true));
     }
 
     // Keep the existing HTTP list contract: q is length-checked, not used as a filter.
@@ -60,11 +57,21 @@ public final class AssignmentService {
             if (term.length() > 160) {
                 throw new DomainException(400, "Từ khóa quá dài.");
             }
-            return new PhanCongChuyenXeRepository(em).list().stream()
-                .filter(AssignmentService::inOperatorScope)
-                .map(AssignmentService::view)
-                .toList();
+            return assignmentViews(em, false);
         });
+    }
+
+    private static List<Map<String, Object>> assignmentViews(EntityManager em, boolean excludeLegacyRoles) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (PhanCongChuyenXe assignment : new PhanCongChuyenXeRepository(em).list()) {
+            if (excludeLegacyRoles && assignment.vaiTro == VaiTroChuyen.KIEM_VE) {
+                continue;
+            }
+            if (inOperatorScope(assignment)) {
+                result.add(view(assignment));
+            }
+        }
+        return result;
     }
 
     public Map<String, Object> get(String id) {

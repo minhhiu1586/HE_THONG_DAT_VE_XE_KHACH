@@ -93,16 +93,20 @@ public final class EmployeeService {
             LoaiNhanVien kind = role == null ? null : LoaiNhanVien.valueOf(role);
             TrangThaiNhanVien status = state == null ? null : TrangThaiNhanVien.valueOf(state);
             String needle = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
-            return new NhanVienRepository(em).list().stream()
-                .filter(employee -> employee.loaiNhanVien != LoaiNhanVien.KIEM_VE)
-                .filter(employee -> visibleTo(user, employee))
-                .filter(employee -> owner == null
-                    || employee.nhaXe != null && employee.nhaXe.maNhaXe.equals(owner))
-                .filter(employee -> kind == null || employee.loaiNhanVien == kind)
-                .filter(employee -> status == null || employee.trangThai == status)
-                .filter(employee -> matchesSearch(employee, needle))
-                .map(EmployeeService::view)
-                .toList();
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (NhanVien employee : new NhanVienRepository(em).list()) {
+                if (employee.loaiNhanVien == LoaiNhanVien.KIEM_VE || !visibleTo(user, employee)) {
+                    continue;
+                }
+                boolean matchesOwner = owner == null
+                    || employee.nhaXe != null && employee.nhaXe.maNhaXe.equals(owner);
+                boolean matchesRole = kind == null || employee.loaiNhanVien == kind;
+                boolean matchesState = status == null || employee.trangThai == status;
+                if (matchesOwner && matchesRole && matchesState && matchesSearch(employee, needle)) {
+                    result.add(view(employee));
+                }
+            }
+            return result;
         });
     }
 
@@ -160,16 +164,21 @@ public final class EmployeeService {
         return tx(em -> {
             NhanVien employee = AccessControl.resource(em, NhanVien.class, text(id, 40));
             scope(caller(em), employee, false);
-            return employee.danhSachPhanCong.stream()
-                .filter(assignment -> assignment.vaiTro != VaiTroChuyen.KIEM_VE)
-                .map(assignment -> {
-                    assignment.chuyenXe = (ChuyenXe) org.hibernate.Hibernate.unproxy(assignment.chuyenXe);
-                    return assignment;
-                })
-                .sorted(Comparator.comparing((PhanCongChuyenXe assignment) -> assignment.chuyenXe.ngayKhoiHanh)
-                    .thenComparing(assignment -> assignment.chuyenXe.gioKhoiHanh))
-                .map(assignment -> assignmentView(employee, assignment))
-                .toList();
+            List<PhanCongChuyenXe> schedule = new ArrayList<>();
+            for (PhanCongChuyenXe assignment : employee.danhSachPhanCong) {
+                if (assignment.vaiTro == VaiTroChuyen.KIEM_VE) {
+                    continue;
+                }
+                assignment.chuyenXe = (ChuyenXe) org.hibernate.Hibernate.unproxy(assignment.chuyenXe);
+                schedule.add(assignment);
+            }
+            schedule.sort(Comparator.comparing((PhanCongChuyenXe assignment) -> assignment.chuyenXe.ngayKhoiHanh)
+                .thenComparing(assignment -> assignment.chuyenXe.gioKhoiHanh));
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (PhanCongChuyenXe assignment : schedule) {
+                result.add(assignmentView(employee, assignment));
+            }
+            return result;
         });
     }
 

@@ -11,17 +11,17 @@ public final class NhanVienRepository extends JpaRepository<NhanVien> {
 
     @Override
     public List<NhanVien> list() {
-        return em.createQuery(
-            "select n from NhanVien n order by n.hoTen,n.maNhanVien", NhanVien.class
-        ).getResultList();
+        String jpql = "select n from NhanVien n order by n.hoTen,n.maNhanVien";
+        return em.createQuery(jpql, NhanVien.class).getResultList();
     }
 
     public boolean contactInUse(String employeeId, String email, String phone) {
-        return em.createQuery("""
+        String jpql = """
             select count(n) from NhanVien n
             where n.maNhanVien <> :id
               and (lower(n.email) = :email or n.soDienThoai = :phone)
-            """, Long.class)
+            """;
+        return em.createQuery(jpql, Long.class)
             .setParameter("id", employeeId)
             .setParameter("email", email)
             .setParameter("phone", phone)
@@ -29,8 +29,9 @@ public final class NhanVienRepository extends JpaRepository<NhanVien> {
     }
 
     public boolean hasLinkedAccount(NhanVien employee) {
-        return em.createQuery(
-            "select count(u) from NguoiDung u where u.nhanVien = :employee", Long.class
-        ).setParameter("employee", employee).getSingleResult() > 0;
+        String jpql = "select count(u) from NguoiDung u where u.nhanVien = :employee";
+        return em.createQuery(jpql, Long.class)
+            .setParameter("employee", employee)
+            .getSingleResult() > 0;
     }
 }
