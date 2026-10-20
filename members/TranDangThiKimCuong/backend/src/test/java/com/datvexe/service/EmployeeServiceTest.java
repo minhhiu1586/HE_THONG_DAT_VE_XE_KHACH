@@ -52,6 +52,43 @@ class EmployeeServiceTest {
         assertEquals(400,assertThrows(DomainException.class,()->employees.save(null,missing)).status());
         assertTrue(employees.list(null,null,null,null).isEmpty());
     }
+    @Test
+    void contactNormalizationExcludesSelfButRejectsEachDuplicateIndependently() {
+        var first = input("E", "  A@EXAMPLE.TEST  ", "NX", TrangThaiNhanVien.DANG_LAM_VIEC);
+        assertEquals("a@example.test", employees.save(null, first).get("email"));
+        assertDoesNotThrow(() -> employees.save("E", first));
+
+        var duplicateEmail = new EmployeeInputs.Employee("E2", "Người khác", "0912345680",
+            "A@example.test", null, "NX", LoaiNhanVien.PHU_XE,
+            TrangThaiNhanVien.DANG_LAM_VIEC, null, null);
+        assertEquals(409, assertThrows(DomainException.class,
+            () -> employees.save(null, duplicateEmail)).status());
+
+        var duplicatePhone = new EmployeeInputs.Employee("E3", "Người khác", "0912345678",
+            "other@example.test", null, "NX", LoaiNhanVien.PHU_XE,
+            TrangThaiNhanVien.DANG_LAM_VIEC, null, null);
+        assertEquals(409, assertThrows(DomainException.class,
+            () -> employees.save(null, duplicatePhone)).status());
+        assertEquals(1, employees.list(null, null, null, null).size());
+    }
+
+    @Test
+    void invalidUpdateRollsBackProfileAndNamesMayRepeat() {
+        employees.save(null, input("E", "a@example.test", "NX", TrangThaiNhanVien.DANG_LAM_VIEC));
+        var invalid = new EmployeeInputs.Employee("E", "Tên mới", "0912345680", "new@example.test",
+            LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1), "NX", LoaiNhanVien.TAI_XE,
+            TrangThaiNhanVien.DANG_LAM_VIEC, "LICENSE", LocalDate.of(2035, 1, 1));
+        assertEquals(400, assertThrows(DomainException.class, () -> employees.save("E", invalid)).status());
+        assertEquals("a@example.test", employees.get("E").get("email"));
+        assertEquals("0912345678", employees.get("E").get("soDienThoai"));
+
+        var sameName = new EmployeeInputs.Employee("E2", "Nguyễn Văn An", "0912345680",
+            "other@example.test", null, "NX", LoaiNhanVien.PHU_XE,
+            TrangThaiNhanVien.DANG_LAM_VIEC, null, null);
+        assertDoesNotThrow(() -> employees.save(null, sameName));
+        assertEquals(2, employees.list(null, null, null, null).size());
+    }
+
     private void identity(LoaiTaiKhoan role,String owner,String employee) {
         try(var em=factory.createEntityManager()) {
             em.getTransaction().begin();

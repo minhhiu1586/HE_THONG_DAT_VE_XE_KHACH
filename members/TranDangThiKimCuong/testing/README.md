@@ -1,40 +1,24 @@
-# Trần Đặng Thị Kim Cương — Kiểm thử
+# Kim Cương — Kiểm thử nhân viên và phân công
+
+- [Checklist tự kiểm tra: 86 mã ca theo từng luồng](manual-checklist.md).
+- [Thay đổi và kết quả build/test ngày 20/10/2026](backend-refactor-2026-10-20.md).
+- Tài khoản local: [database/tai-khoan-mau.md](../../../database/tai-khoan-mau.md).
 
 <a id="section-1"></a>
 
-## Chạy kiểm thử
+Chạy từ thư mục gốc, dùng database phát triển cho bộ HTTP:
 
-Từ root: `mvn -B verify`. Chọn lớp: `mvn -B -f apps/backend/pom.xml -Dtest=TenLopTest test`.
-
-Source Java test nằm ở `../backend/src/test/java`; gồm unit test và integration test.
-
-- `AssignmentRulesTest.java`
-- `EmployeeServiceTest.java`
-
-<a id="section-4"></a>
-
-## Test case
-
-- [Ma trận use case](../../../tests/use-cases/test-cases.json).
-- [Các bài kiểm tra HTTP tích hợp](../../../tests/backend/README.md).
+```powershell
+mvn -B -f apps/backend/pom.xml verify
+npm.cmd run build
+python tests/backend/run_integration_audit.py --only employees vehicles trip-sale
+```
 
 <a id="section-2"></a>
 <a id="section-3"></a>
-
-## Bug report và bằng chứng
-
-Chưa có bug report nghiệp vụ mới trong đợt tái cấu trúc. Các review/ma trận và báo cáo được dẫn ở đây là bằng chứng đã có; không coi test bị bỏ qua là đạt.
-
+<a id="section-4"></a>
 <a id="section-5"></a>
 <a id="section-6"></a>
 
-## Kết quả backend sau tái cấu trúc — 18/10/2026
-
-Nguồn: Surefire XML của lần Maven verify sau di chuyển. Giữ nguyên test gốc; có cả unit/integration test.
-
-| Lớp | Tổng | Lỗi assertion | Lỗi thực thi | Bỏ qua |
-|---|---:|---:|---:|---:|
-| com.datvexe.service.AssignmentRulesTest | 3 | 0 | 0 | 0 |
-| com.datvexe.service.EmployeeServiceTest | 6 | 0 | 0 | 0 |
-
-PostgreSQL/HTTP/browser/provider thật chưa được chạy trong đợt này. Test bị bỏ qua không được tính đạt. Báo cáo chung: [ket-qua-kiem-thu-sau-tai-cau-truc.md](../../../docs/team/ket-qua-kiem-thu-sau-tai-cau-truc.md).
+Web: http://localhost:3000/quan-tri/nhan-vien; lịch cá nhân: http://localhost:3000/nhan-vien.
+Chỉ ghi Pass khi đã chạy và có bằng chứng; test bỏ qua/chưa chạy không tính đạt.

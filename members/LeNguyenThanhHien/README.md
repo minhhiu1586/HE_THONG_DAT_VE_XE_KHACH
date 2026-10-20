@@ -2,6 +2,8 @@
 
 Tỉnh/thành, bến, tuyến, phương tiện, ghế, tìm kiếm backend và vòng đời chuyến.
 
+Phân công nhân viên được xử lý tại module Kim Cương qua AssignmentService; các test tích hợp chuyến gọi service này. Kiểm tra nhân sự trước mở bán/bắt đầu chuyến vẫn sử dụng AssignmentRules.
+
 ## Tài liệu và kiểm thử
 
 - [Hướng dẫn demo](docs/huong-dan-demo.md)
