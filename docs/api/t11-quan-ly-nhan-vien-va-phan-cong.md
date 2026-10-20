@@ -54,7 +54,7 @@ python tests/backend/project_data_check.py --check-reload
 ## Ảnh hưởng dùng chung / bàn giao T12
 
 - Guard T07.1 bổ sung quyền/path nhân viên, phân biệt ID tạo mới với ID tài nguyên cũ; giữ kiểm tra nhà xe theo tài khoản thật.
-- `VehicleService` dùng `AssignmentRules`; `RouteTripService` gọi lại kiểm tra khi đổi xe/giờ. Fixture test xe/chuyến dùng lịch về đúng bến.
+- API `/api/phan-cong` hiện do `AssignmentController` → `AssignmentService` xử lý trong module Kim Cương, dùng `AssignmentInputs.PhanCong` và `AssignmentRules`. `VehicleController`/`VehicleService` không còn xử lý phân công. `RouteTripService` vẫn gọi lại quy tắc khi đổi xe/giờ. Fixture test xe/chuyến tạo tổ lái qua `AssignmentService`.
 - T12 gọi `AssignmentRules.validateTrip(em, trip)` khi cập nhật, `readyForOperation(em, trip)` trước mở bán trong transaction của T12. Kiểm tra xe dùng `validateVehicleSchedule`; không tạo bộ quy tắc thứ hai.
 - Bộ dữ liệu gọi API mở bán T12 hiện có. API giữ ghế/đơn nháp sau merge thuộc T16; checkout cần dùng hợp đồng `/api/booking/...` trong `giu-cho-va-don-dat-ve.md`.
 

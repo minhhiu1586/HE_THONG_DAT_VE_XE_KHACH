@@ -6,9 +6,9 @@
 - **Nguyễn Thế Ân** (`members/NguyenTheAn`): Giao diện tìm/chọn chuyến, giữ chỗ, đơn, người đi, lịch sử, hiển thị vé và yêu cầu hoàn.
 - **Nguyễn Gia Bảo** (`members/NguyenGiaBao`): Giá, khuyến mãi, thanh toán, phát hành vé, QR, email và hoàn tiền.
 
-## File phối hợp còn nguyên khối
+## Ranh giới và phần phối hợp
 
-- VehicleService/VehicleInputs: đặt tại Thanh Hiền vì chứa quản lý xe; các hàm phân công do Kim Cương phối hợp. AssignmentRules, EmployeeService và repository phân công đặt tại Kim Cương. Không tách hàm trong đợt di chuyển.
+- VehicleService/VehicleInputs tại Thanh Hiền chỉ còn quản lý phương tiện. API `/api/phan-cong`, AssignmentInputs và AssignmentService đã chuyển về Kim Cương; Hiền gọi AssignmentRules khi kiểm tra lịch/nhân sự và điều kiện vận hành. API HTTP và dữ liệu giữ nguyên; không tạo bản sao xử lý trong shared.
 - BookingService/BookingDto: đặt tại Thế Ân; có phần báo/chốt giá và promotion phối hợp Gia Bảo. PriceCalculator/PricingDto và thanh toán/hoàn đặt tại Gia Bảo.
 - RouteTripService và API tìm kiếm ở Thanh Hiền; frontend tìm chuyến ở Thế Ân.
 - Hiển thị vé/yêu cầu hoàn ở Thế Ân; phát hành vé và nghiệp vụ tiền/hoàn ở Gia Bảo.

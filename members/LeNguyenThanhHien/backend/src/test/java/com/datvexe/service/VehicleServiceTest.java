@@ -65,42 +65,4 @@ class VehicleServiceTest {
         assertThrows(DomainException.class,()->service.saveType("L",new VehicleInputs.LoaiXe("L","Test",10,2,null)));
         assertEquals(6,service.get("loai-xe","L").get("soChoNgoi"));
     }
-    @Test void assignmentsRejectExpiredLicenseWrongRoleAndOverlappingTrips() {
-        try(EntityManager em=factory.createEntityManager()) {
-            em.getTransaction().begin();
-            TinhThanh city=new TinhThanh(); city.maTinhThanh="T"; city.tenTinhThanh="City"; em.persist(city);
-            BenXe a=new BenXe(); a.maBenXe="A"; a.tenBenXe="A"; a.diaChi="A"; a.tinhThanh=city; em.persist(a);
-            BenXe b=new BenXe(); b.maBenXe="B"; b.tenBenXe="B"; b.diaChi="B"; b.tinhThanh=city; em.persist(b);
-            TuyenXe route=new TuyenXe(); route.maTuyen="R"; route.tenTuyen="Route"; route.tramKhoiHanh=a; route.tramDen=b;
-            route.giaCoBan=java.math.BigDecimal.TEN; route.nhaXe=em.find(NhaXe.class,"NX"); em.persist(route);
-            for(String id:new String[]{"C1","C2"}) {
-                ChuyenXe c=new ChuyenXe(); c.maChuyen=id; c.tuyenXe=route;
-                c.ngayKhoiHanh=LocalDate.of(2030,1,1); c.gioKhoiHanh=java.time.LocalTime.of(8,0);
-                c.gioDenDuKien=c.ngayKhoiHanh.atTime(12,0); em.persist(c);
-            }
-            NhanVien n=new NhanVien(); n.maNhanVien="N"; n.hoTen="Driver"; n.email="driver@test.local";
-            n.soDienThoai="0901234567"; n.nhaXe=route.nhaXe; n.loaiNhanVien=LoaiNhanVien.TAI_XE;
-            n.soBangLai="DEMO-LICENSE"; n.ngayHetHanBangLai=LocalDate.of(2029,1,1); em.persist(n); em.getTransaction().commit();
-        }
-        var input=new VehicleInputs.PhanCong("P1","C1","N",VaiTroChuyen.TAI_XE_CHINH);
-        assertThrows(DomainException.class,()->service.saveAssignment(null,input));
-        try(EntityManager em=factory.createEntityManager()) {
-            em.getTransaction().begin(); em.find(NhanVien.class,"N").ngayHetHanBangLai=LocalDate.of(2031,1,1); em.getTransaction().commit();
-        }
-        assertThrows(DomainException.class,()->service.saveAssignment(null,new VehicleInputs.PhanCong("P1","C1","N",VaiTroChuyen.PHU_XE)));
-        service.saveAssignment(null,input);
-        assertEquals("N",service.saveAssignment("P1",new VehicleInputs.PhanCong("P1","C1","N",VaiTroChuyen.TAI_XE_PHU,"Cập nhật vai trò")).get("maNhanVien"));
-        assertEquals("Cập nhật vai trò",service.get("phan-cong","P1").get("ghiChu"));
-        assertThrows(DomainException.class,()->service.saveAssignment(null,new VehicleInputs.PhanCong("P2","C2","N",VaiTroChuyen.TAI_XE_CHINH)));
-        assertEquals(1,service.list("phan-cong").size());
-        service.delete("phan-cong","P1"); assertTrue(service.list("phan-cong").isEmpty());
-        try(EntityManager em=factory.createEntityManager()) {
-            em.getTransaction().begin();
-            NhaXe otherOwner=new NhaXe(); otherOwner.maNhaXe="NX2"; otherOwner.tenNhaXe="Demo 2";
-            em.persist(otherOwner);
-            em.find(NhanVien.class,"N").nhaXe=otherOwner;
-            em.getTransaction().commit();
-        }
-        assertEquals(409,assertThrows(DomainException.class,()->service.saveAssignment(null,input)).status());
-    }
 }
