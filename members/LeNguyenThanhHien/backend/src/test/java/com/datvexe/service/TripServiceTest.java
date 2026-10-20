@@ -17,12 +17,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TripServiceTest {
     static final LocalDate DAY=LocalDate.of(2030,1,1);
-    EntityManagerFactory factory;TripService trips;VehicleService vehicles;EmployeeService employees;
+    EntityManagerFactory factory;TripService trips;VehicleService vehicles;AssignmentService assignments;EmployeeService employees;
     @BeforeEach void setup() {
         factory=Persistence.createEntityManagerFactory("datvexe",Map.of("jakarta.persistence.jdbc.driver","org.h2.Driver",
             "jakarta.persistence.jdbc.url","jdbc:h2:mem:t12;MODE=PostgreSQL","jakarta.persistence.jdbc.user","sa",
             "jakarta.persistence.jdbc.password","","hibernate.hbm2ddl.auto","create-drop"));
-        trips=new TripService(factory,clock(DAY.minusDays(1).atStartOfDay()));vehicles=new VehicleService(factory);employees=new EmployeeService(factory);
+        trips=new TripService(factory,clock(DAY.minusDays(1).atStartOfDay()));vehicles=new VehicleService(factory);assignments=new AssignmentService(factory);employees=new EmployeeService(factory);
         tx(em->{
             em.createNativeQuery("create table trip_lifecycle_history(id varchar(40) primary key,ma_chuyen varchar(40),trang_thai_cu varchar(30),trang_thai_moi varchar(30),ma_nguoi_thao_tac varchar(40),vai_tro varchar(30),ly_do varchar(1000),created_at timestamp with time zone)").executeUpdate();
             em.createNativeQuery("create table trip_cancellation_work(ma_don varchar(40),ma_chuyen varchar(40),trang_thai varchar(24),ly_do varchar(1000),last_error varchar(120),created_at timestamp with time zone,updated_at timestamp with time zone,primary key(ma_don,ma_chuyen))").executeUpdate();
@@ -51,7 +51,7 @@ class TripServiceTest {
             String id=code+"E"+i;boolean assistant=i==3;
             String phone="09"+String.format(Locale.ROOT,"%08d",Math.floorMod(id.hashCode(),100000000));
             employees.save(null,new EmployeeInputs.Employee(id,"Staff "+id,phone,id+"@example.test",null,"A",assistant?LoaiNhanVien.PHU_XE:LoaiNhanVien.TAI_XE,TrangThaiNhanVien.DANG_LAM_VIEC,assistant?null:"123456789012",assistant?null:LocalDate.of(2100,1,1)));
-            vehicles.saveAssignment(null,new VehicleInputs.PhanCong(code+"P"+i,code,id,i==1?VaiTroChuyen.TAI_XE_CHINH:i==2?VaiTroChuyen.TAI_XE_PHU:VaiTroChuyen.PHU_XE,"Kế hoạch kiểm thử",true));
+            assignments.save(null,new AssignmentInputs.PhanCong(code+"P"+i,code,id,i==1?VaiTroChuyen.TAI_XE_CHINH:i==2?VaiTroChuyen.TAI_XE_PHU:VaiTroChuyen.PHU_XE,"Kế hoạch kiểm thử",true));
         }
     }
     void ready(String code){trips.create(input(code,"R","X",LocalTime.of(8,0)));crew(code);}
@@ -158,7 +158,7 @@ class TripServiceTest {
         assertEquals(409,assertThrows(DomainException.class,()->trips.update("C2",input("C2","RETURN","X",LocalTime.of(10,0)))).status());
         assertEquals(LocalTime.of(16,0),trips.get("C2").get("gioKhoiHanh"));
         trips.create(input("C3","RETURN",null,LocalTime.of(16,0)));
-        vehicles.saveAssignment(null,new VehicleInputs.PhanCong("OTHER","C3","C1E1",VaiTroChuyen.TAI_XE_CHINH,null,true));
+        assignments.save(null,new AssignmentInputs.PhanCong("OTHER","C3","C1E1",VaiTroChuyen.TAI_XE_CHINH,null,true));
         assertEquals(409,assertThrows(DomainException.class,()->trips.update("C3",input("C3","RETURN",null,LocalTime.of(14,0)))).status());
         assertEquals(LocalTime.of(16,0),trips.get("C3").get("gioKhoiHanh"));
     }

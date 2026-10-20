@@ -15,12 +15,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /** PostgreSQL transaction/locking proof on a separately configured disposable database. */
 @EnabledIfSystemProperty(named="vehicle.pg.url",matches=".+")
 class PostgresTripTest {
-    EntityManagerFactory factory;TripService trips;VehicleService vehicles;EmployeeService employees;String prefix;LocalDate day;
+    EntityManagerFactory factory;TripService trips;VehicleService vehicles;AssignmentService assignments;EmployeeService employees;String prefix;LocalDate day;
     @BeforeEach void setup() {
         factory=Persistence.createEntityManagerFactory("datvexe",Map.of("jakarta.persistence.jdbc.driver","org.postgresql.Driver",
             "jakarta.persistence.jdbc.url",System.getProperty("vehicle.pg.url"),"jakarta.persistence.jdbc.user",System.getProperty("vehicle.pg.user"),
             "jakarta.persistence.jdbc.password",System.getProperty("vehicle.pg.password",""),"hibernate.hbm2ddl.auto","validate"));
-        trips=new TripService(factory);vehicles=new VehicleService(factory);employees=new EmployeeService(factory);
+        trips=new TripService(factory);vehicles=new VehicleService(factory);assignments=new AssignmentService(factory);employees=new EmployeeService(factory);
         prefix="T12PG_"+UUID.randomUUID().toString().substring(0,8);day=LocalDate.now(TripSaleRules.ZONE).plusDays(30);
         try(var em=factory.createEntityManager()) {
             em.getTransaction().begin();var owner=new NhaXe();owner.maNhaXe=id("NX");owner.tenNhaXe="T12 test";em.persist(owner);em.getTransaction().commit();
@@ -38,7 +38,7 @@ class PostgresTripTest {
             String code=id(suffix+"E"+i);boolean assistant=i==3;
             String phone="09"+String.format(Locale.ROOT,"%08d",Math.floorMod(code.hashCode(),100000000));
             employees.save(null,new EmployeeInputs.Employee(code,"Staff "+i,phone,code+"@example.test",null,id("NX"),assistant?LoaiNhanVien.PHU_XE:LoaiNhanVien.TAI_XE,TrangThaiNhanVien.DANG_LAM_VIEC,assistant?null:"123456789012",assistant?null:day.plusDays(730)));
-            vehicles.saveAssignment(null,new VehicleInputs.PhanCong(id(suffix+"P"+i),id(suffix),code,i==1?VaiTroChuyen.TAI_XE_CHINH:i==2?VaiTroChuyen.TAI_XE_PHU:VaiTroChuyen.PHU_XE,"Test plan",true));
+            assignments.save(null,new AssignmentInputs.PhanCong(id(suffix+"P"+i),id(suffix),code,i==1?VaiTroChuyen.TAI_XE_CHINH:i==2?VaiTroChuyen.TAI_XE_PHU:VaiTroChuyen.PHU_XE,"Test plan",true));
         }
     }
     @AfterEach void cleanup(){

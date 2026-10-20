@@ -11,7 +11,7 @@ import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.util.Map;
 
-@WebServlet(urlPatterns={"/api/loai-xe", "/api/loai-xe/*", "/api/xe", "/api/xe/*", "/api/phan-cong", "/api/phan-cong/*"})
+@WebServlet(urlPatterns={"/api/loai-xe", "/api/loai-xe/*", "/api/xe", "/api/xe/*"})
 public class VehicleController extends HttpServlet {
     private VehicleService service;
     private final ObjectMapper json=new ObjectMapper().registerModule(new JavaTimeModule())
@@ -56,7 +56,6 @@ public class VehicleController extends HttpServlet {
                     result=switch(kind) {
                         case "loai-xe" -> service.saveType(id,body(req,VehicleInputs.LoaiXe.class));
                         case "xe" -> service.saveVehicle(id,body(req,VehicleInputs.Xe.class));
-                        case "phan-cong" -> service.saveAssignment(id,body(req,VehicleInputs.PhanCong.class));
                         default -> throw new DomainException(404,"API không tồn tại");
                     }; if(id==null) status=201;
                 } else if(method.equals("DELETE") && id!=null) { service.delete(kind,id); result=null; status=204; }
