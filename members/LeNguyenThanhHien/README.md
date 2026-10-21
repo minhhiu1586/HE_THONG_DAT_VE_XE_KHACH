@@ -1,133 +1,79 @@
 # Lê Nguyễn Thanh Hiền
 
-Tỉnh/thành, bến, tuyến, phương tiện, ghế, tìm kiếm backend và vòng đời chuyến.
+## Phạm vi
 
-Phân công nhân viên được xử lý tại module Kim Cương qua AssignmentService; các test tích hợp chuyến gọi service này. Kiểm tra nhân sự trước mở bán/bắt đầu chuyến vẫn sử dụng AssignmentRules.
+Tỉnh/thành, bến xe, tuyến và điểm dừng; loại xe, phương tiện và sơ đồ ghế;
+backend tìm chuyến; tạo chuyến nháp, mở bán, vòng đời chuyến và danh sách hành khách.
 
-## Tài liệu và kiểm thử
+## Luồng chính
 
-- [Hướng dẫn demo](docs/huong-dan-demo.md)
-- [Sơ đồ luồng nghiệp vụ, nhánh thành công và thất bại](docs/so-do-luong-nghiep-vu.md)
-- [Bảng truy vết chức năng tới code, Entity, bảng DB và test](docs/bang-truy-vet-chuc-nang.md)
-- [Kiểm thử và kết quả chạy](testing/README.md)
-- [Phân công và phần phối hợp](../../docs/team/phan-cong-thanh-vien.md)
-- [Hợp đồng API](../../docs/api/README.md)
+| Chức năng | Giao diện | Controller | Service | Repository / truy cập dữ liệu |
+|---|---|---|---|---|
+| Tỉnh, bến, tuyến và điểm dừng | `RouteManagement` → `CityPanel`, `StationPanel`, `RouteForm`, `RouteList`, `RouteStopsPanel` | `RouteTripController` | `RouteTripService` | JPA trực tiếp: `find`, `persist`, `remove`, JPQL |
+| Loại xe, xe và sơ đồ ghế | `VehicleManagement` → `VehicleTypePanel`, `VehicleForm`, `VehicleList`, `VehicleSeatLayout` | `VehicleController` | `VehicleService`, `VehicleRules` | `LoaiXeRepository`, `XeRepository`, `GheRepository`; JPA kiểm tra lịch sử |
+| Chuyến nháp và mở bán | `TripManagement` → `TripForm`, `TripList`, `TripDetails`, `TripSaleConditions` | `TripController` | `TripService`, `TripSaleRules` | `ChuyenXeRepository`; JPA kiểm tra điều kiện |
+| Tìm chuyến và ghế theo chuyến | Frontend Thế An: `SearchForm`, `SearchResultsPage`, `TripDetails` | `RouteTripController` | `RouteTripService`, `VehicleService`, `VehicleRules` | `ChuyenXeRepository.findForSearch`, `GheRepository`; JPQL đếm ghế/vé/giữ chỗ |
+| Bắt đầu, hoàn tất, hủy và theo dõi xử lý | `TripDetails`, `TripLifecyclePanel` | `TripController` | `TripService` | `ChuyenXeRepository`; JPA và native SQL lịch sử/công việc |
+| Danh sách hành khách và vé | `TripPassengerModal`, `trip-passengers-api` | `RouteTripController` | `TripPassengerService` | JPA đọc vé; `HoanVeRepository` đọc tình trạng hoàn |
+
+Component quản lý giữ state, gọi API và điều phối; component con hiển thị form/bảng và gọi callback.
+Type, nhãn trạng thái, form trống và hàm chuyển dữ liệu sang form nằm trong `frontend/src/*/lib`.
+FE dùng chung `useAuth().request`, `errorMessage` và validation tiếng Việt; Backend kiểm tra quyền, phạm vi và nghiệp vụ.
+
+Entity nằm trong `shared/backend/src/main/java/com/datvexe/domain/Entities.java`, không sao chép vào thư mục cá nhân.
+Phân công do Kim Cương xử lý qua `AssignmentService`/`AssignmentRules`; giao diện tìm chuyến thuộc Thế An;
+hoàn tiền và email khi hủy gọi module Gia Bảo. Hủy chuyến thành công không đồng nghĩa đã hoàn tiền/gửi email thành công.
+
+- [Luồng demo và thứ tự mở code](docs/huong-dan-demo.md)
+- [Sơ đồ nghiệp vụ](docs/huong-dan-demo.md#so-do-nghiep-vu)
+- [Bảng truy vết tới Entity, bảng DB và test](docs/huong-dan-demo.md#bang-truy-vet)
+- [Kiểm thử và kết quả](testing/README.md)
+- [Chạy ứng dụng](../../README.md)
 
 <a id="source"></a>
 
-## Source thuộc phạm vi bảo trì
+## Source
 
-Ứng dụng tích hợp dùng trực tiếp source bên dưới. Chạy từ thư mục gốc theo [README](../../README.md).
+Các đường dẫn dưới đây là source đang được ứng dụng tích hợp sử dụng.
 
 | File |
 |---|
-| [TripPassengerService.java](backend/src/main/java/com/datvexe/service/TripPassengerService.java) |
-| [TripPassengerDto.java](backend/src/main/java/com/datvexe/dto/TripPassengerDto.java) |
-| [trip-passengers-api.ts](frontend/src/trips/lib/trip-passengers-api.ts) |
 | [RouteTripController.java](backend/src/main/java/com/datvexe/controller/RouteTripController.java) |
 | [TripController.java](backend/src/main/java/com/datvexe/controller/TripController.java) |
 | [VehicleController.java](backend/src/main/java/com/datvexe/controller/VehicleController.java) |
 | [TripInputs.java](backend/src/main/java/com/datvexe/dto/TripInputs.java) |
+| [TripPassengerDto.java](backend/src/main/java/com/datvexe/dto/TripPassengerDto.java) |
 | [VehicleInputs.java](backend/src/main/java/com/datvexe/dto/VehicleInputs.java) |
 | [ChuyenXeRepository.java](backend/src/main/java/com/datvexe/repository/ChuyenXeRepository.java) |
 | [GheRepository.java](backend/src/main/java/com/datvexe/repository/GheRepository.java) |
 | [LoaiXeRepository.java](backend/src/main/java/com/datvexe/repository/LoaiXeRepository.java) |
 | [XeRepository.java](backend/src/main/java/com/datvexe/repository/XeRepository.java) |
 | [RouteTripService.java](backend/src/main/java/com/datvexe/service/RouteTripService.java) |
+| [TripPassengerService.java](backend/src/main/java/com/datvexe/service/TripPassengerService.java) |
 | [TripSaleRules.java](backend/src/main/java/com/datvexe/service/TripSaleRules.java) |
 | [TripService.java](backend/src/main/java/com/datvexe/service/TripService.java) |
 | [VehicleRules.java](backend/src/main/java/com/datvexe/service/VehicleRules.java) |
 | [VehicleService.java](backend/src/main/java/com/datvexe/service/VehicleService.java) |
-| [PostgresTask10Test.java](backend/src/test/java/com/datvexe/service/PostgresTask10Test.java) |
-| [PostgresTripTest.java](backend/src/test/java/com/datvexe/service/PostgresTripTest.java) |
-| [PostgresVehicleTest.java](backend/src/test/java/com/datvexe/service/PostgresVehicleTest.java) |
-| [RouteTripServiceTest.java](backend/src/test/java/com/datvexe/service/RouteTripServiceTest.java) |
-| [TripServiceTest.java](backend/src/test/java/com/datvexe/service/TripServiceTest.java) |
-| [VehicleServiceTest.java](backend/src/test/java/com/datvexe/service/VehicleServiceTest.java) |
-| [VehicleTask10Test.java](backend/src/test/java/com/datvexe/service/VehicleTask10Test.java) |
-| [RouteManagement.module.css](frontend/src/routes/components/RouteManagement.module.css) |
+| [CityPanel.tsx](frontend/src/routes/components/CityPanel.tsx) |
+| [RouteForm.tsx](frontend/src/routes/components/RouteForm.tsx) |
+| [RouteList.tsx](frontend/src/routes/components/RouteList.tsx) |
 | [RouteManagement.tsx](frontend/src/routes/components/RouteManagement.tsx) |
-| [TripManagement.module.css](frontend/src/trips/components/TripManagement.module.css) |
+| [RouteStopsPanel.tsx](frontend/src/routes/components/RouteStopsPanel.tsx) |
+| [StationPanel.tsx](frontend/src/routes/components/StationPanel.tsx) |
+| [route-types.ts](frontend/src/routes/lib/route-types.ts) |
+| [TripDetails.tsx](frontend/src/trips/components/TripDetails.tsx) |
+| [TripForm.tsx](frontend/src/trips/components/TripForm.tsx) |
+| [TripLifecyclePanel.tsx](frontend/src/trips/components/TripLifecyclePanel.tsx) |
+| [TripList.tsx](frontend/src/trips/components/TripList.tsx) |
 | [TripManagement.tsx](frontend/src/trips/components/TripManagement.tsx) |
-| [TripPassengerModal.module.css](frontend/src/trips/components/TripPassengerModal.module.css) |
 | [TripPassengerModal.tsx](frontend/src/trips/components/TripPassengerModal.tsx) |
-| [VehicleManagement.module.css](frontend/src/vehicles/components/VehicleManagement.module.css) |
+| [TripSaleConditions.tsx](frontend/src/trips/components/TripSaleConditions.tsx) |
+| [trip-passengers-api.ts](frontend/src/trips/lib/trip-passengers-api.ts) |
+| [trip-types.ts](frontend/src/trips/lib/trip-types.ts) |
+| [VehicleField.tsx](frontend/src/vehicles/components/VehicleField.tsx) |
+| [VehicleForm.tsx](frontend/src/vehicles/components/VehicleForm.tsx) |
+| [VehicleList.tsx](frontend/src/vehicles/components/VehicleList.tsx) |
 | [VehicleManagement.tsx](frontend/src/vehicles/components/VehicleManagement.tsx) |
-| [t10-ma-tran-kiem-thu-xe-va-ghe.md](testing/existing/t10-ma-tran-kiem-thu-xe-va-ghe.md) |
-| [t12-ma-tran-kiem-thu-chuyen-xe.md](testing/existing/t12-ma-tran-kiem-thu-chuyen-xe.md) |
-| [t13-ma-tran-kiem-thu-tim-chuyen.md](testing/existing/t13-ma-tran-kiem-thu-tim-chuyen.md) |
-| [t10-vscode-guide.md](docs/huong-dan-demo.md#section-1) |
-| [t12-vscode-guide.md](docs/huong-dan-demo.md#section-2) |
-| [t13-vscode-guide.md](docs/huong-dan-demo.md#section-3) |
-
-## Cách đọc backend sau khi viết lại
-
-Giữ cấu trúc thư mục và hợp đồng API đang sử dụng. Source nằm trong
-`backend/src/main/java/com/datvexe/` bên dưới thư mục thành viên này.
-
-| Lớp | Vai trò |
-|---|---|
-| `controller/RouteTripController.java` | Chọn handler tỉnh, bến, tuyến, chuyến; đọc request và trả JSON |
-| `controller/TripController.java` | Chọn thao tác tạo/sửa/xóa, mở bán, bắt đầu/hoàn tất/hủy chuyến |
-| `controller/VehicleController.java` | Nhận yêu cầu loại xe, xe, ghế, sơ đồ và phân công |
-| `service/RouteTripService.java` | Kiểm tra đầu vào, xử lý tỉnh/bến/tuyến và tổng hợp kết quả tìm chuyến |
-| `repository/ChuyenXeRepository.java` | Truy vấn lọc/phân trang quản lý và `findForSearch` tìm chuyến đang mở bán |
-| `service/TripSaleRules.java` | Kiểm tra lần lượt từng điều kiện mở bán và trả đầy đủ lý do chưa đạt |
-| `service/TripService.java` | Tạo/cập nhật chuyến, chuyển trạng thái, ghi lịch sử và xử lý công việc hủy |
-| `service/VehicleService.java` | Xử lý phương tiện, sơ đồ ghế và phân công bằng các bước/vòng lặp rõ ràng |
-| `service/VehicleRules.java` | Kiểm tra đăng kiểm, sơ đồ, lịch sử sử dụng và khả năng bán ghế |
-| `service/TripPassengerService.java` | Kiểm tra quyền rồi tạo danh sách hành khách và đếm trạng thái vé |
-
-### Ví dụ luồng tìm chuyến
-
-```text
-RouteTripController.handleTrips
-  → RouteTripService.searchChuyenXe
-    → Kiểm tra điểm đi, điểm đến và ngày
-    → Bắt đầu transaction, kiểm tra quyền
-    → ChuyenXeRepository.findForSearch
-    → Duyệt từng chuyến, gọi TripSaleRules.ensureSellable
-    → searchView lấy thông tin và số ghế còn
-    → Commit, trả danh sách
-  → Ghi JSON vào response
-```
-
-`findForSearch` thêm điều kiện bằng `StringBuilder` và các nhánh `if/else`.
-Vẫn nhận mã tỉnh (`CITY:`), mã bến (`STATION:`) và mã cũ không có tiền tố.
-Các kiểm tra về xe, nhân sự, hạn đặt vé vẫn thuộc Service/quy tắc nghiệp vụ.
-
-### Transaction và dữ liệu trả về
-
-Trong từng thao tác Service, thứ tự được thể hiện trực tiếp:
-
-```java
-try (EntityManager em = factory.createEntityManager()) {
-    EntityTransaction transaction = em.getTransaction();
-    transaction.begin();
-    try {
-        AccessPolicy.guard(em);
-        // Kiểm tra đầu vào/quyền, truy vấn và xử lý nghiệp vụ.
-        // Tạo dữ liệu response trước khi commit.
-        transaction.commit();
-        // Trả kết quả.
-    } catch (RuntimeException error) {
-        if (transaction.isActive()) {
-            transaction.rollback();
-        }
-        throw error;
-    }
-}
-```
-
-Không còn callback transaction bằng `Function<EntityManager,T>` trong các Service
-của thành viên. Repository dùng cùng EntityManager, không tự mở transaction riêng.
-Khóa nhà xe/chuyến/bến/xe và thứ tự refresh được giữ trong luồng đang sử dụng.
-
-Danh sách được tạo bằng `ArrayList` và vòng `for`. Response giữ tên trường cũ,
-được dựng bằng DTO đang có hoặc từng lệnh `put`, không đổi sang phong bì JSON của Cinema.
-Generic trong Repository dùng chung, DTO dạng record và các phép so sánh sắp xếp
-ngắn vẫn được giữ để tương thích các phần khác của hệ thống.
-
-Khi hủy chuyến, công việc hoàn và thông báo vẫn được lưu trong transaction hủy.
-Gọi bộ xử lý hoàn tiền/gửi thông báo sau commit; lỗi của bộ xử lý không làm mất
-bản ghi công việc để thử lại. Không đổi chính sách hoàn tiền hay tự đánh dấu vé đã lên xe.
+| [VehicleSeatLayout.tsx](frontend/src/vehicles/components/VehicleSeatLayout.tsx) |
+| [VehicleTypePanel.tsx](frontend/src/vehicles/components/VehicleTypePanel.tsx) |
+| [vehicle-types.ts](frontend/src/vehicles/lib/vehicle-types.ts) |

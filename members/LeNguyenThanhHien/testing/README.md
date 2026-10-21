@@ -135,3 +135,57 @@ CSDL PostgreSQL và Tomcat thử chạy riêng, không đặt lại dữ liệu 
 Callback VNPay được ký và gửi cục bộ; không xác nhận giao dịch sandbox,
 QueryDR, hoàn tiền qua ngân hàng hoặc gửi email thật. Các kết quả này không
 phải cam kết không còn lỗi ở mọi tình huống.
+
+## Frontend: tách component và làm rõ luồng xử lý — 21/10/2026
+
+Phạm vi: frontend của Hiền, ba màn tuyến/bến/tỉnh/điểm dừng, xe/sơ đồ ghế và chuyến/mở bán/vòng đời.
+Component cha giữ state và gọi API; form, danh sách, bảng điều kiện và báo cáo tách thành component hiển thị.
+Type, nhãn trạng thái và hàm đổi dữ liệu sang form nằm trong `frontend/src/*/lib`.
+Giữ payload API, CSS và quy tắc nghiệp vụ phía backend. Các nút tìm/lọc tuyến xử lý lỗi API qua cùng wrapper,
+form tuyến chặn gửi trùng bằng ref. Hướng dẫn cấu trúc: [cách đọc frontend](../docs/huong-dan-demo.md#cách-đọc-frontend-sau-refactor).
+
+| Kiểm tra trong môi trường cloud | Kết quả |
+|---|---|
+| `npm run typecheck` sau Next.js khởi tạo type | Đạt |
+| `npm run lint` toàn FE | 0 lỗi; 2 cảnh báo `<img>` có sẵn ở frontend Thế An |
+| `node tests/frontend/management_options_check.cjs` | Đạt: danh mục tuyến, nhãn, sắp xếp, không sửa input |
+| `node tests/frontend/trip_search_check.cjs` | Đạt: danh mục tỉnh và request tìm chuyến |
+| `node members/LeNguyenThanhHien/testing/frontend/management_smoke.cjs` | 4 nhóm đạt: chuyến, xe, tuyến và xác thực; không có ngoại lệ trình duyệt |
+| `npm run build` mặc định (Turbopack) | Chưa hoàn tất: Google Fonts bị proxy chặn 403 khi tải Inter; không thay layout chung hoặc tắt kiểm tra TLS để vượt lỗi |
+
+Bài trình duyệt dùng Chromium và Next.js dev/Webpack với API giả lập bằng Playwright route.
+Bao phủ tạo chuyến với xe rỗng/giờ đến tính từ tuyến, mở bán bị từ chối rồi kiểm tra lại, bắt đầu/hoàn tất,
+modal hành khách, hủy/thử lại xử lý hoàn; lưu sơ đồ đúng ID, lỗi lưu và tải lại bản đã lưu;
+danh mục không bị thu hẹp sau lọc, lỗi tìm tỉnh, payload tạo tuyến/chặn gửi trùng, đổi thứ tự/thêm điểm dừng.
+Kiểm tra thêm khách hàng bị chặn khỏi khu vực quản lý và các request ghi có CSRF.
+Đây là kiểm tra FE/payload, không phải lần chạy integration mới với backend/PostgreSQL hay nhà cung cấp thật.
+
+## Kiểm tra bổ sung với backend và PostgreSQL thật — 21/10/2026
+
+Đã build backend bằng container Maven 3.9.9/JDK 21 và khởi động WAR trên Tomcat 10.1,
+kết nối PostgreSQL 16.15 với database thử riêng `hien_fe_verify_20261021`.
+Frontend chạy Next.js dev/Webpack; lần này các bài dưới gọi API thật, không dùng mock.
+Health trả HTTP 200 với `status=UP`, `database=UP`.
+
+| Kiểm tra | Kết quả thực tế |
+|---|---|
+| TypeScript sau refactor | Đạt |
+| Bốn lớp Java liên quan Hiền | 57/57 đạt: RouteTripServiceTest 20, TripServiceTest 21, VehicleServiceTest 4, VehicleTask10Test 12 |
+| Maven verify toàn backend | 285 ca: 221 đạt, 1 lỗi, 63 bỏ qua; BUILD FAILURE |
+| Lỗi trong verify | `BookingServiceExpiryTest.schedulerAndGetAtExactDeadlineConvergeOnOneExpiredFrozenOrder`: deadlock H2, cùng lỗi đã ghi nhận trong báo cáo trước; backend/test Java không thay đổi trong đợt FE này |
+| Đóng gói WAR phục vụ kiểm tra runtime | `mvn -DskipTests package` đạt; kết quả này không thay thế verify đang lỗi ở trên |
+| Trình duyệt tuyến/bến/tỉnh/điểm dừng + API thật | Đạt: validation tiếng Việt, trường tùy chọn, trạng thái tuyến, cập nhật/đổi thứ tự điểm dừng, xóa thông báo khi đổi tab |
+| Trình duyệt xe/sơ đồ ghế + API thật | Đạt: tạo loại/xe, danh mục không mất sau lọc, sơ đồ hai tầng, lưu/đọc lại, ghế bảo trì, từ chối vị trí trùng và tải lại bản đã lưu, sửa trạng thái xe |
+| Trình duyệt chuyến/mở bán + API thật | Đạt: nháp qua đêm, phân công T11 thật, kiểm tra điều kiện/mở bán, tìm chuyến/ghế, lọc, khóa sửa/xóa chuyến đã bán, menu nhà xe/khách hàng và màn hình di động |
+
+Dùng ba bài `tests/frontend/route_management_smoke.cjs`, `vehicle_management_smoke.cjs`,
+`trip_sale_smoke.cjs` dưới dạng bản chạy tạm trong `/tmp`.
+Các điều chỉnh để khớp giao diện/dữ liệu hiện tại chỉ gồm: vào `/quan-tri` thay liên kết cũ “Quản trị”,
+nhãn menu “Mở/đóng menu”, kiểm tra vùng `#management-navigation`, đợi điều hướng hoàn tất trước kiểm tra menu,
+và dùng nhà xe `NX_FUTA` trong seed hiện tại thay `DEMO_NX`. Không bỏ assertion nghiệp vụ hoặc sửa application để làm test đạt.
+Các bài dùng dữ liệu có tiền tố riêng và dọn fixture sau chạy; database/container backend thử được dọn sau xác minh.
+Database `datvexe` đang có không bị reset hoặc nạp fixture kiểm thử.
+
+Giới hạn vẫn còn: build production FE mặc định bị chặn ở Google Fonts (403 từ proxy),
+và verify toàn backend còn lỗi H2 nêu trên. Kết quả này xác nhận các luồng đã kiểm tra chạy được sau refactor,
+không phải cam kết mọi chức năng của toàn dự án đều không còn lỗi.
