@@ -1,664 +1,446 @@
-# LeNguyenThanhHien — Hướng dẫn demo trên VS Code
+# Luồng demo tuyến, xe và chuyến
 
-Các mục dưới đây được gộp từ tài liệu hiện có; kết quả kiểm thử lịch sử giữ nguyên thời điểm và giới hạn của lần chạy.
+Chạy ứng dụng từ thư mục gốc theo [README dự án](../../../README.md).
+Phạm vi và danh sách file chính thức nằm trong [README của Hiền](../README.md#source).
+Tài liệu này gộp thứ tự mở code, sơ đồ nghiệp vụ và bảng truy vết; kết quả chạy được giữ trong [testing/README.md](../testing/README.md).
 
-## Mục lục
+## Chuẩn bị
 
-- [Chạy và kiểm tra T10 trong VS Code](#section-1)
-- [T12 — Chạy và kiểm tra trên VS Code](#section-2)
-- [T13 — Hướng dẫn chạy và kiểm tra chi tiết trong VS Code](#section-3)
+Cần JDK 21, Maven 3.9.9, Node.js 22 và Docker Desktop. Dùng `.env` theo cấu hình dự án,
+không commit thông tin bí mật. Tài khoản seed được mô tả ở [database/tai-khoan-mau.md](../../../database/tai-khoan-mau.md).
+Dùng database phát triển/thử riêng khi tạo dữ liệu kiểm thử; không reset volume để nâng cấp schema.
+Migration và seed: [hướng dẫn database](../../../database/README.md).
+
+```bash
+mvn -B -f apps/backend/pom.xml verify
+docker compose up -d postgres backend
+```
+
+Kiểm tra kết quả từng lệnh trước khi chạy tiếp. Backend phải dùng WAR vừa build;
+sau lần build tiếp theo, chạy `docker compose restart backend` và kiểm tra `GET /api/health` trả 200.
+Nếu khởi tạo database dừng ở migration hoặc verify thất bại, đọc lỗi và phần giới hạn trong báo cáo kiểm thử;
+không coi container có trạng thái chạy là toàn bộ ứng dụng đã sẵn sàng.
+
+Mở terminal khác, từ thư mục gốc:
+
+```bash
+npm ci
+npm run dev
+```
+
+Dùng cùng hostname frontend đã cấu hình trong `FRONTEND_ORIGIN`. Chạy frontend trong thư mục gốc
+để sử dụng lockfile và cấu trúc chung; không cần đổi sang các nhánh tính năng T10/T12 cũ.
+
+## Cách đọc frontend sau refactor
+
+| Nhóm | Component cha | Component con | Dữ liệu và hàm chuyển form |
+|---|---|---|---|
+| Tỉnh, bến, tuyến, điểm dừng | `RouteManagement` | `CityPanel`, `StationPanel`, `RouteForm`, `RouteList`, `RouteStopsPanel` | `routes/lib/route-types.ts` |
+| Xe và sơ đồ ghế | `VehicleManagement` | `VehicleTypePanel`, `VehicleForm`, `VehicleList`, `VehicleSeatLayout`, `VehicleField` | `vehicles/lib/vehicle-types.ts` |
+| Chuyến và vòng đời | `TripManagement` | `TripForm`, `TripList`, `TripDetails`, `TripSaleConditions`, `TripLifecyclePanel`, `TripPassengerModal` | `trips/lib/trip-types.ts`, `trip-passengers-api.ts` |
+
+Các đường dẫn FE tính từ `frontend/src` trong thư mục thành viên.
+Component cha giữ state, dựng payload và gọi API. Component con nhận dữ liệu/callback, hiển thị và chuyển sự kiện về cha.
+Không viết lại cookie/CSRF ở từng component: dùng `useAuth().request`; lỗi được đưa qua `errorMessage`.
+`try/catch/finally` thể hiện các bước gửi, tải lại dữ liệu, báo kết quả và mở lại thao tác.
+Ref `sending` chặn gửi trùng; mã phiên bản thông báo ngăn kết quả cũ hiện lại sau tương tác mới.
+
+Giữ riêng danh mục tỉnh/bến/loại xe và kết quả lọc bảng để việc tìm kiếm không làm mất lựa chọn trong form khác.
+Dữ liệu form là bản nháp trên FE; chỉ thông báo đã lưu sau khi API thao tác thành công.
+Hàm chuyển form giữ đúng kiểu chuỗi/ngày giờ và chuyển trường rỗng sang `null` theo hợp đồng API.
+Giữ tên trường JSON; khai báo ngắn có thể ở một dòng, chỉ tách dòng khi cần đọc các thuộc tính/bước xử lý dài.
+
+<a id="so-do-nghiep-vu"></a>
+
+### Quy ước đọc sơ đồ
+
+Các luồng ghi dữ liệu kiểm tra đăng nhập, quyền và CSRF tại tầng xác thực chung,
+sau đó kiểm tra phạm vi tài nguyên ở Service. Lỗi xác thực/quyền trả 401/403;
+CSRF sai hoặc thiếu bị từ chối theo bộ lọc chung. Không coi việc ẩn nút ở frontend là phân quyền.
+Lỗi nghiệp vụ được trả qua `ApiErrors` với thông báo để giao diện hiển thị bằng `errorMessage`.
+Các thông báo trong dấu ngoặc kép dưới đây được lấy từ code, là ví dụ đại diện,
+không phải danh sách đầy đủ mọi lỗi. Lỗi trong transaction làm rollback; lỗi sau commit được xử lý theo từng luồng.
+
+## 1. Quản lý tuyến và điểm dừng
+
+### Thứ tự mở file và demo
+
+`RouteManagement` → `CityPanel`/`StationPanel`/`RouteForm`/`RouteStopsPanel` →
+`RouteTripController` → `RouteTripService` → JPA và `Entities.java`.
+Mở `route-types.ts` để xem form trống, các hàm `routeToForm`/`stopToForm` và nhãn trạng thái.
+Demo: tạo tỉnh/bến → tạo tuyến → thêm hai điểm dừng → sửa/đổi thứ tự → thử xóa tuyến đã có chuyến.
+
+### Luồng xử lý
+
+Frontend: `RouteManagement.tsx`; Controller: `RouteTripController.handleRoutes`;
+Service: `RouteTripService`. Endpoint gốc `/api/tuyen-xe`.
+
+```mermaid
+flowchart TD
+    A[Người quản lý mở Quản lý tuyến] --> B[Tải tuyến, bến và nhà xe trong phạm vi quyền]
+    B --> C{Thao tác}
+    C -->|Tạo hoặc sửa| D[Nhập mã, tên, bến đầu cuối, thời gian, giá và nhà xe]
+    D --> E{Đầu vào, bến và quyền hợp lệ?}
+    E -->|Không| F[Trả 400, 403, 404 hoặc 409 và thông báo lỗi; không lưu]
+    E -->|Có| G{Sửa cấu hình tuyến đã có chuyến?}
+    G -->|Có| F
+    G -->|Không| H[Lưu trong transaction; commit]
+    H --> I[201 khi tạo hoặc 200 khi sửa; tải lại danh sách]
+    C -->|Điểm dừng| J[Thêm, sửa, xóa hoặc sắp xếp điểm dừng]
+    J --> K{Tuyến chưa có chuyến và danh sách hợp lệ?}
+    K -->|Không| F
+    K -->|Có| L[Lưu thứ tự điểm dừng; commit; trả kết quả]
+    C -->|Xóa tuyến| M{Tuyến chưa có chuyến tham chiếu?}
+    M -->|Không| F
+    M -->|Có| N[Xóa trong transaction; trả 204]
+    C -->|Đổi trạng thái| O[Kiểm tra quy tắc trạng thái riêng; lưu và trả 200]
+    O -->|Bị từ chối| F
+```
+
+Ví dụ lỗi: 400 “Trạm khởi hành và trạm đến phải khác nhau”; 409
+“Bến khởi hành và bến đến phải đang hoạt động để cấu hình tuyến”.
+Đổi trạng thái là thao tác riêng; không suy ra tuyến đã có chuyến thì mọi thao tác đều bị cấm.
+Kiểm thử: `RouteTripServiceTest.stationAndRouteValidationAndDeleteProtection`,
+`routeAndStopsCannotBeChangedAfterTripsExistButStatusCanChange`,
+`invalidStopOperationsDoNotChangeExistingOrder`.
 
 <a id="section-1"></a>
 
-## Chạy và kiểm tra T10 trong VS Code
+## 2. Tạo xe và sơ đồ ghế
 
-Hướng dẫn dùng Windows/Git Bash. Các lệnh ở thư mục gốc `HE_THONG_DAT_VE_XE_KHACH11`, trừ phần frontend. Linux/macOS thay `py -3` bằng `python3`.
+### Thứ tự mở file và demo
 
-### 1. Lấy nhánh và kiểm tra công cụ
+`VehicleManagement` → `VehicleTypePanel`/`VehicleForm` → `VehicleController` →
+`VehicleService.saveType`/`saveVehicle` → `LoaiXeRepository`/`XeRepository`.
+Tiếp theo mở `VehicleSeatLayout` → `handleSaveSeatLayout` trong component cha → `VehicleService.saveLayout`.
+Demo: tạo loại xe → tạo xe đủ đăng kiểm → sửa sơ đồ hai tầng → lưu, F5 và đọc lại → thử vị trí trùng.
 
-```bash
-git fetch origin
-git switch feat/t10-vehicle-management
-git pull --ff-only origin feat/t10-vehicle-management
-java -version
-javac -version
-mvn -version
-node -v
-docker compose version
-py -3 --version
+### Luồng xử lý
+
+Frontend: `VehicleManagement.tsx`; Controller: `VehicleController`;
+Service: `VehicleService`. Tạo xe dùng `POST /api/xe`, lưu sơ đồ dùng
+`PUT /api/xe/{maXe}/so-do-ghe`.
+
+```mermaid
+flowchart TD
+    A[Người quản lý chọn loại xe, nhà xe và nhập thông tin xe] --> B[Kiểm tra phiên, phạm vi và dữ liệu]
+    B --> C{Mã, biển số, loại xe, sức chứa và đăng kiểm hợp lệ?}
+    C -->|Không| D[Trả lỗi; không tạo xe hoặc ghế]
+    C -->|Có| E[Tạo xe và tự sinh ghế vật lý cùng transaction]
+    E --> F[Commit; 201 và dữ liệu xe]
+    F --> G[Người dùng chỉnh vị trí, tầng, trạng thái ghế rồi lưu toàn sơ đồ]
+    G --> H[Khóa xe; kiểm tra đủ số ghế, tầng, mã ghế và vị trí không trùng]
+    H --> I{Sơ đồ hợp lệ?}
+    I -->|Không| J[400 hoặc 409; rollback; giữ nguyên sơ đồ cũ]
+    I -->|Có| K{Có thay đổi sơ đồ?}
+    K -->|Không| N[200 và danh sách ghế]
+    K -->|Có| L{Có lịch chuyến hoặc lịch sử vé, giữ chỗ?}
+    L -->|Có| J
+    L -->|Không| M[Cập nhật toàn bộ; flush; commit]
+    M --> N
 ```
 
-Nếu chưa có nhánh local, dùng `git switch --track origin/feat/t10-vehicle-management`. Giữ lại thay đổi local trước khi đổi nhánh. Cần Java 21/JDK có javac, Maven dùng JDK 21, Node từ 20.9, Python 3 và Docker Desktop đang chạy Linux containers.
-
-### 2. Backend — terminal 1 tại thư mục gốc
-
-```bash
-mvn -f apps/backend/pom.xml -B clean verify
-docker compose up -d postgres
-docker compose ps
-```
-
-Mong đợi `BUILD SUCCESS`; PostgreSQL `healthy`. Maven mặc định bỏ qua những test cần PostgreSQL. T10 không thay entity/schema, không có migration mới. Database cũ cần có đủ schema 001/002/003 của T07/T09. Không xóa volume để nâng cấp.
-
-```bash
-docker compose up -d backend
-docker compose restart backend
-curl -i http://localhost:8080/api/health
-```
-
-Chờ HTTP 200. Sau mỗi build WAR mới, restart backend. Xem lỗi bằng `docker compose logs --tail=100 backend`. Không cần mở pgAdmin.
-
-### 3. Frontend — terminal 2
-
-Từ thư mục gốc:
-
-```bash
-cd apps/frontend
-npm ci
-npm run dev
-```
-
-Giữ terminal chạy; mở Chrome/Edge tại **http://localhost:3000**. Nếu cổng 3000 đang bận, xử lý ứng dụng đang dùng cổng hoặc cập nhật `FRONTEND_ORIGIN` backend cho đúng cổng. Dùng `localhost` thống nhất. Next proxy `/api` đến `BACKEND_URL`, mặc định `http://127.0.0.1:8080`; khi đổi backend, đặt biến trước khi chạy/build.
-
-### 4. ADMIN và nhà xe kiểm thử
-
-Đăng nhập ADMIN đã có từ T07. Bấm **Quản trị** trên thanh đầu trang, rồi chọn **Xe và sơ đồ ghế** trong menu bên trái; hoặc mở **http://localhost:3000/quan-tri/xe**. Tài khoản NHA_XE dùng nút **Quản lý nhà xe**. Trên điện thoại, mở menu ☰ ở đầu trang để vào khu vực quản lý; menu bên của khu vực này có nút ☰ riêng để mở các chức năng.
-
-Nếu chưa có ADMIN, đăng ký `admin.t10@example.test` tại `/dang-ky`, tự đặt mật khẩu và ghi nhớ. Tại terminal gốc:
-
-```bash
-docker exec -it datvexe-postgres psql -U datvexe_user -d datvexe
-```
-
-Trong psql:
-
-```sql
-BEGIN;
-UPDATE nguoi_dung SET loai_tai_khoan='ADMIN'
-WHERE email='admin.t10@example.test'
-RETURNING email,loai_tai_khoan;
-DELETE FROM phien_dang_nhap WHERE ma_nguoi_dung IN (
-  SELECT ma_nguoi_dung FROM nguoi_dung WHERE email='admin.t10@example.test'
-);
-COMMIT;
-```
-
-Phải thấy đúng email với ADMIN, không phải `UPDATE 0`. Thoát bằng `\q`, đăng xuất/đăng nhập lại. Không nhập placeholder UUID vào SQL. Chỉ thao tác này trên database phát triển cục bộ.
-
-Chọn nhà xe **HOAT_DONG** có sẵn trong danh sách khi tạo xe. Nếu chưa có nhà xe, ADMIN dùng T09 tại `/quan-tri/nha-xe` tạo và duyệt nhà xe trước. Để kiểm thử vai trò NHA_XE, dùng T09 gán tài khoản quản lý cho đúng nhà xe, rồi đăng nhập tài khoản đó ở cửa sổ ẩn danh.
-
-### 5. Loại xe
-
-ADMIN chọn tab **Loại xe**:
-
-| Trường | Giá trị thử |
-| --- | --- |
-| Mã loại xe | `KT_T10_L20` |
-| Tên loại xe | `Xe kiểm thử 20 chỗ` |
-| Sức chứa | `20` |
-| Số tầng | `2` |
-
-Bấm **Thêm loại xe** → thành công. Thử tạo lại mã đó → lỗi trùng. Sức chứa 0/âm hoặc số tầng lớn hơn sức chứa không được lưu. Tìm theo mã/tên; **Sửa** tên/mô tả → thành công. Loại xe đã có xe thì không đổi cấu trúc sức chứa/tầng, không xóa cứng.
-
-NHA_XE được đọc/chọn loại xe, không được thêm/sửa danh mục chung. Entity loại xe không có trạng thái nên không thêm trạng thái sử dụng.
-
-### 6. Tạo, lọc và cập nhật xe
-
-Chọn **Xe và ghế**:
-
-| Trường | Giá trị thử |
-| --- | --- |
-| Mã xe | `KT_T10_X1` |
-| Biển số | `51B-123.45` (chọn biển khác nếu đã có) |
-| Loại xe | Loại 20 chỗ vừa tạo |
-| Nhà xe | Nhà xe đang hoạt động của bạn |
-| Ngày đăng kiểm | `2026-01-01` |
-| Hạn đăng kiểm | `2028-12-31` |
-| Dung tích nhiên liệu | `100` lít |
-| Tốc độ | `60` km/giờ |
-| Trạng thái | Sẵn sàng |
-
-Bấm **Thêm xe** → xe và 20 ghế được tạo cùng lúc. Số ghế lấy từ loại xe, không tự nhập sức chứa khác. Giữ ngày đăng kiểm/hạn phù hợp ngày hiện tại và ngày chuyến khi thử trong tương lai.
-
-- Thử biển số đã có → từ chối, không tạo xe/ghế dở dang.
-- Dung tích âm, hạn trước ngày đăng kiểm hoặc thiếu trường bắt buộc → lỗi tiếng Việt.
-- Lọc theo biển số/mã xe, loại, nhà xe, trạng thái → danh sách phù hợp.
-- Bấm **Sửa** xe chưa có chuyến; đổi đăng kiểm, thông tin kỹ thuật hoặc trạng thái Bảo trì → thành công.
-- Loại xe/nhà xe của xe đã tạo được cố định để giữ lịch sử ghế.
-- Xe hết đăng kiểm vẫn lưu để theo dõi; danh sách/chi tiết cảnh báo **Chưa đủ điều kiện**. Backend không cho gán xe đó vào chuyến mở bán mới.
-
-### 7. Xem và lưu sơ đồ ghế
-
-Bấm **Chi tiết / ghế** đúng dòng `KT_T10_X1`:
-
-1. Kiểm tra tiêu đề đúng biển số, thông tin đăng kiểm và sơ đồ đủ **20/20 chỗ**.
-2. Hai tầng được hiển thị riêng; màu xanh là hoạt động, màu bảo trì là không bán. Đây là trạng thái vật lý, không phải ghế đã bán theo chuyến.
-3. Trong bảng, đổi **Mã/vị trí** một ghế thành `A1`, chọn tầng trong giới hạn loại xe.
-4. Chọn trạng thái ghế **Bảo trì**, bấm **Lưu sơ đồ ghế** → thành công nếu chưa có ràng buộc.
-5. Tải lại trang, chọn lại chi tiết xe → dữ liệu vẫn được lưu.
-6. Đổi hai ghế cùng vị trí `A1` → backend từ chối; **Tải lại sơ đồ** để xem bản đã lưu không bị thay đổi.
-7. Bấm **Bỏ vị trí** → chỉ thay đổi trên form; khi còn 19/20 thì nút lưu bị khóa. Thêm vị trí thay thế, điền mã hợp lệ để đủ 20 mới lưu được.
-8. Thêm vượt 20 → không được lưu. Backend cũng kiểm tra đủ đúng sức chứa khi gọi trực tiếp API.
-
-`maGhe` là ID liên kết do backend sinh, hiển thị cố định. Mã/vị trí A1 dùng `viTri`; hai xe có thể cùng A1. Không thêm hàng/cột vào entity đã chốt. Bố cục các ô trên màn hình là cách hiển thị danh sách theo tầng/vị trí.
-
-Nếu chi tiết báo xe có lịch chuyến hoặc ghế có lịch sử vé/giữ chỗ, bảng sửa sơ đồ bị khóa. Không xóa dữ liệu lịch sử để vượt kiểm tra. Quy trình đổi xe/ghế sau bán vé không nằm trong T10.
-
-### 8. Kiểm tra quyền và bảo vệ lịch sử
-
-- Khách chưa đăng nhập mở `/quan-tri/xe` → chuyển đăng nhập; gọi `/api/xe` → 401.
-- Khách hàng đã đăng nhập mở trang → thông báo không có quyền; API quản lý → 403.
-- NHA_XE chỉ nhận xe của mình, chỉ chọn nhà xe mình và không có tab sửa loại xe.
-- Dùng ADMIN để xem tất cả xe; T09 cung cấp liên kết tài khoản quản lý nhà xe.
-- Xe đã có chuyến không xóa cứng; ghế có vé/giữ chỗ không đổi vị trí/tầng hoặc xóa.
-- Đăng kiểm/trạng thái mới làm mất điều kiện của chuyến đang có sẽ bị từ chối; không tự hủy chuyến hay vé.
-
-Các tình huống giả mạo URL/body, nhà xe khác, đăng kiểm qua đêm, vé theo từng chuyến và giữ/bán ghế bảo trì được kiểm tra bằng bộ test tự động sau đây. T10 không có giao diện bán vé; module đặt vé sẽ tích hợp helper khi triển khai.
-
-### 9. Chạy test API — terminal 3 tại thư mục gốc
-
-Nếu đang ở `apps/frontend`, dùng `cd ../..`. Backend/PostgreSQL phải đang chạy:
-
-```bash
-py -3 tests/backend/vehicle_management_smoke.py
-py -3 tests/backend/vehicle_api_smoke.py
-py -3 tests/backend/api_smoke.py
-```
-
-Mong đợi các dòng **PASS** ở cuối mỗi script. Script tự tạo tài khoản ADMIN tạm, dữ liệu riêng và dọn trong finally; chỉ chạy trên database phát triển. Bộ T10 tạo cả dữ liệu vé để xác minh lịch sử và khả dụng theo chuyến, không thực hiện thanh toán thật.
-
-Nếu có `AssertionError`, giữ đầy đủ log để kiểm tra. Lỗi `can't open file ...apps/frontend/tests/...` là chạy sai thư mục. Nếu lặp bộ test liên tục bị 429, chờ hết cửa sổ một phút theo giới hạn đăng nhập T07.
-
-### 10. PostgreSQL test riêng — tùy chọn
-
-Repo có stack test dùng database tạm riêng tại cổng 55432; không dùng database ứng dụng `datvexe` cho Maven PostgreSQL tests:
-
-```bash
-docker compose -p t10-test -f tests/backend/docker-compose.postgres.yml up -d
-docker compose -p t10-test -f tests/backend/docker-compose.postgres.yml ps
-mvn -f apps/backend/pom.xml -B -Duser.timezone=Asia/Ho_Chi_Minh -Dvehicle.pg.url=jdbc:postgresql://localhost:55432/datvexe_test -Dvehicle.pg.user=datvexe_test -Dvehicle.pg.password=datvexe_test -Dt07.t06.enabled=true verify
-```
-
-Chờ PostgreSQL test healthy trước Maven. Mong đợi BUILD SUCCESS, không failures/errors/skipped khi toàn bộ seed test có đủ. Dừng stack test sau dùng:
-
-```bash
-docker compose -p t10-test -f tests/backend/docker-compose.postgres.yml down
-```
-
-Stack test dùng tmpfs; dừng container mất dữ liệu test. Không ảnh hưởng volume database ứng dụng. Sau Maven tạo WAR mới, restart backend trước HTTP smoke.
-
-### 11. Kiểm tra frontend và tài liệu
-
-Tại terminal frontend, **Ctrl+C**, rồi:
-
-```bash
-npm run build
-npm run lint
-npm run dev
-```
-
-Build phải thành công; lint không có lỗi. Các cảnh báo unused variable có sẵn ở `lib/api.ts` và `lib/mock-data.ts` được ghi riêng trong kết quả kiểm thử.
-
-- [Hợp đồng API/helper T10](../../../docs/api/t10-quan-ly-xe-va-ghe.md).
-- [Ma trận kiểm thử và kết quả T10](../testing/existing/t10-ma-tran-kiem-thu-xe-va-ghe.md).
-- Browser smoke cho môi trường có Playwright/Chromium: `tests/frontend/vehicle_management_smoke.cjs`; có thể đặt `FRONTEND_URL`, `DB_NAME`, `DB_CONTAINER`, `CHROMIUM_PATH`. Trên Windows phải chọn đường dẫn trình duyệt và runner Playwright phù hợp, không dùng mặc định Linux `/usr/bin/chromium`.
-
-Việc test đạt chưa thay thế review/chấp nhận PR của Minh Hiếu. API giữ/bán ghế tương lai phải tích hợp `VehicleRules.seatSellable` trong cùng transaction, rồi bổ sung test end-to-end module đặt vé.
+Ví dụ lỗi: 409 “Biển số đã tồn tại.”; 400 “Sức chứa phải khớp với loại xe.”;
+400 “Tầng ghế không hợp lệ.”; 409 “Xe đang có lịch chuyến; không sửa sơ đồ ghế.”.
+Ghế vật lý hoạt động/bảo trì khác với tình trạng trống/giữ/đã bán của một chuyến.
+Kiểm thử: `VehicleTask10Test.typeAndVehicleValidationUniquePlatesAndFilters`,
+`layoutRejectsWrongCountsDuplicatesForeignIdsAndInvalidFloorsWithoutPartialSave`;
+`PostgresTask10Test.concurrentSamePlateAcrossTypesCreatesOnlyOneCompleteVehicle`.
 
 <a id="section-2"></a>
 
-## T12 — Chạy và kiểm tra trên VS Code
+## 3. Tạo chuyến nháp và mở bán
 
-### Chuẩn bị
+### Thứ tự mở file và demo
 
-Cần JDK 21 (có javac), Maven, Node từ 20.9, Python 3 và Docker Desktop chạy Linux containers. Mở thư mục gốc dự án trong VS Code, dùng Git Bash. PostgreSQL chạy bằng Docker; không cần mở pgAdmin. Giữ dữ liệu hiện tại, không chạy `docker compose down -v`.
+`TripManagement` → `TripForm`/`TripList`/`TripDetails`/`TripSaleConditions` →
+`TripController` → `TripService.create`/`eligibility`/`open` → `TripSaleRules` → `ChuyenXeRepository`.
+Demo: lưu nháp thiếu xe/nhân sự → xem lý do chưa đạt → chuẩn bị xe và phân công T11 → kiểm tra lại → mở bán.
 
-```bash
-git switch feat/t12-trip-creation-sale-validation
-mvn -f apps/backend/pom.xml clean verify
-docker compose up -d postgres backend
+### Luồng xử lý
+
+Frontend: `TripManagement.tsx`; Controller: `TripController`;
+Service: `TripService`, `TripSaleRules`, `VehicleRules`, `AssignmentRules`.
+Endpoint gốc `/api/quan-ly/chuyen-xe`.
+
+```mermaid
+flowchart TD
+    A[Người quản lý nhập tuyến, ngày giờ và xe tùy chọn] --> B[POST tạo chuyến; kiểm tra quyền, mã, tuyến, giá và giờ đến]
+    B --> C{Hợp lệ?}
+    C -->|Không| D[400, 403, 404 hoặc 409; rollback; hiện thông báo]
+    C -->|Có| E[Lưu NHAP; commit; 201; chưa xuất hiện để đặt vé]
+    E --> F[Gán xe và phân công nhân viên qua module phân công]
+    F --> G[GET dieu-kien-mo-ban]
+    G --> H[Trả 200 với duDieuKien và danh sách điều kiện, lý do chưa đạt]
+    H --> I[Người quản lý bấm Mở bán]
+    I --> J[Khóa chuyến; kiểm tra lại trạng thái, hạn đặt, tuyến, bến, nhà xe, xe và nhân sự]
+    J --> K{Đủ điều kiện và vẫn còn trong hạn?}
+    K -->|Không| L[409 với lý do chưa đạt; rollback; tải lại bảng điều kiện]
+    K -->|Có| M[Lưu DANG_MO_BAN nếu chưa mở; commit; 200]
+    M --> N[Giao diện cập nhật trạng thái; tìm chuyến có thể thấy chuyến]
 ```
 
-Đợi backend sẵn sàng tại `/api/health`. Nếu backend đang chạy trong lúc build WAR, restart riêng backend:
-
-```bash
-docker compose restart backend
-```
-
-Trong terminal khác, từ thư mục gốc:
-
-```bash
-cd apps/frontend
-npm ci
-npm run build
-npm run lint
-npm run dev
-```
-
-Không chạy npm ở thư mục gốc vì package.json nằm trong `apps/frontend`. Để thoát frontend, Ctrl+C.
-
-### Kiểm tra giao diện
-
-1. Đăng nhập ADMIN, chọn **Quản lý → Chuyến xe và mở bán**. NHA_XE chỉ thấy dữ liệu nhà xe mình; khách không có quyền.
-2. Tạo mã chuyến mới, chọn tuyến và ngày tương lai. Chưa chọn xe/phân công vẫn lưu nháp được; chuyến không tự xuất hiện trong API tìm vé.
-3. Chọn tuyến 7 giờ, nhập 22:00: giờ đến phải là 05:00 ngày sau. Giờ đến sớm hơn khởi hành bị từ chối.
-4. Mở chi tiết, kiểm tra tám nhóm điều kiện. Thiếu xe/nhân viên không được mở bán.
-5. Phân công qua T11 API, gồm nhân sự bắt buộc và xác nhận kế hoạch phù hợp. T11 hiện chưa có giao diện phân công. Không chỉ sửa trạng thái bằng SQL để giả lập mở bán.
-6. Kiểm tra lại điều kiện, xác nhận mở bán. Chuyến đủ điều kiện mới chuyển trạng thái; sau mở bán không sửa xe/lịch bằng form nháp.
-7. Lọc trạng thái, tuyến, xe, khoảng ngày; kiểm tra trên cửa sổ hẹp và tài khoản nhà xe khác.
-8. Thông báo dùng tiếng Việt; chọn tab/thao tác khác phải xóa thông báo cũ. Nhập rỗng trường bắt buộc phải có hướng dẫn tiếng Việt.
-
-Mặc định hạn nhận vé là 60 phút trước khởi hành, đổi qua `TRIP_BOOKING_CUTOFF_MINUTES` rồi tạo lại container backend. Tại đúng hạn và sau hạn đều bị chặn, kể cả gọi helper backend trực tiếp.
-
-### Kiểm thử tự động
-
-Từ thư mục gốc, backend chạy cổng8080 và Docker PostgreSQL hiện có:
-
-```bash
-py -3 tests/backend/trip_sale_smoke.py
-```
-
-Script tạo fixture có tiền tố riêng và dọn fixture khi hoàn tất. Khuyến nghị database kiểm thử riêng; có thể đặt `DB_NAME` và `API_BASE_URL` trỏ đến backend dùng đúng database đó. Không trộn backend database thật với DB_NAME kiểm thử.
-
-Kiểm thử Java/PostgreSQL:
-
-```bash
-mvn -f apps/backend/pom.xml -Dvehicle.pg.url=jdbc:postgresql://localhost:5432/datvexe -Dvehicle.pg.user=datvexe_user -Dvehicle.pg.password=datvexe_password -Dt07.t06.enabled=true verify
-```
-
-Các test PostgreSQL tạo và dọn fixture riêng; kiểm tra kết quả Skipped để biết đã thực sự chạy. Không có cấu hình PG thì các test này có thể bị bỏ qua.
-
-Kiểm thử browser cần Playwright và Chromium. File `tests/frontend/trip_sale_smoke.cjs`, cấu hình `FRONTEND_URL`, `DB_NAME`, `CHROMIUM_PATH`. Test sử dụng API T11 thật để phân công rồi mở bán từ giao diện.
-
-Đối chiếu [ma trận kiểm thử](../testing/existing/t12-ma-tran-kiem-thu-chuyen-xe.md) và [API T12](../../../docs/api/t12-quan-ly-chuyen-xe.md). Việc PR được review/chấp nhận là bước riêng, không được suy ra từ test đạt.
+Tạo nháp cho phép thiếu xe và nhân sự; mở bán thì bắt buộc đủ điều kiện.
+GET điều kiện không đạt vẫn có thể trả 200 với `duDieuKien=false`; POST mở bán thất bại trả 409.
+Ví dụ lỗi: “Mã chuyến đã tồn tại.”; “Ngày giờ đến phải sau khởi hành.”;
+“Chuyến chưa được gán xe.”; “Đã đến thời điểm ngừng nhận đặt vé trong khi kiểm tra điều kiện.”.
+Mở bán lại trong hạn và đủ điều kiện không tạo chuyến mới. Hai chuyến xung đột lịch phải kiểm tra bằng khóa database.
+Kiểm thử: `TripServiceTest.draftCanLackVehicleAndCrewButCannotBeSearchedOrSold`,
+`actualT11AssignmentFlowAndIdempotentOpening`, `cutoffReachedDuringValidationStillRollsBackOpening`;
+`PostgresTripTest.conflictingSimultaneousPublishSerializesUnderDatabaseLocks`.
 
 <a id="section-3"></a>
 
-## T13 — Hướng dẫn chạy và kiểm tra chi tiết trong VS Code
+## 4. Tìm chuyến
 
-Hướng dẫn dành cho Windows, Terminal Git Bash trong VS Code. Các lệnh chạy từ thư mục gốc `HE_THONG_DAT_VE_XE_KHACH11`, trừ phần có yêu cầu chuyển vào `apps/frontend`. Kết quả cần kiểm tra gồm tìm chuyến, xem chi tiết, chỗ còn và chọn ghế trên giao diện.
+### Thứ tự mở file và demo
 
-### 1. Mở đúng dự án và terminal
+Frontend Thế An: `SearchForm` → `SearchResultsPage` → `booking/lib/api.ts`.
+Backend Hiền: `RouteTripController.handleTrips` → `RouteTripService.searchChuyenXe` →
+`ChuyenXeRepository.findForSearch` → `TripSaleRules.ensureSellable` → `searchView`.
+Demo: tìm chuyến theo tỉnh/ngày → xem ghế còn → thử cùng điểm đi/đến, ngày không có chuyến và lỗi API.
 
-1. Mở VS Code → **File → Open Folder** → chọn thư mục `HE_THONG_DAT_VE_XE_KHACH11`.
-2. Chọn **Terminal → New Terminal**.
-3. Nhấn mũi tên cạnh dấu **+** trong terminal → chọn **Git Bash**.
-4. Chạy:
+### Luồng xử lý
+
+Frontend thuộc Nguyễn Thế An: `SearchForm.tsx`, `SearchResultsPage.tsx`, `booking/lib/api.ts`.
+Backend của Hiền: `RouteTripController.handleTrips` → `RouteTripService.searchChuyenXe`
+→ `ChuyenXeRepository.findForSearch` → `TripSaleRules.ensureSellable` → `searchView`.
+
+```mermaid
+flowchart TD
+    A[Khách chọn điểm đi, điểm đến và ngày] --> B[GET /api/chuyen-xe với from, to, date]
+    B --> C{Ngày, mã địa điểm và hai điểm hợp lệ?}
+    C -->|Không| D[400; hiển thị thông báo đầu vào không hợp lệ]
+    C -->|Có| E[Truy vấn chuyến theo tỉnh hoặc bến và ngày]
+    E --> F[Lọc chuyến theo điều kiện bán hiện tại; đếm ghế theo chuyến]
+    F --> G{Có chuyến phù hợp?}
+    G -->|Không| H[200 với mảng rỗng; giao diện báo không có chuyến phù hợp]
+    G -->|Có| I[200 với danh sách giờ, giá, xe và số ghế còn]
+    I --> J{Chuyến còn ghế?}
+    J -->|Không| K[Vẫn hiển thị; coTheDatVe=false; HET_CHO]
+    J -->|Có| L[Cho xem chi tiết và đi tiếp tới chọn ghế]
+    B -->|Mạng hoặc backend lỗi| M[Hiển thị lỗi tải hoặc tìm dữ liệu; không dùng dữ liệu giả]
+```
+
+Ví dụ lỗi: “Ngày đi là bắt buộc”; “Tỉnh đi và tỉnh đến phải khác nhau.”.
+Chuyến không còn đủ điều kiện bán bị bỏ khỏi kết quả; không trả lỗi toàn bộ chỉ vì một chuyến không bán được.
+Kết quả rỗng là thành công HTTP, khác lỗi API. Chọn ghế ở frontend chưa giữ ghế trong database.
+Kiểm thử: `RouteTripServiceTest.emptySearchWrongDirectionDateAndDepartureOrdering`,
+`searchAcceptsCityStationAndLegacyCodesWithoutChangingSaleRules`,
+`publicDetailAndAvailabilityUseCurrentTripSpecificSeats`.
+
+## 5. Bắt đầu chuyến
+
+### Thứ tự mở file và demo
+
+`TripDetails` → `TripManagement.handleStartTrip` → `TripController.handleAction` →
+`TripService.transition` → `VehicleRules.ready`/`AssignmentRules.readyForOperation` → `history`.
+Demo: bắt đầu chuyến đang mở bán → thử bắt đầu lại hoặc thao tác bằng tài khoản không có quyền.
+
+### Luồng xử lý
+
+`POST /api/quan-ly/chuyen-xe/{maChuyen}/bat-dau` → `TripService.transition`.
+
+```mermaid
+flowchart TD
+    A[Người có quyền bấm Bắt đầu chuyến] --> B[Kiểm tra quyền; khóa chuyến]
+    B --> C{ADMIN, nhà xe đúng phạm vi hoặc tài xế được phân công hợp lệ?}
+    C -->|Không| D[401 hoặc 403; giữ trạng thái cũ]
+    C -->|Có| E{Chuyến đang DANG_MO_BAN?}
+    E -->|Không| F[409: Chỉ bắt đầu chuyến đang mở bán.]
+    E -->|Có| G[Kiểm tra lại xe và nhân sự đủ điều kiện vận hành]
+    G --> H{Đạt?}
+    H -->|Không| I[Trả lỗi nghiệp vụ; rollback; hiển thị lý do]
+    H -->|Có| J[Lưu DANG_CHAY và lịch sử thao tác trong transaction]
+    J --> K[Commit; 200; cập nhật trạng thái trên giao diện]
+```
+
+Bấm bắt đầu lại khi đã chạy bị từ chối, không tạo thêm lịch sử thành công.
+Kiểm thử: `TripServiceTest.lifecycleRejectsInvalidStatesAndDoesNotDuplicateHistory`,
+`lifecycleRechecksVehicleAndRejectsCustomer`, `assignedDriverCanOperateButCannotCancelOrOperateAnotherTrip`.
+
+## 6. Hoàn tất chuyến
+
+### Thứ tự mở file và demo
+
+`TripDetails` → `TripManagement.handleCompleteTrip` → `TripController.handleAction` →
+`TripService.transition` → `history`.
+Demo: hoàn tất chuyến đang chạy → xem lịch sử → thử hoàn tất chuyến chưa bắt đầu.
+
+### Luồng xử lý
+
+`POST /api/quan-ly/chuyen-xe/{maChuyen}/hoan-thanh` → `TripService.transition`.
+
+```mermaid
+flowchart TD
+    A[Người có quyền bấm Hoàn tất chuyến] --> B[Kiểm tra quyền và khóa chuyến]
+    B --> C{Quyền hợp lệ?}
+    C -->|Không| D[401 hoặc 403; không thay đổi dữ liệu]
+    C -->|Có| E{Chuyến đang DANG_CHAY?}
+    E -->|Không| F[409: Chỉ hoàn tất chuyến đang chạy.]
+    E -->|Có| G[Lưu HOAN_TAT và lịch sử thao tác]
+    G --> H{Giao dịch thành công?}
+    H -->|Không| I[Rollback; trả lỗi; giao diện không báo thành công]
+    H -->|Có| J[Commit; 200; cập nhật giao diện]
+```
+
+Hoàn tất chuyến không tự đánh dấu toàn bộ vé là đã lên xe.
+Kiểm thử: `TripServiceTest.completingDoesNotMarkUninspectedPassengersAsBoarded`,
+`lifecycleRejectsInvalidStatesAndDoesNotDuplicateHistory`.
+
+## 7. Hủy chuyến và theo dõi xử lý
+
+### Thứ tự mở file và demo
+
+`TripDetails` → `TripManagement.handleCancelTrip` → `TripController.handleAction` →
+`TripService.cancel`/`transition` → `cancelAffectedOrders` → ghi lịch sử/công việc → commit.
+Sau commit gọi xử lý hoàn và email. Mở `TripLifecyclePanel`, `lifecycleReport` và `retryCancellationWork`
+để giải thích kết quả từng đơn, trạng thái đối soát và thao tác thử lại.
+Demo: nhập lý do → hủy chuyến chưa chạy → xem công việc → thử thiếu lý do, sai quyền hoặc chuyến đã chạy.
+
+### Luồng xử lý
+
+`POST /api/quan-ly/chuyen-xe/{maChuyen}/huy` với `{lyDo}` → `TripService.cancel/transition`.
+Báo cáo: GET hậu tố `/vong-doi`; thử lại công việc: POST hậu tố `/xu-ly-hoan`.
+
+```mermaid
+flowchart TD
+    A[ADMIN hoặc nhà xe nhập lý do và xác nhận hủy] --> B[Kiểm tra quyền; khóa chuyến]
+    B --> C{Đúng phạm vi và lý do 1 đến 1000 ký tự sau trim?}
+    C -->|Không| D[401, 403 hoặc 400; không hủy]
+    C -->|Có| E{Trạng thái NHAP, CHUA_KHOI_HANH hoặc DANG_MO_BAN?}
+    E -->|Không| F[409: Không hủy chuyến đang chạy, đã hoàn tất hoặc đã hủy.]
+    E -->|Có| G[Khóa đơn liên quan; giải phóng giữ chỗ; phân loại công việc hoàn và thông báo]
+    G --> H[Lưu DA_HUY cùng lịch sử và công việc trong một transaction]
+    H --> I{Commit thành công?}
+    I -->|Không| J[Rollback; trả lỗi; chuyến chưa hủy thành công]
+    I -->|Có| K[Sau commit: thử xử lý hoàn và gửi thông báo]
+    K --> L{Công việc hoàn hoặc thông báo còn lỗi, chưa rõ?}
+    L -->|Có| M[Giữ công việc để đối soát hoặc thử lại; không đảo trạng thái hủy]
+    L -->|Không| N[Ghi nhận kết quả xử lý]
+    M --> O[200 cho thao tác hủy; tải báo cáo vòng đời để xem kết quả từng công việc]
+    N --> O
+```
+
+Ví dụ lỗi: 400 “Vui lòng nhập lý do hủy chuyến.”; 400 “Lý do hủy không được vượt quá 1000 ký tự.”.
+Tài xế được phân công có thể bắt đầu/hoàn tất nhưng không có quyền hủy.
+Đơn chưa thu tiền không cần hoàn; đơn đã thu có thể chờ xử lý; giao dịch chưa rõ hoặc đơn chứa chuyến khác cần đối soát.
+Cấu hình phê duyệt chính sách hoàn và khả năng của nhà cung cấp ảnh hưởng bước hoàn thực tế.
+**Hủy thành công không đồng nghĩa đã hoàn tiền hoặc đã gửi email thành công.**
+Kiểm thử: `TripServiceTest.cancellingReleasesHoldsWithoutAnOrderAndRequiresReason`,
+`assignedDriverCanOperateButCannotCancelOrOperateAnotherTrip`, `lifecycleRejectsInvalidStatesAndDoesNotDuplicateHistory`.
+Các test này không thay thế kiểm thử nhà cung cấp hoàn tiền/email thật.
+
+
+<a id="bang-truy-vet"></a>
+
+## Bảng truy vết chức năng
+
+### Cách đọc
+
+Mỗi hàng đi từ thao tác giao diện đến Controller → Service → truy cập dữ liệu → Entity → bảng DB → test.
+Tên phương thức trong ô Controller/Service thuộc file có liên kết trong bảng hoặc mục Source của README thành viên.
+Các bảng liệt kê gồm bảng chính và bảng được đọc để kiểm tra quy tắc/quyền, không có nghĩa mọi bảng đều bị ghi.
+Các bảng xác thực phiên dùng chung không được lặp lại ở từng hàng.
+
+Entity nghiệp vụ dùng chung tại [Entities.java](../../../shared/backend/src/main/java/com/datvexe/domain/Entities.java).
+Không sao chép Entity về thư mục thành viên. Với native SQL, ghi tên bảng thật và nêu rõ nếu không có Entity.
+Test được dẫn là bằng chứng bao phủ trong source, **không phải kết quả chạy mới** hoặc cam kết mỗi test kiểm tra mọi nhánh của hàng.
+
+### Truy vết từ giao diện tới dữ liệu và test
+
+| Chức năng | Frontend | Controller | Service | Repository hoặc JPA/SQL trực tiếp | Entity | Bảng database | Test liên quan và trường hợp |
+|---|---|---|---|---|---|---|---|
+| Tỉnh/thành, bến xe | [FE tuyến](../../../members/LeNguyenThanhHien/frontend/src/routes/components/RouteManagement.tsx) | `RouteTripController.handleCities/handleStations` | `RouteTripService: create/update/get/list/deleteTinhThanh; create/update/get/list/deleteBenXe` | JPA trực tiếp: find, persist, remove, JPQL kiểm tra tham chiếu | TinhThanh, BenXe; TuyenXe, ChuyenXe để kiểm tra ràng buộc | `tinh_thanh, ben_xe, tuyen_xe, chuyen_xe` | [RouteTripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/RouteTripServiceTest.java)<br>citiesCanBeSearchedUpdatedAndCannotBeDeletedWhileReferenced; stationsCanBeFilteredByProvinceNameAndStatus |
+| Tạo/sửa/xem/lọc/xóa tuyến | [FE tuyến](../../../members/LeNguyenThanhHien/frontend/src/routes/components/RouteManagement.tsx) | `RouteTripController.handleRoutes` | `RouteTripService.createTuyenXe/updateTuyenXe/getTuyenXe/listTuyenXe/deleteTuyenXe/setTramDauCuoi/setTrangThaiTuyenXe` | JPA trực tiếp: find, persist, remove, createQuery; hasTrips kiểm tra chuyến tham chiếu | TuyenXe, BenXe, TinhThanh, NhaXe, ChuyenXe, DiemDung | `tuyen_xe, ben_xe, tinh_thanh, nha_xe, chuyen_xe, diem_dung` | [RouteTripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/RouteTripServiceTest.java)<br>stationAndRouteValidationAndDeleteProtection; routeAndStopsCannotBeChangedAfterTripsExistButStatusCanChange |
+| Thêm/sửa/xóa/sắp xếp điểm dừng | [FE tuyến](../../../members/LeNguyenThanhHien/frontend/src/routes/components/RouteManagement.tsx) | `RouteTripController.handleRoutes` | `RouteTripService.addDiemDung/updateDiemDung/deleteDiemDung/reorderDiemDung` | JPA trực tiếp: find/persist/remove; stops, renumber, park; kiểm tra tuyến đã có chuyến | DiemDung, TuyenXe, ChuyenXe | `diem_dung, tuyen_xe, chuyen_xe` | [RouteTripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/RouteTripServiceTest.java)<br>stopsCanBeInsertedReorderedAndRemovedWithoutDuplicatePositions; invalidStopOperationsDoNotChangeExistingOrder |
+| Danh mục loại xe | [FE xe](../../../members/LeNguyenThanhHien/frontend/src/vehicles/components/VehicleManagement.tsx) | `VehicleController.handleResource` | `VehicleService.saveType/get/filtered/delete` | LoaiXeRepository kế thừa JpaRepository; JPA/quan hệ danhSachXe kiểm tra loại đã sử dụng | LoaiXe, Xe | `loai_xe, xe` | [VehicleTask10Test](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/VehicleTask10Test.java)<br>typeAndVehicleValidationUniquePlatesAndFilters |
+| Tạo/cập nhật/lọc xe, đăng kiểm | [FE xe](../../../members/LeNguyenThanhHien/frontend/src/vehicles/components/VehicleManagement.tsx) | `VehicleController.handleResource` | `VehicleService.saveVehicle/get/filtered; VehicleRules.inspection` | XeRepository, LoaiXeRepository; JPA trực tiếp tìm NhaXe, kiểm tra trùng biển; generate tạo ghế cùng giao dịch | Xe, LoaiXe, NhaXe, Ghe; ChuyenXe để bảo vệ lịch vận hành | `xe, loai_xe, nha_xe, ghe, chuyen_xe` | [VehicleTask10Test](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/VehicleTask10Test.java)<br>typeAndVehicleValidationUniquePlatesAndFilters; registrationUpdateAfterCompletedTripPreservesTicketsAndSeatReferences |
+| Sinh ghế, CRUD ghế, lưu toàn sơ đồ | [FE xe](../../../members/LeNguyenThanhHien/frontend/src/vehicles/components/VehicleManagement.tsx) | `VehicleController.handleSeats; nhánh so-do-ghe trong service` | `VehicleService.seats/createSeat/updateSeat/deleteSeat/saveLayout` | XeRepository.lock, GheRepository; JPA persist/remove và JPQL kiểm tra lịch sử vé/giữ chỗ | Xe, LoaiXe, Ghe, ChuyenXe, VeXe, GiuCho | `xe, loai_xe, ghe, chuyen_xe, ve_xe, giu_cho` | [VehicleTask10Test](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/VehicleTask10Test.java)<br>layoutRejectsWrongCountsDuplicatesForeignIdsAndInvalidFloorsWithoutPartialSave; twoVehiclesMayUseSameLocalCodeAndLabelSwapIsAtomic |
+| Tạo/sửa/xóa chuyến nháp | [FE chuyến](../../../members/LeNguyenThanhHien/frontend/src/trips/components/TripManagement.tsx) | `TripController.handleCollection/handleTrip` | `TripService.create/update/delete; apply; VehicleRules và AssignmentRules khi có xe/lịch` | JPA find/persist/remove; ChuyenXeRepository.lock khi sửa/xóa; JPA kiểm tra lịch xe/nhân viên | ChuyenXe, TuyenXe, BenXe, NhaXe, Xe; PhanCongChuyenXe, NhanVien, VeXe, GiuCho khi kiểm tra lịch/lịch sử | `chuyen_xe, tuyen_xe, ben_xe, nha_xe, xe, phan_cong_chuyen_xe, nhan_vien, ve_xe, giu_cho` | [TripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/TripServiceTest.java)<br>draftCanLackVehicleAndCrewButCannotBeSearchedOrSold; invalidReferencesPricesAndArrivalRollbackWithoutChangingRoute; draftTimeUpdatesRecheckVehicleAndEmployeeSchedulesAndRollback |
+| Danh sách quản lý chuyến, phân trang | [FE chuyến](../../../members/LeNguyenThanhHien/frontend/src/trips/components/TripManagement.tsx) | `TripController.handleCollection` | `TripService.list` | ChuyenXeRepository.search/count với Filters; phân quyền/phạm vi trong Service | ChuyenXe, TuyenXe, NhaXe, Xe; dữ liệu phân công được đưa vào view | `chuyen_xe, tuyen_xe, nha_xe, xe, phan_cong_chuyen_xe, nhan_vien` | [TripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/TripServiceTest.java)<br>authenticatedScopeIsEnforcedForManagementNotClientIds |
+| Kiểm tra điều kiện và mở bán | [FE chuyến](../../../members/LeNguyenThanhHien/frontend/src/trips/components/TripManagement.tsx) | `TripController.handleAction` | `TripService.eligibility/open; TripSaleRules.inspect/ensureOpenable; VehicleRules.ready; AssignmentRules.readyForOperation/validateVehicleSchedule` | ChuyenXeRepository.lock; JPA khóa/refresh tuyến, bến, xe và truy vấn lịch/phân công | ChuyenXe, TuyenXe, BenXe, NhaXe, Xe, LoaiXe, Ghe, PhanCongChuyenXe, NhanVien | `chuyen_xe, tuyen_xe, ben_xe, nha_xe, xe, loai_xe, ghe, phan_cong_chuyen_xe, nhan_vien` | [TripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/TripServiceTest.java)<br>actualT11AssignmentFlowAndIdempotentOpening; vehicleMaintenanceInspectionAndInvalidLayoutBlockOpening; cutoffReachedDuringValidationStillRollsBackOpening |
+| Tìm chuyến, số ghế còn | [FE tìm](../../../members/NguyenTheAn/frontend/src/trip-search/pages/SearchResultsPage.tsx) | `RouteTripController.handleTrips` | `RouteTripService.searchChuyenXe/searchView; TripSaleRules.ensureSellable` | ChuyenXeRepository.findForSearch; JPA cityOf và JPQL đếm ghế/vé/giữ chỗ theo chuyến | ChuyenXe, TuyenXe, BenXe, TinhThanh, NhaXe, Xe, LoaiXe, Ghe, VeXe, GiuCho; nhân sự qua TripSaleRules | `chuyen_xe, tuyen_xe, ben_xe, tinh_thanh, nha_xe, xe, loai_xe, ghe, ve_xe, giu_cho, phan_cong_chuyen_xe, nhan_vien` | [RouteTripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/RouteTripServiceTest.java)<br>emptySearchWrongDirectionDateAndDepartureOrdering; searchAcceptsCityStationAndLegacyCodesWithoutChangingSaleRules |
+| Chi tiết chuyến, ghế theo chuyến | [FE chi tiết](../../../members/NguyenTheAn/frontend/src/booking/components/TripDetails.tsx) | `RouteTripController.handleTrips` | `RouteTripService.getChuyenXe; VehicleService.tripSeats; VehicleRules.availability` | JPA find/query; GheRepository.byVehicle; quy tắc bán kiểm tra theo chuyến | ChuyenXe, TuyenXe, DiemDung, BenXe, TinhThanh, NhaXe, Xe, LoaiXe, Ghe, VeXe, GiuCho; nhân sự qua quy tắc bán | `chuyen_xe, tuyen_xe, diem_dung, ben_xe, tinh_thanh, nha_xe, xe, loai_xe, ghe, ve_xe, giu_cho, phan_cong_chuyen_xe, nhan_vien` | [RouteTripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/RouteTripServiceTest.java)<br>publicDetailAndAvailabilityUseCurrentTripSpecificSeats |
+| Bắt đầu chuyến | [FE chuyến](../../../members/LeNguyenThanhHien/frontend/src/trips/components/TripManagement.tsx) | `TripController.handleAction: bat-dau` | `TripService.transition/authorizeLifecycle/history; VehicleRules.ready; AssignmentRules.readyForOperation` | ChuyenXeRepository.lock; JPA kiểm tra xe/phân công; native SQL ghi lịch sử | ChuyenXe và entity vận hành; lịch sử không có Entity riêng | `chuyen_xe, tuyen_xe, nha_xe, xe, loai_xe, ghe, phan_cong_chuyen_xe, nhan_vien`; `trip_lifecycle_history` | [TripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/TripServiceTest.java)<br>lifecycleRejectsInvalidStatesAndDoesNotDuplicateHistory; lifecycleRechecksVehicleAndRejectsCustomer; assignedDriverCanOperateButCannotCancelOrOperateAnotherTrip |
+| Hoàn tất chuyến | [FE chuyến](../../../members/LeNguyenThanhHien/frontend/src/trips/components/TripManagement.tsx) | `TripController.handleAction: hoan-thanh` | `TripService.transition/authorizeLifecycle/history` | ChuyenXeRepository.lock; kiểm tra quyền JPA; native SQL ghi lịch sử; không tự đánh dấu hành khách đã lên xe | ChuyenXe, PhanCongChuyenXe, NhanVien, NhaXe/TuyenXe cho quyền; lịch sử không có Entity riêng | `chuyen_xe, phan_cong_chuyen_xe, nhan_vien, nha_xe, tuyen_xe`; `trip_lifecycle_history` | [TripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/TripServiceTest.java)<br>lifecycleRejectsInvalidStatesAndDoesNotDuplicateHistory; completingDoesNotMarkUninspectedPassengersAsBoarded |
+| Hủy chuyến, công việc hoàn/thông báo, báo cáo/thử lại | [FE chuyến](../../../members/LeNguyenThanhHien/frontend/src/trips/components/TripManagement.tsx) | `TripController.handleAction: huy/vong-doi/xu-ly-hoan` | `TripService.cancel/transition/cancelAffectedOrders/lifecycleReport/retryCancellationWork; HoanVeService và TripCancellationEmailDispatcher sau commit` | ChuyenXeRepository.lock; JPA khóa đơn/vé/giữ chỗ/thanh toán; native SQL ghi lịch sử, công việc, thông báo và đọc yêu cầu hoàn | ChuyenXe, DonDatVe, VeXe, GiuCho, ThanhToan; quyền qua TuyenXe/NhaXe. Các bảng công việc/lịch sử không có Entity riêng | `chuyen_xe, tuyen_xe, nha_xe, don_dat_ve, ve_xe, giu_cho, thanh_toan`; `trip_lifecycle_history, trip_cancellation_work, trip_cancellation_notification, refund_request` | [TripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/TripServiceTest.java)<br>cancellingReleasesHoldsWithoutAnOrderAndRequiresReason; assignedDriverCanOperateButCannotCancelOrOperateAnotherTrip |
+| Danh sách hành khách và vé | [FE hành khách](../../../members/LeNguyenThanhHien/frontend/src/trips/components/TripPassengerModal.tsx) | `RouteTripController.handleTrips: hanh-khach` | `TripPassengerService.list` | JPA trực tiếp find/JPQL lấy VeXe và kiểm tra phân công/quyền; HoanVeRepository.ticketBlocked truy vấn trạng thái hoàn bằng SQL | ChuyenXe, TuyenXe, NhaXe, Xe, PhanCongChuyenXe, NhanVien, VeXe; bảng hoàn qua SQL | `chuyen_xe, tuyen_xe, nha_xe, xe, phan_cong_chuyen_xe, nhan_vien, ve_xe, refund_request` | [TripServiceTest](../../../members/LeNguyenThanhHien/backend/src/test/java/com/datvexe/service/TripServiceTest.java)<br>Chưa có test chuyên biệt TripPassengerService trong 7 lớp test của thành viên; các test vòng đời không thay thế kiểm thử danh sách hành khách. |
+
+### Endpoint để lần theo Controller
+
+Mọi đường dẫn dưới đây có tiền tố `/api`. Request ghi chịu kiểm tra phiên, CSRF và phạm vi nhà xe theo cấu hình xác thực chung.
+
+| Nhóm | Endpoint chính |
+|---|---|
+| Tỉnh/bến/tuyến | `/tinh-thanh`, `/ben-xe`, `/tuyen-xe`; chi tiết `/{id}`; tuyến có `/tram-dau-cuoi`, `/trang-thai`, `/diem-dung` và `/diem-dung/sap-xep` |
+| Loại xe/xe/ghế | `/loai-xe`, `/xe`, `/xe/{id}/ghe`, `/xe/{id}/ghe/sinh`, `/xe/{id}/so-do-ghe` |
+| Quản lý chuyến | `/quan-ly/chuyen-xe`, `/quan-ly/chuyen-xe/{id}` |
+| Mở bán/vòng đời | `/quan-ly/chuyen-xe/{id}/dieu-kien-mo-ban`, `/mo-ban`, `/bat-dau`, `/hoan-thanh`, `/huy`, `/vong-doi`, `/xu-ly-hoan` (các hậu tố cùng thuộc chuyến quản lý) |
+| Công khai/tìm chuyến | `/chuyen-xe?from=…&to=…&date=YYYY-MM-DD`, `/chuyen-xe/{id}`, `/chuyen-xe/{id}/ghe` |
+| Hành khách có phân quyền | `/chuyen-xe/{id}/hanh-khach` |
+
+API công khai `/chuyen-xe` và API quản lý `/quan-ly/chuyen-xe` là hai luồng khác nhau.
+`RouteTripService` còn các thao tác tương thích cũ; giao diện quản lý hiện gọi `TripController`/`TripService`.
+API hủy công khai cũ bị từ chối và hướng sang API quản lý có lý do hủy.
+
+### Ánh xạ Entity → bảng
+
+Tất cả Entity ở bảng này nằm trong `Entities.java` dùng chung.
+
+| Entity | Bảng |
+|---|---|
+| TinhThanh / BenXe | `tinh_thanh` / `ben_xe` |
+| TuyenXe / DiemDung / ChuyenXe | `tuyen_xe` / `diem_dung` / `chuyen_xe` |
+| NhaXe / NhanVien / PhanCongChuyenXe | `nha_xe` / `nhan_vien` / `phan_cong_chuyen_xe` |
+| LoaiXe / Xe / Ghe | `loai_xe` / `xe` / `ghe` |
+| GiuCho / DonDatVe / VeXe / ThanhToan | `giu_cho` / `don_dat_ve` / `ve_xe` / `thanh_toan` |
+
+`trip_lifecycle_history`, `trip_cancellation_work`, `trip_cancellation_notification` được tạo trong
+[013_trip_lifecycle.sql](../../../database/migrations/013_trip_lifecycle.sql), thao tác bằng native SQL trong `TripService`.
+`refund_request` thuộc phần hoàn vé, được đọc khi lập báo cáo; không suy ra có Entity tương ứng trong `Entities.java`.
+
+### Test bổ sung và giới hạn
+
+- PostgreSQL thật: `PostgresTask10Test.fullLayoutSwapsLabelsAndRejectsBadLastEntryAtomically`,
+  `concurrentSamePlateAcrossTypesCreatesOnlyOneCompleteVehicle`;
+  `PostgresTripTest.realT11AssignmentCanPublishDraftAndDuplicateOpeningIsStable`,
+  `conflictingSimultaneousPublishSerializesUnderDatabaseLocks`, `failedPublishAndUpdateRollbackOnPostgres`;
+  `PostgresVehicleTest.concurrentAssignmentsCannotDoubleBookDriver`.
+- Các lớp PostgreSQL chỉ chạy khi có system property `vehicle.pg.url`; bỏ qua không được tính đạt.
+- HTTP tích hợp: `api_smoke.py`, `vehicle_management_smoke.py`, `trip_sale_smoke.py` ở danh mục dưới.
+  Dùng database kiểm thử riêng; không chạy fixture lên dữ liệu cần giữ.
+- Luồng hoàn tiền và email khi hủy phụ thuộc module của thành viên khác; test vòng đời không chứng minh
+  đã hoàn tiền qua ngân hàng hoặc gửi email thật.
+- Chưa tìm thấy test chuyên biệt cho danh sách hành khách trong phạm vi test của thành viên.
+- Xem [báo cáo kiểm thử](../testing/README.md) để biết kết quả lịch sử;
+  [sơ đồ nghiệp vụ](#so-do-nghiep-vu) để trình bày các nhánh thành công/thất bại.
+
+
+## Kiểm thử và cách trình bày
 
 ```bash
-pwd
-git status
-```
-
-**Kết quả mong đợi:** đường dẫn kết thúc bằng thư mục dự án; Git hiển thị trạng thái repository, không báo “not a git repository”.
-
-Nếu terminal đang ở `apps/frontend`, quay về gốc:
-
-```bash
-cd ../..
-```
-
-Không chạy `cd apps/frontend` lần nữa khi đã đứng trong thư mục frontend.
-
-### 2. Kiểm tra công cụ
-
-Mở Docker Desktop và đợi Docker sẵn sàng, sau đó chạy:
-
-```bash
-java -version
-javac -version
-mvn -version
-node -v
-npm -v
-docker compose version
-```
-
-**Kết quả mong đợi:**
-
-| Lệnh | Kết quả cần có |
-| --- | --- |
-| `java -version`, `javac -version` | Java/JDK 21 |
-| `mvn -version` | Maven hoạt động và dùng Java 21 |
-| `node -v` | Node từ 20.9 trở lên |
-| `npm -v` | Có số phiên bản |
-| `docker compose version` | Có phiên bản Compose |
-
-Nếu có “command not found”, cài công cụ tương ứng và mở lại terminal. Chỉ có `java` nhưng thiếu `javac` nghĩa là chưa có đủ JDK để build backend.
-
-### 3. Chuyển sang nhánh T13
-
-```bash
-git fetch origin
-git switch feat/t13-trip-search-availability
-git pull --ff-only origin feat/t13-trip-search-availability
-git branch --show-current
-```
-
-**Kết quả mong đợi:** dòng cuối là `feat/t13-trip-search-availability`; pull thành công hoặc báo `Already up to date`.
-
-Nếu máy chưa có nhánh local, dùng:
-
-```bash
-git switch --track origin/feat/t13-trip-search-availability
-```
-
-Nếu Git báo có thay đổi local cản chuyển nhánh/pull, giữ lại thay đổi đó trước khi tiếp tục. Không dùng reset để xóa công việc đang làm.
-
-### 4. Chạy kiểm thử backend và tạo WAR
-
-Tại thư mục gốc, chạy nhóm kiểm thử liên quan T13:
-
-```bash
-mvn -f apps/backend/pom.xml -Dtest=RouteTripServiceTest,TripServiceTest,VehicleTask10Test,AccessControlTest,OperatorServiceTest,HealthPolicyTest test
-```
-
-**Kết quả mong đợi:** `BUILD SUCCESS`, 66 test, `Failures: 0`, `Errors: 0`. Nhóm này kiểm tra nghiệp vụ bằng H2; không cần PostgreSQL đang chạy.
-
-Tiếp theo tạo WAR:
-
-```bash
-mvn -f apps/backend/pom.xml -DskipTests package
-```
-
-**Kết quả mong đợi:** `BUILD SUCCESS` và file:
-
-```text
-apps/backend/target/he-thong-dat-ve-xe-khach-0.1.0-SNAPSHOT.war
-```
-
-Ở lệnh thứ hai, test được bỏ qua vì vừa chạy nhóm test ở bước trước; nó không thay thế kiểm thử.
-
-### 5. Khởi động PostgreSQL và backend
-
-```bash
-docker compose up -d postgres backend
-docker compose ps
-```
-
-**Kết quả mong đợi:** PostgreSQL trạng thái `healthy`, backend đang chạy; cổng database thường là 5432 và backend là 8080.
-
-Nếu backend đã chạy trước khi build WAR mới:
-
-```bash
-docker compose restart backend
-```
-
-Đợi Tomcat triển khai xong rồi kiểm tra:
-
-```bash
-curl -i http://localhost:8080/api/health
-```
-
-**Kết quả mong đợi:** HTTP 200 và JSON có `"status":"UP"`, `"database":"UP"`; thứ tự hai trường có thể khác.
-
-Nếu chưa đạt, xem log:
-
-```bash
-docker compose logs --tail=100 backend
-docker compose logs --tail=50 postgres
-```
-
-Giữ volume database hiện tại; không chạy `docker compose down -v`. SQL seed chỉ tự chạy khi PostgreSQL khởi tạo volume mới. Pull code không tự chạy lại seed trên volume cũ.
-
-### 6. Kiểm tra dữ liệu thật trong database
-
-Không cần cài `psql` trên Windows. Chạy qua container:
-
-```bash
-docker compose exec postgres psql -U datvexe_user -d datvexe -c "SELECT 1;"
-```
-
-**Kết quả mong đợi:** một hàng có giá trị `1`. Nếu bạn đã đổi tên database/user trong cấu hình, thay hai giá trị trên cho đúng.
-
-Xem danh mục tỉnh/thành:
-
-```bash
-docker compose exec postgres psql -U datvexe_user -d datvexe -c "SELECT ma_tinh_thanh, ten_tinh_thanh FROM tinh_thanh ORDER BY ma_tinh_thanh;"
-```
-
-Xem các chuyến và tỉnh tương ứng:
-
-```bash
-docker compose exec postgres psql -U datvexe_user -d datvexe -c "SELECT c.ma_chuyen, bd.ma_tinh_thanh AS tinh_di, be.ma_tinh_thanh AS tinh_den, c.ngay_khoi_hanh, c.gio_khoi_hanh, c.gio_den_du_kien, c.trang_thai FROM chuyen_xe c JOIN tuyen_xe t ON t.ma_tuyen=c.ma_tuyen JOIN ben_xe bd ON bd.ma_ben_xe=t.tram_khoi_hanh JOIN ben_xe be ON be.ma_ben_xe=t.tram_den ORDER BY c.ngay_khoi_hanh,c.gio_khoi_hanh;"
-```
-
-**Kết quả mong đợi:** mã tỉnh đi/đến được lấy từ hai bến của tuyến; có ngày giờ riêng của mỗi chuyến. Ghi lại mã chuyến, mã tỉnh và ngày để dùng ở các bước sau.
-
-Các bản ghi `NHAP` hoặc `CHUA_KHOI_HANH` không tự xuất hiện như chuyến được đặt. T13 đọc PostgreSQL qua backend; dữ liệu SQL seed đã nạp và dữ liệu nhập bằng giao diện đều là bản ghi trong database.
-
-### 7. Chuẩn bị ít nhất một chuyến mở bán hợp lệ
-
-Nếu database đã có chuyến `DANG_MO_BAN` ở ngày tương lai và đủ điều kiện, dùng chuyến đó. Seed T11 cũng cung cấp sẵn một bộ chuyến đi-về để thử mở bán; `CX_6_1` được cấu hình làm chuyến TP. Hồ Chí Minh → Đà Lạt, xe `XE_006` và nhân viên cùng nhà xe. Chuyến này có một tài xế chính, một tài xế phụ, một phụ xe và tuyến về `CX_6_2` nối đúng bến. Trong database được seed mới, đây là dữ liệu kiểm thử có thể đủ điều kiện mở bán sau khi backend kiểm tra.
-
-#### Dữ liệu chạy dự án hiện tại
-
-Database chính là `datvexe`. Dùng ba seed khởi tạo và API T12 mở bán:
-
-```powershell
-docker compose up -d postgres
-python scripts/load_project_data.py --activate
-python tests/backend/project_data_check.py --check-reload
-```
-
-Xem [dữ liệu và tài khoản](../../../database/README.md#section-2). Mã chuyến hiện tại có dạng `CX_FUTA_1_YYYYMMDD_1`, ngày trong 14 ngày tới. Không dùng các mã CX_6_1/DEMO trong phần hồi quy dưới đây để kiểm tra database dự án mới.
-
-#### Seed hồi quy cũ — chỉ dùng database kiểm thử
-
-Docker chỉ tự chạy các file seed khi khởi tạo volume PostgreSQL lần đầu. Vì vậy pull code hoặc khởi động lại container không tự tạo `CX_6_1`. Các seed có phụ thuộc; không chạy riêng `006_t11_staff.sql` trước seed vận tải T06.
-
-Tại thư mục gốc repository, nếu các seed nền chưa có, nạp theo thứ tự:
-
-```bash
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/001_base.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/002_fleet.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/003_transport.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/005_alignment.sql
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U datvexe_user -d datvexe < tests/backend/fixtures/sql/006_staff.sql
-```
-
-Nếu đã xác nhận `001_demo.sql`, `002_fleet_demo.sql` và `005_t06_display_alignment.sql` có đủ dữ liệu, có thể chỉ cần chạy `003_t06_transport.sql` rồi `006_t11_staff.sql`. Ví dụ đang ở terminal `apps/frontend`, đường dẫn file lần lượt bắt đầu bằng `../../docs/...`.
-
-Các script seed dùng mã cố định và phần lớn bỏ qua bản ghi đã tồn tại; không xóa volume bằng `docker compose down -v`. Nếu một script báo lỗi, dừng tại đó, đọc lỗi và bổ sung đúng seed phụ thuộc trước khi chạy bước tiếp theo. `006_t11_staff.sql` nằm trong transaction; khi gặp lỗi giữa chừng, các thay đổi của lần chạy lỗi được rollback.
-
-Kiểm tra chuyến và ngày giờ thực tế trong database:
-
-```bash
-docker compose exec postgres psql -U datvexe_user -d datvexe -c "SELECT ma_chuyen, ma_tuyen, ma_xe, ngay_khoi_hanh, gio_khoi_hanh, gio_den_du_kien, trang_thai FROM chuyen_xe WHERE ma_chuyen='CX_6_1';"
-```
-
-**Kết quả mong đợi:** một dòng `CX_6_1`; ngày khởi hành là ngày nạp seed cộng một ngày trong lần nạp thành công đầu tiên, giờ đi `08:00`. Chạy lại seed không dời ngày của chuyến đã tồn tại. Nếu ngày này đã qua, chuyến không thể dùng để mở bán; hãy dùng chuyến tương lai khác hoặc tạo bộ dữ liệu kiểm thử có ngày tương lai.
-
-#### Mở bán `CX_6_1`
-
-1. Đảm bảo backend và frontend đang chạy theo các bước 5 và 8; đăng nhập tài khoản ADMIN hoặc NHA_XE có quyền quản lý.
-2. Mở **Quản lý → Chuyến xe và mở bán**. Bộ lọc trạng thái ban đầu có thể đang chọn **Đang mở bán**; đổi thành **Tất cả trạng thái** hoặc **Chưa mở bán (dữ liệu cũ)** rồi bấm **Lọc chuyến**.
-3. Tìm `CX_6_1`, chọn **Chi tiết / mở bán** và xem từng ô trong phần **Điều kiện mở bán**.
-4. Nếu tất cả điều kiện xanh, bấm **Mở bán chuyến**. Nếu có điều kiện đỏ, xử lý đúng nguyên nhân hiển thị. Không ép trạng thái bằng SQL.
-5. Nạp lại chi tiết hoặc danh sách và xác nhận trạng thái là **Đang mở bán**. Nếu chuyến bị từ chối, ghi lại lý do; dữ liệu hiện có trong database như lịch xe/nhân viên vẫn được Backend kiểm tra nên không thể khẳng định chuyến luôn hợp lệ ở mọi máy.
-
-**Kết quả mong đợi:** trong bộ seed T11 nguyên vẹn, lịch xe và nhân viên của `CX_6_1` được bố trí để nối đúng với chuyến về `CX_6_2`, và đã có đủ vai trò. Khi các dữ liệu liên quan còn hợp lệ và chuyến chưa quá hạn, quy tắc T12 cho phép mở bán. Chuyến seed ban đầu có trạng thái `CHUA_KHOI_HANH`, nên T13 chưa tìm thấy cho đến khi mở bán thành công.
-
-Nếu không có tài khoản quản trị, không có giao diện phân công nhân viên đầy đủ trong T11; xem [hướng dẫn T12](huong-dan-demo.md#section-2) và [API nhân viên T11](../../../docs/api/t11-quan-ly-nhan-vien-va-phan-cong.md) để chuẩn bị dữ liệu qua API. Không có tài khoản quản trị mặc định. Nếu cần tạo tài khoản kiểm thử quản trị trên database phát triển, làm theo [hướng dẫn T07](../../NguyenMinhHieu/docs/huong-dan-demo.md#section-1).
-
-Mặc định ngừng nhận đặt 60 phút trước khởi hành. Nên chọn chuyến ngày mai hoặc xa hơn để tránh hết hạn trong lúc kiểm tra. Xe/nhân viên cần có đăng kiểm, bằng lái và lịch vận hành hợp lệ cho ngày đó.
-
-### 8. Khởi động frontend
-
-Mở terminal thứ hai tại gốc dự án:
-
-```bash
-cd apps/frontend
-npm ci
+npm run typecheck
 npm run lint
 npm run build
-npm run dev
+mvn -B -f apps/backend/pom.xml -Dtest=RouteTripServiceTest,TripServiceTest,VehicleServiceTest,VehicleTask10Test test
 ```
 
-**Kết quả mong đợi:**
-
-- `npm ci`: cài dependency thành công.
-- `npm run lint`: kết thúc không có lỗi.
-- `npm run build`: thành công, có đường dẫn `/tim-chuyen` và `/tim-chuyen/[maChuyen]`.
-- `npm run dev`: thông báo địa chỉ frontend, mặc định `http://localhost:3000`.
-
-Giữ terminal này chạy. Nếu Node tự chọn cổng 3001 vì 3000 đã bị chiếm, dừng phiên frontend cũ và chạy lại trên 3000 để phù hợp cấu hình origin hiện tại.
-
-### 9. Kiểm tra danh mục và tìm kiếm trên giao diện
-
-1. Mở `http://localhost:3000/tim-chuyen` bằng trình duyệt.
-2. Không đăng nhập.
-3. Chọn tỉnh đi, tỉnh đến khác nhau theo dữ liệu đã xem ở bước 6.
-4. Chọn đúng **ngày khởi hành** của chuyến đã mở bán.
-5. Nhấn **Tìm kiếm**.
-
-**Kết quả mong đợi:** danh sách địa điểm lấy từ backend; trong lúc tải có thông báo tải; kết quả có nhà xe, bến đi/đến, giờ riêng của chuyến, loại xe, giá và số chỗ còn.
-
-Đối chiếu:
-
-| Thông tin | Nguồn cần khớp |
-| --- | --- |
-| Tỉnh đi/đến | Tỉnh của bến đầu/cuối tuyến |
-| Giờ khởi hành | `ChuyenXe.gioKhoiHanh` |
-| Ngày đến và giờ đến | `ChuyenXe.gioDenDuKien` |
-| Giá | Giá tuyến đang gán cho chuyến |
-| Chỗ còn | Ghế hoạt động, chưa bán và chưa có giữ hợp lệ của chuyến |
-
-### 10. Kiểm tra từng trường hợp tìm kiếm
-
-| Bước thực hiện | Kết quả mong đợi |
-| --- | --- |
-| Chọn cùng tỉnh đi và tỉnh đến rồi tìm | Thông báo dữ liệu không hợp lệ; không hiện như kết quả thành công |
-| Bỏ trống địa điểm/ngày bắt buộc | Form yêu cầu nhập/chọn trước khi gửi |
-| Chọn ngày không có chuyến mở bán | Thông báo không có chuyến phù hợp; không hiện lại chuyến của lần tìm trước |
-| Đổi cặp tỉnh hoặc ngày rồi tìm lại | URL và kết quả cập nhật theo lựa chọn mới |
-| Có nhiều chuyến cùng tuyến | Hiện đầy đủ các chuyến phù hợp, đúng giờ từng chuyến |
-| Dùng bộ lọc loại xe/nhà xe | Chỉ còn kết quả phù hợp bộ lọc |
-| Chọn sắp xếp giờ/giá/chỗ còn | Thứ tự thay đổi đúng tiêu chí |
-| Nhấn xóa bộ lọc | Checkbox và kết quả trở về trạng thái không lọc |
-
-Để kiểm tra mã tỉnh không tồn tại, dùng API ở bước 14 vì giao diện chỉ cho chọn danh mục hợp lệ.
-
-### 11. Kiểm tra trang chi tiết
-
-1. Tại một thẻ chuyến, nhấn **Xem chi tiết**.
-2. Kiểm tra URL dạng `/tim-chuyen/MÃ_CHUYẾN`.
-3. Đối chiếu mã chuyến, tuyến, nhà xe, loại xe, biển số, giá và chỗ còn với chuyến vừa chọn.
-4. Kiểm tra bến đầu/cuối và địa chỉ.
-5. Kiểm tra điểm dừng trung gian.
-
-**Kết quả mong đợi:** chuyển sang trang chi tiết ngay, không phải kéo xuống cuối danh sách tìm kiếm. Nếu không có điểm dừng, hiện thông báo không có điểm dừng trung gian; nếu có nhiều điểm, hiển thị theo thứ tự đã cấu hình.
-
-Thử mở URL với mã không tồn tại:
-
-```text
-http://localhost:3000/tim-chuyen/MA_KHONG_TON_TAI_T13
-```
-
-**Kết quả mong đợi:** thông báo không thể xem chi tiết và lý do từ backend; có liên kết quay lại tìm chuyến. API tương ứng trả 404.
-
-### 12. Kiểm tra chuyến qua đêm và trạng thái nhận đặt
-
-Chọn chuyến đã chuẩn bị có giờ đi 22:00, đến 05:00 hôm sau.
-
-**Kết quả mong đợi:** ngày khởi hành là ngày tìm kiếm; ngày đến là hôm sau. Không lấy giờ mặc định của tuyến thay giờ đi thực tế. Tìm theo ngày đến không trả chuyến này chỉ vì nó đến vào ngày đó.
-
-Kiểm tra trạng thái:
-
-| Dữ liệu chuyến | Kết quả mong đợi |
-| --- | --- |
-| Nháp/chưa mở bán/hủy | Không xuất hiện như chuyến đặt được trong kết quả |
-| Hết hạn nhận đặt | Không xuất hiện như chuyến đặt được; mở chi tiết hiện không còn nhận đặt |
-| Đang mở bán nhưng hết ghế | Có thể vẫn xem chuyến với trạng thái **Hết chỗ**, không chọn ghế thêm |
-| Đủ điều kiện và còn ghế | Hiện **Đang nhận đặt vé**, nút chọn ghế được bật |
-
-### 13. Kiểm tra số ghế và chọn ghế
-
-1. Mở chi tiết chuyến còn chỗ.
-2. Nhấn **Cập nhật chỗ còn**.
-3. Nhấn **Chọn ghế**.
-4. Chọn một ghế còn trống, rồi nhấn lại ghế đó để bỏ chọn.
-5. Thử ghế đã bán, đang giữ hoặc bảo trì nếu database có dữ liệu tương ứng.
-
-**Kết quả mong đợi:** cập nhật lấy dữ liệu mới; ghế trống chọn được và có hiệu ứng đang chọn; ghế không khả dụng bị vô hiệu hóa. Chọn trong T13 chưa tạo giữ chỗ. Khi cập nhật lại, lựa chọn cũ được xóa.
-
-Ca nghiệp vụ cần đối chiếu bằng dữ liệu kiểm thử:
-
-| Dữ liệu | Kết quả mong đợi |
-| --- | --- |
-| 20 ghế, 5 ghế bán, 3 ghế giữ hợp lệ, 2 ghế bảo trì; các nhóm không trùng | Còn 10 ghế |
-| A1 bán ở chuyến A, chưa bán/giữ ở chuyến B cùng xe | Không trừ A1 của chuyến B |
-| Lượt giữ vừa hết hạn | Chỗ còn tăng sau lần truy vấn mới |
-| Chỗ thay đổi sau khi tải kết quả | Mở chi tiết/cập nhật lấy trạng thái mới |
-| Hết toàn bộ chỗ | Hiện hết chỗ, không cho chọn thêm |
-
-Nếu module giữ ghế/bán vé chưa sẵn sàng, kiểm tra các ca động bằng test tự động. Không sửa Entity/schema hoặc tạo vé giả trên database đang dùng để thay nghiệm thu tích hợp.
-
-### 14. Kiểm tra API không cần đăng nhập
-
-Từ kết quả SQL ở bước 6, thay các giá trị trong dấu `<...>` bằng mã/ngày thật rồi bỏ dấu ngoặc:
+Bài kiểm tra FE giả lập API (cần frontend chạy, Playwright và Chromium có sẵn):
 
 ```bash
-curl -i "http://localhost:8080/api/chuyen-xe?from=CITY:<MA_TINH_DI>&to=CITY:<MA_TINH_DEN>&date=<YYYY-MM-DD>"
-curl -i "http://localhost:8080/api/chuyen-xe/<MA_CHUYEN>"
+node members/LeNguyenThanhHien/testing/frontend/management_smoke.cjs
 ```
 
-**Kết quả mong đợi:** HTTP 200, không yêu cầu cookie đăng nhập. Tìm kiếm trả array, chi tiết trả object. Danh sách rỗng là `[]`, không phải lỗi 500.
+Có thể đặt `FRONTEND_URL`, `CHROMIUM_PATH`. Bài này không đọc/ghi database và không thay thế integration test thật.
+Các bài PostgreSQL cần `vehicle.pg.url` và database fixture riêng. Test bỏ qua không được tính đạt.
+Báo cáo Maven ở `apps/backend/target/surefire-reports`; ma trận T10/T12/T13 và kết quả mới nhất ở
+[testing/README.md](../testing/README.md).
 
-Các lệnh sau chạy nguyên văn:
+Lần kiểm tra 21/10/2026: TypeScript, lint và ba nhóm trình duyệt với API/PostgreSQL thật đã đạt trong phạm vi ghi ở báo cáo.
+Verify toàn backend còn một lỗi deadlock H2 đã ghi nhận; build production FE bị proxy chặn Google Fonts.
+Không dùng kết quả đóng gói với `-DskipTests` để thay cho kết luận test đạt.
 
-```bash
-curl -i "http://localhost:8080/api/chuyen-xe/MA_KHONG_TON_TAI_T13"
-curl -i "http://localhost:8080/api/chuyen-xe?from=CITY:MA_TINH_KHONG_TON_TAI&to=CITY:MA_TINH_KHONG_TON_TAI&date=2030-01-01"
-curl -i "http://localhost:8080/api/chuyen-xe?from=CITY:ANY&to=CITY:OTHER&date=khong-phai-ngay"
-```
-
-**Kết quả mong đợi:** lần lượt 404, 400, 400; JSON có thông báo lỗi. Các mã không tồn tại chỉ là tham số để kiểm tra lỗi, không tạo dữ liệu vào database.
-
-### 15. Kiểm tra lỗi tải dữ liệu
-
-Trong terminal gốc:
-
-```bash
-docker compose stop backend
-```
-
-Quay lại trình duyệt, tải lại trang tìm chuyến hoặc gửi tìm kiếm mới.
-
-**Kết quả mong đợi:** thông báo không tải/tìm được dữ liệu; không hiện chuyến giả, không dùng kết quả cũ thay lần tìm mới, không coi lỗi API là kết quả không có chuyến.
-
-Khởi động lại:
-
-```bash
-docker compose start backend
-curl -i http://localhost:8080/api/health
-```
-
-Khi health đạt HTTP 200, thử tìm kiếm lại; dữ liệu phải tải bình thường.
-
-### 16. Những lỗi thường gặp
-
-| Lỗi | Cách xử lý |
-| --- | --- |
-| `npm ENOENT package.json` | Chạy npm trong `apps/frontend` |
-| `cd: apps/frontend: No such file` | Kiểm tra `pwd`; nếu đã ở frontend thì không cd thêm |
-| `psql: command not found` | Dùng `docker compose exec postgres psql ...` |
-| PostgreSQL trong container chạy nhưng Maven báo sai mật khẩu | Kiểm tra cấu hình JDBC của test trên máy; truy cập localhost có thể khác kết nối nội bộ container |
-| Backend 404 hoặc chạy code cũ | Kiểm tra WAR mới, build lại rồi restart backend |
-| Health HTTP 503 | Xem log backend/database và cấu hình kết nối |
-| Danh mục địa điểm trống | Kiểm tra API tỉnh/bến và database đã có dữ liệu hay chưa |
-| Có chuyến trong SQL nhưng tìm không thấy | Kiểm tra ngày khởi hành, tỉnh của bến, trạng thái mở bán, hạn đặt và toàn bộ điều kiện T12 |
-| `release version 21 not supported` | Cài JDK 21 và kiểm tra Java mà Maven đang dùng |
-
-### 17. Ghi kết quả nghiệm thu
-
-Ghi từng trường hợp: ngày kiểm tra, mã chuyến, tỉnh đi/đến, ngày đi, kết quả thực tế, đạt/chưa đạt, ảnh hoặc log nếu lỗi. Đối chiếu [ma trận T13](../testing/existing/t13-ma-tran-kiem-thu-tim-chuyen.md) và [API T13](../../../docs/api/t13-tim-chuyen-va-cho-con.md).
-
-Test tự động đã chạy trong môi trường phát triển: 66 test backend liên quan đạt; frontend lint/build đạt. Việc kiểm tra PostgreSQL, trình duyệt trên máy bạn và reviewer nghiệm thu là các bước cần ghi kết quả riêng.
-
-Để dừng frontend, nhấn **Ctrl+C** ở terminal đang chạy `npm run dev`. Nếu cần dừng dịch vụ Docker:
-
-```bash
-docker compose stop backend postgres
-```
-
-**Kết quả mong đợi:** dịch vụ dừng, dữ liệu database trong volume vẫn được giữ.
+Khi demo, chọn một luồng: thao tác trên giao diện → chỉ endpoint/payload → mở hàm Controller/Service →
+chỉ ra Entity/bảng và transaction → làm một trường hợp thành công, một trường hợp thất bại → mở test tương ứng.
+Ví dụ lỗi dữ liệu, sai quyền, thiếu điều kiện hoặc thao tác lặp lại phải được giải thích từ code thực tế.
