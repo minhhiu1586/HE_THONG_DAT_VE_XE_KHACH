@@ -7,11 +7,10 @@ import com.datvexe.domain.States.TrangThaiChinhSach;
 import com.datvexe.domain.States.TrangThaiDon;
 import com.datvexe.dto.ChinhSachHoanVeDto;
 import com.datvexe.security.AccountException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public final class ChinhSachHoanVeServiceTest {
     private static final AtomicInteger DATABASE_ID = new AtomicInteger();
-    private static final ObjectMapper JSON = new ObjectMapper();
 
     private EntityManagerFactory factory;
     private ChinhSachHoanVeService service;
@@ -73,6 +71,10 @@ public final class ChinhSachHoanVeServiceTest {
         assertEquals(2, page.totalItems());
         assertEquals(2, page.totalPages());
         assertEquals(1, page.items().size());
+
+        assertEquals(TrangThaiChinhSach.HOAT_DONG,
+                service.capNhatTrangThai("CS_FIRST", TrangThaiChinhSach.HOAT_DONG).trangThai());
+        assertEquals(TrangThaiChinhSach.TAM_NGUNG, service.chiTiet("CS_SECOND").trangThai());
     }
 
     @Test
@@ -91,12 +93,12 @@ public final class ChinhSachHoanVeServiceTest {
     }
 
     @Test
-    void rejectsInvalidPolicyValuesWithAccountErrors() {
-        assertEquals(400, assertThrows(AccountException.class,
+    void rejectsInvalidPolicyValues() {
+        assertEquals(400, assertThrows(DomainException.class,
                 () -> service.tao(request("BAD_RATE", null, "0", "100.001"))).status());
-        assertEquals(400, assertThrows(AccountException.class,
+        assertEquals(400, assertThrows(DomainException.class,
                 () -> service.tao(request("BAD_FEE", null, "1.5", "80"))).status());
-        assertEquals(400, assertThrows(AccountException.class,
+        assertEquals(400, assertThrows(DomainException.class,
                 () -> service.danhSach(1, 101)).status());
     }
 
@@ -133,18 +135,10 @@ public final class ChinhSachHoanVeServiceTest {
                 id,
                 "Hoàn vé 24 giờ",
                 24,
-                decimal(rate),
-                fee,
+                new BigDecimal(rate),
+                new BigDecimal(fee),
                 true,
                 status);
-    }
-
-    private static JsonNode decimal(String value) {
-        try {
-            return JSON.readTree(value);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     public static Long advisoryLock(Long key) {

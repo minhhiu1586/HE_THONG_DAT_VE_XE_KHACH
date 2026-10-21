@@ -2,7 +2,6 @@ package com.datvexe.dto;
 
 import com.datvexe.domain.Entities.ChinhSachHoanVe;
 import com.datvexe.domain.States.TrangThaiChinhSach;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,17 +11,15 @@ import java.util.Objects;
 public final class ChinhSachHoanVeDto {
     private ChinhSachHoanVeDto() {}
 
-    /** Percentage is a JSON number; the whole-VND fee is a decimal string. */
+    /** Percentage and whole-VND fee are JSON numbers. */
     public record Request(
             String maChinhSach,
             String tenChinhSach,
             Integer soGioToiThieuTruocKhoiHanh,
-            JsonNode tyLeHoan,
-            String phiHoan,
+            BigDecimal tyLeHoan,
+            BigDecimal phiHoan,
             Boolean choPhepHoanVeKhuyenMai,
             TrangThaiChinhSach trangThai) {}
-
-    public record StatusRequest(TrangThaiChinhSach trangThai) {}
 
     public record Response(
             String maChinhSach,

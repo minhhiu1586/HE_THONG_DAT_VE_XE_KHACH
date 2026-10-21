@@ -12,6 +12,41 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PriceCalculatorTest {
     @Test
+    void rebuildsFrozenPricesWithStableRemainderAllocation() {
+        PriceSummary summary = PriceCalculator.calculateFromFrozenTotals(
+                List.of("C", "A", "B"), new BigDecimal("300000"), new BigDecimal("10000"));
+        PriceSummary expected = PriceCalculator.calculate(List.of(
+                seat("A", "100000"), seat("B", "100000"), seat("C", "100000")),
+                new BigDecimal("10000"));
+        assertEquals(expected, summary);
+        assertEquals(List.of("3334", "3333", "3333"), discounts(summary));
+    }
+
+    @Test
+    void frozenPricesSupportMissingDiscountAndZeroTotal() {
+        PriceSummary noDiscount = PriceCalculator.calculateFromFrozenTotals(
+                List.of("A", "B"), new BigDecimal("200"), null);
+        assertEquals("200", noDiscount.tongThanhToan());
+        assertEquals(List.of("0", "0"), discounts(noDiscount));
+        PriceSummary zero = PriceCalculator.calculateFromFrozenTotals(
+                List.of("A", "B"), BigDecimal.ZERO, BigDecimal.ZERO);
+        assertEquals("0", zero.tongThanhToan());
+        assertEquals(List.of("0", "0"), discounts(zero));
+    }
+
+    @Test
+    void frozenTotalsMustDescribeWholeVndPricesAndUniqueSeats() {
+        assertThrows(IllegalArgumentException.class, () -> PriceCalculator.calculateFromFrozenTotals(
+                List.of(), BigDecimal.ZERO, BigDecimal.ZERO));
+        assertThrows(IllegalArgumentException.class, () -> PriceCalculator.calculateFromFrozenTotals(
+                List.of("A", "A"), new BigDecimal("200"), BigDecimal.ZERO));
+        assertThrows(IllegalArgumentException.class, () -> PriceCalculator.calculateFromFrozenTotals(
+                List.of("A"), new BigDecimal("100"), new BigDecimal("0.5")));
+        assertThrows(ArithmeticException.class, () -> PriceCalculator.calculateFromFrozenTotals(
+                List.of("A", "B"), new BigDecimal("101"), BigDecimal.ZERO));
+    }
+
+    @Test
     void allocatesUnequalPricesProportionally() {
         PriceSummary summary = PriceCalculator.calculate(List.of(
                 seat("A", "100000"), seat("B", "200000"), seat("C", "300000")),

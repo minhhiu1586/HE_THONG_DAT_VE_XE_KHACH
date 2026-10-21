@@ -2,7 +2,7 @@ package com.datvexe.dto;
 
 import com.datvexe.domain.States.LoaiGiam;
 import com.datvexe.domain.States.TrangThaiKhuyenMai;
-import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -10,19 +10,15 @@ import java.util.List;
 public final class KhuyenMaiDto {
     private KhuyenMaiDto() {}
 
-    /**
-     * Mã bắt buộc khi tạo; khi sửa, mã lấy từ URL.
-     * giaTriGiam: JSON number nếu PHAN_TRAM, chuỗi VND nếu SO_TIEN_CO_DINH.
-     * JsonNode giữ đúng kiểu JSON để service kiểm tra trước khi đổi sang BigDecimal.
-     */
+    /** Mã bắt buộc khi tạo; khi sửa, mã lấy từ URL. */
     public record Request(
             String maKhuyenMai,
             String tenKhuyenMai,
             String moTa,
             LoaiGiam loaiGiam,
-            JsonNode giaTriGiam,
-            String giamToiDa,
-            String donToiThieu,
+            BigDecimal giaTriGiam,
+            BigDecimal giamToiDa,
+            BigDecimal donToiThieu,
             Integer soLuong,
             OffsetDateTime ngayBatDau,
             OffsetDateTime ngayKetThuc) {}
@@ -32,9 +28,9 @@ public final class KhuyenMaiDto {
             String tenKhuyenMai,
             String moTa,
             LoaiGiam loaiGiam,
-            JsonNode giaTriGiam,
-            String giamToiDa,
-            String donToiThieu,
+            BigDecimal giaTriGiam,
+            BigDecimal giamToiDa,
+            BigDecimal donToiThieu,
             Integer soLuong,
             OffsetDateTime ngayBatDau,
             OffsetDateTime ngayKetThuc,

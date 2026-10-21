@@ -1,5 +1,6 @@
 package com.datvexe.service;
 
+import com.datvexe.config.Jpa;
 import com.datvexe.domain.Entities.PhuongThucThanhToan;
 import com.datvexe.domain.States.TrangThaiPhuongThuc;
 import com.datvexe.dto.PhuongThucThanhToanDto;
@@ -9,19 +10,13 @@ import com.datvexe.security.AccountException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityTransaction;
-import jakarta.persistence.PersistenceException;
 import java.util.List;
 
 /** Business rules and transactions for payment methods. */
 public final class PhuongThucThanhToanService {
-    private static final String PRIMARY_KEY = "phuong_thuc_thanh_toan_pkey";
     private static final String RESOURCE_CODE = "^[A-Za-z0-9_-]{1,40}$";
 
-    private final EntityManagerFactory factory;
-
-    public PhuongThucThanhToanService(EntityManagerFactory factory) {
-        this.factory = factory;
-    }
+    private final EntityManagerFactory factory = Jpa.factory();
 
     public List<PhuongThucThanhToanDto.Response> danhSach() {
         try (EntityManager em = factory.createEntityManager()) {
@@ -67,9 +62,13 @@ public final class PhuongThucThanhToanService {
             tx.begin();
             try {
                 AccessPolicy.guard(em);
-                String id = requiredCode(maPhuongThuc, "maPhuongThuc");
-                PhuongThucThanhToan paymentMethod = found(
-                        new PhuongThucThanhToanRepository(em).find(id));
+                kiemTraMa(maPhuongThuc);
+                PhuongThucThanhToan paymentMethod =
+                        new PhuongThucThanhToanRepository(em).find(maPhuongThuc);
+                if (paymentMethod == null) {
+                    throw new AccountException(
+                            404, "RESOURCE_NOT_FOUND", "Không tìm thấy phương thức thanh toán.");
+                }
                 PhuongThucThanhToanDto.Response result = toResponse(paymentMethod);
                 tx.commit();
                 return result;
@@ -81,44 +80,35 @@ public final class PhuongThucThanhToanService {
     }
 
     public PhuongThucThanhToanDto.Response tao(PhuongThucThanhToanDto.Request request) {
-        try {
-            try (EntityManager em = factory.createEntityManager()) {
-                EntityTransaction tx = em.getTransaction();
-                tx.begin();
-                try {
-                    AccessPolicy.guard(em);
-                    if (request == null) {
-                        throw AccountException.invalid("body", "Body không được để trống.");
-                    }
+        try (EntityManager em = factory.createEntityManager()) {
+            EntityTransaction tx = em.getTransaction();
+            tx.begin();
+            try {
+                AccessPolicy.guard(em);
+                kiemTraDuLieu(request);
+                kiemTraMa(request.maPhuongThuc());
 
-                    String id = requiredCode(request.maPhuongThuc(), "maPhuongThuc");
-                    String name = requiredText(request.tenPhuongThuc(), "tenPhuongThuc", 120);
-                    String description = optionalText(request.moTa(), "moTa", 1000);
-
-                    PhuongThucThanhToanRepository repository =
-                            new PhuongThucThanhToanRepository(em);
-                    if (repository.find(id) != null) {
-                        throw conflict();
-                    }
-
-                    PhuongThucThanhToan paymentMethod = new PhuongThucThanhToan();
-                    paymentMethod.maPhuongThuc = id;
-                    paymentMethod.tenPhuongThuc = name;
-                    paymentMethod.moTa = description;
-                    repository.save(paymentMethod);
-                    em.flush();
-
-                    PhuongThucThanhToanDto.Response result = toResponse(paymentMethod);
-                    tx.commit();
-                    return result;
-                } catch (RuntimeException e) {
-                    if (tx.isActive()) tx.rollback();
-                    throw e;
+                PhuongThucThanhToanRepository repository =
+                        new PhuongThucThanhToanRepository(em);
+                String id = request.maPhuongThuc();
+                if (repository.find(id) != null) {
+                    throw new AccountException(
+                            409, "CONFLICT", "Mã phương thức thanh toán đã tồn tại.");
                 }
+
+                PhuongThucThanhToan paymentMethod = new PhuongThucThanhToan();
+                paymentMethod.maPhuongThuc = id;
+                paymentMethod.tenPhuongThuc = request.tenPhuongThuc().strip();
+                paymentMethod.moTa = request.moTa() == null ? null : request.moTa().strip();
+                repository.save(paymentMethod);
+
+                PhuongThucThanhToanDto.Response result = toResponse(paymentMethod);
+                tx.commit();
+                return result;
+            } catch (RuntimeException e) {
+                if (tx.isActive()) tx.rollback();
+                throw e;
             }
-        } catch (PersistenceException e) {
-            if (isPaymentMethodPrimaryKeyViolation(e)) throw conflict();
-            throw e;
         }
     }
 
@@ -130,23 +120,21 @@ public final class PhuongThucThanhToanService {
             tx.begin();
             try {
                 AccessPolicy.guard(em);
-                String id = requiredCode(maPhuongThuc, "maPhuongThuc");
-                if (request == null) {
-                    throw AccountException.invalid("body", "Body không được để trống.");
-                }
+                kiemTraMa(maPhuongThuc);
+                kiemTraDuLieu(request);
                 if (request.maPhuongThuc() != null) {
-                    throw AccountException.invalid(
-                            "maPhuongThuc", "Khi sửa, mã chỉ lấy từ URL.");
+                    throw new DomainException(400, "Khi sửa, mã chỉ lấy từ URL.");
                 }
-
-                String name = requiredText(request.tenPhuongThuc(), "tenPhuongThuc", 120);
-                String description = optionalText(request.moTa(), "moTa", 1000);
 
                 PhuongThucThanhToanRepository repository =
                         new PhuongThucThanhToanRepository(em);
-                PhuongThucThanhToan paymentMethod = found(repository.lock(id));
-                paymentMethod.tenPhuongThuc = name;
-                paymentMethod.moTa = description;
+                PhuongThucThanhToan paymentMethod = repository.lock(maPhuongThuc);
+                if (paymentMethod == null) {
+                    throw new AccountException(
+                            404, "RESOURCE_NOT_FOUND", "Không tìm thấy phương thức thanh toán.");
+                }
+                paymentMethod.tenPhuongThuc = request.tenPhuongThuc().strip();
+                paymentMethod.moTa = request.moTa() == null ? null : request.moTa().strip();
 
                 PhuongThucThanhToanDto.Response result = toResponse(paymentMethod);
                 tx.commit();
@@ -166,14 +154,18 @@ public final class PhuongThucThanhToanService {
             tx.begin();
             try {
                 AccessPolicy.guard(em);
-                String id = requiredCode(maPhuongThuc, "maPhuongThuc");
+                kiemTraMa(maPhuongThuc);
                 if (trangThai == null) {
-                    throw AccountException.invalid("trangThai", "Trạng thái là bắt buộc.");
+                    throw new DomainException(400, "Trạng thái là bắt buộc.");
                 }
 
                 PhuongThucThanhToanRepository repository =
                         new PhuongThucThanhToanRepository(em);
-                PhuongThucThanhToan paymentMethod = found(repository.lock(id));
+                PhuongThucThanhToan paymentMethod = repository.lock(maPhuongThuc);
+                if (paymentMethod == null) {
+                    throw new AccountException(
+                            404, "RESOURCE_NOT_FOUND", "Không tìm thấy phương thức thanh toán.");
+                }
                 paymentMethod.capNhatTrangThai(trangThai);
 
                 PhuongThucThanhToanDto.Response result = toResponse(paymentMethod);
@@ -186,47 +178,31 @@ public final class PhuongThucThanhToanService {
         }
     }
 
-    private static String requiredText(String value, String field, int maxLength) {
+    private static void kiemTraMa(String value) {
         if (value == null || value.strip().isEmpty()) {
-            throw AccountException.invalid(field, "Trường này là bắt buộc.");
+            throw new DomainException(400, "Mã phương thức thanh toán là bắt buộc.");
         }
-
-        String result = value.strip();
-        if (result.length() > maxLength) {
-            throw AccountException.invalid(
-                    field, "Trường này tối đa " + maxLength + " ký tự.");
-        }
-        return result;
-    }
-
-    private static String requiredCode(String value, String field) {
-        String result = requiredText(value, field, 40);
         if (!value.matches(RESOURCE_CODE)) {
-            throw AccountException.invalid(
-                    field,
+            throw new DomainException(
+                    400,
                     "Mã chỉ được gồm chữ cái ASCII, chữ số, dấu gạch dưới hoặc dấu gạch ngang, "
                             + "dài từ 1 đến 40 ký tự.");
         }
-        return result;
     }
 
-    private static String optionalText(String value, String field, int maxLength) {
-        if (value == null) return null;
-
-        String result = value.strip();
-        if (result.length() > maxLength) {
-            throw AccountException.invalid(
-                    field, "Trường này tối đa " + maxLength + " ký tự.");
+    private static void kiemTraDuLieu(PhuongThucThanhToanDto.Request request) {
+        if (request == null) {
+            throw new DomainException(400, "Body không được để trống.");
         }
-        return result;
-    }
-
-    private static PhuongThucThanhToan found(PhuongThucThanhToan paymentMethod) {
-        if (paymentMethod == null) {
-            throw new AccountException(
-                    404, "RESOURCE_NOT_FOUND", "Không tìm thấy phương thức thanh toán.");
+        if (request.tenPhuongThuc() == null || request.tenPhuongThuc().strip().isEmpty()) {
+            throw new DomainException(400, "Trường tenPhuongThuc là bắt buộc.");
         }
-        return paymentMethod;
+        if (request.tenPhuongThuc().strip().length() > 120) {
+            throw new DomainException(400, "Trường tenPhuongThuc tối đa 120 ký tự.");
+        }
+        if (request.moTa() != null && request.moTa().strip().length() > 1000) {
+            throw new DomainException(400, "Trường moTa tối đa 1000 ký tự.");
+        }
     }
 
     private static PhuongThucThanhToanDto.Response toResponse(
@@ -236,21 +212,5 @@ public final class PhuongThucThanhToanService {
                 paymentMethod.tenPhuongThuc,
                 paymentMethod.moTa,
                 paymentMethod.trangThai);
-    }
-
-    private static AccountException conflict() {
-        return new AccountException(
-                409, "CONFLICT", "Mã phương thức thanh toán đã tồn tại.");
-    }
-
-    private static boolean isPaymentMethodPrimaryKeyViolation(Throwable error) {
-        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
-            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
-                    && "23505".equals(violation.getSQLState())
-                    && PRIMARY_KEY.equals(violation.getConstraintName())) {
-                return true;
-            }
-        }
-        return false;
     }
 }

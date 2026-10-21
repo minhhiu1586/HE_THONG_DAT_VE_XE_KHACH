@@ -9,7 +9,7 @@ import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.util.Set;
 
-/** Small HTTP helpers shared by the two refund servlet routes. */
+/** api cũ còn giữ lại, k ảnh hưởng tv khác */
 final class RefundHttp {
     private RefundHttp() {}
     private static final ObjectMapper JSON = new ObjectMapper().registerModule(new JavaTimeModule())

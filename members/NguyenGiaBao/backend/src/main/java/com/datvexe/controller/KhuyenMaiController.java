@@ -1,132 +1,89 @@
 package com.datvexe.controller;
 
-import com.datvexe.config.Jpa;
 import com.datvexe.domain.States.TrangThaiKhuyenMai;
 import com.datvexe.dto.KhuyenMaiDto;
-import com.datvexe.security.AccountException;
 import com.datvexe.service.DomainException;
 import com.datvexe.service.KhuyenMaiService;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.*;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.util.Set;
 
 @WebServlet(urlPatterns = {
+        "/api/khuyen-mai",
         "/api/quan-tri/khuyen-mai",
         "/api/quan-tri/khuyen-mai/*"
 })
 public class KhuyenMaiController extends HttpServlet {
 
-    private static final Set<String> FILTERS = Set.of(
-            "tuKhoa", "trangThai", "tuNgay", "denNgay", "page", "size"
-    );
-
     private final ObjectMapper json = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .disable(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
-            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     private KhuyenMaiService service;
 
     @Override
     public void init() {
-        service = new KhuyenMaiService(Jpa.factory());
+        service = new KhuyenMaiService();
     }
 
-    // Chặn method ngoài phạm vi; HttpServlet vẫn phân phối đến doGet/doPost...
-    @Override
-    protected void service(
-            HttpServletRequest request,
-            HttpServletResponse response)
-            throws ServletException, IOException {
-
-        switch (request.getMethod()) {
-            case "GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS" ->
-                    super.service(request, response);
-
-            default ->
-                    throw methodNotAllowed(response, maTuPath(request) == null);
-        }
-    }
 
     @Override
     protected void doGet(
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 
+        // GET /api/khuyen-mai
+        if ("/api/khuyen-mai".equals(request.getServletPath())) {
+            var result = service.danhSachCongKhai();
+            writeJson(response, 200, result);
+            return;
+        }
+
+        // GET /api/quan-tri/khuyen-mai
         String ma = maTuPath(request);
 
-        // GET /khuyen-mai/{ma}
         if (ma != null) {
-            kiemTraQuery(request, Set.of());
-
             writeJson(response, 200, service.chiTiet(ma));
             return;
         }
 
-        // GET /khuyen-mai
-        kiemTraQuery(request, FILTERS);
+        // GET /api/quan-tri/khuyen-mai?optional=[page, size, tuKhoa, trangThai, tuNgay, denNgay]
+        String tuKhoa = request.getParameter("tuKhoa");
+        String pageText = request.getParameter("page");
+        String sizeText = request.getParameter("size");
+        String trangThaiText = request.getParameter("trangThai");
+        String tuNgayText = request.getParameter("tuNgay");
+        String denNgayText = request.getParameter("denNgay");
 
-        int page;
-        int size;
-        TrangThaiKhuyenMai trangThai;
-        LocalDate tuNgay;
-        LocalDate denNgay;
+        int page = 1;
+        int size = 20;
+        TrangThaiKhuyenMai trangThai = null;
+        LocalDate tuNgay = null;
+        LocalDate denNgay = null;
 
         try {
-            page = Integer.parseInt(param(request, "page", "1"));
-            size = Integer.parseInt(param(request, "size", "20"));
+            if (pageText != null && !pageText.trim().isEmpty()) {page = Integer.parseInt(pageText);}
+            if (sizeText != null && !sizeText.trim().isEmpty()) {size = Integer.parseInt(sizeText);}
+            if (trangThaiText != null && !trangThaiText.trim().isEmpty()) {trangThai = TrangThaiKhuyenMai.valueOf(trangThaiText);}
+            if (tuNgayText != null && !tuNgayText.trim().isEmpty()) {tuNgay = LocalDate.parse(tuNgayText);}
+            if (denNgayText != null && !denNgayText.trim().isEmpty()) {denNgay = LocalDate.parse(denNgayText);}
 
-            String trangThaiValue = request.getParameter("trangThai");
-            trangThai = trangThaiValue == null
-                    ? null
-                    : TrangThaiKhuyenMai.valueOf(trangThaiValue);
-
-            String tuNgayValue = request.getParameter("tuNgay");
-            tuNgay = tuNgayValue == null ? null : LocalDate.parse(tuNgayValue);
-
-            String denNgayValue = request.getParameter("denNgay");
-            denNgay = denNgayValue == null ? null : LocalDate.parse(denNgayValue);
         } catch (IllegalArgumentException | DateTimeParseException e) {
-            throw AccountException.invalid(
-                    "query",
-                    "page, size, trạng thái hoặc ngày không đúng định dạng."
-            );
-        }
-
-        if (page < 1) {
-            throw AccountException.invalid("page", "page phải từ 1.");
-        }
-
-        if (size < 1 || size > 100) {
-            throw AccountException.invalid(
-                    "size", "size phải từ 1 đến 100.");
-        }
-
-        String tuKhoa = request.getParameter("tuKhoa");
-
-        if (tuKhoa != null && tuKhoa.length() > 200) {
-            throw AccountException.invalid("tuKhoa", "Từ khóa quá dài.");
-        }
-
-        if (tuNgay != null && denNgay != null && tuNgay.isAfter(denNgay)) {
-            throw AccountException.invalid(
-                    "denNgay", "denNgay phải từ tuNgay trở đi.");
+            throw new DomainException(400, "Tham số tìm kiếm sai định dạng.");
         }
 
         var result = service.danhSach(
@@ -135,37 +92,31 @@ public class KhuyenMaiController extends HttpServlet {
         writeJson(response, 200, result);
     }
 
+// POST /api/quan-tri/khuyen-mai
     @Override
     protected void doPost(
             HttpServletRequest request,
             HttpServletResponse response) throws IOException {
 
-        // POST chỉ được dùng trên đường dẫn danh sách.
         if (maTuPath(request) != null) {
-            throw methodNotAllowed(response, false);
+            response.setHeader("Allow", "GET, HEAD, PUT, DELETE, OPTIONS");
+            throw new DomainException(405, "Đường dẫn này không hỗ trợ POST.");
         }
 
-        kiemTraQuery(request, Set.of());
-
-        KhuyenMaiDto.Request input = readBody(request, true);
+        KhuyenMaiDto.Request input = readBody(request);
         KhuyenMaiDto.Response result = service.tao(input);
-
-        String encodedMa = URLEncoder.encode(
-                result.maKhuyenMai(),
-                StandardCharsets.UTF_8
-        ).replace("+", "%20");
 
         response.setHeader(
                 "Location",
                 request.getContextPath()
-                        + request.getServletPath()
-                        + "/"
-                        + encodedMa
+                        + "/api/quan-tri/khuyen-mai/"
+                        + result.maKhuyenMai()
         );
 
         writeJson(response, 201, result);
     }
 
+// PUT /api/quan-tri/khuyen-mai/{ma}
     @Override
     protected void doPut(
             HttpServletRequest request,
@@ -173,19 +124,18 @@ public class KhuyenMaiController extends HttpServlet {
 
         String ma = maTuPath(request);
 
-        // PUT phải có mã trên URL.
         if (ma == null) {
-            throw methodNotAllowed(response, true);
+            response.setHeader("Allow", "GET, HEAD, POST, OPTIONS");
+            throw new DomainException(405, "Đường dẫn này không hỗ trợ PUT.");
         }
 
-        kiemTraQuery(request, Set.of());
-
-        KhuyenMaiDto.Request input = readBody(request, false);
+        KhuyenMaiDto.Request input = readBody(request);
         KhuyenMaiDto.Response result = service.capNhat(ma, input);
 
         writeJson(response, 200, result);
     }
 
+// DELETE /api/quan-tri/khuyen-mai/{ma}
     @Override
     protected void doDelete(
             HttpServletRequest request,
@@ -194,15 +144,30 @@ public class KhuyenMaiController extends HttpServlet {
         String ma = maTuPath(request);
 
         if (ma == null) {
-            throw methodNotAllowed(response, true);
+            response.setHeader("Allow", "GET, HEAD, POST, OPTIONS");
+            throw new DomainException(405, "Đường dẫn này không hỗ trợ DELETE.");
         }
 
-        kiemTraQuery(request, Set.of());
-
         service.xoa(ma);
-
-        // 204 không có response body.
         response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+    }
+
+// helper
+    private KhuyenMaiDto.Request readBody(HttpServletRequest request)
+            throws IOException {
+
+        try {
+            KhuyenMaiDto.Request input = json.readValue(
+                    request.getInputStream(), KhuyenMaiDto.Request.class);
+
+            if (input == null) {
+                throw new DomainException(400, "Thiếu dữ liệu khuyến mãi.");
+            }
+
+            return input;
+        } catch (JsonProcessingException e) {
+            throw new DomainException(400, "JSON không hợp lệ.");
+        }
     }
 
     private String maTuPath(HttpServletRequest request) {
@@ -214,105 +179,11 @@ public class KhuyenMaiController extends HttpServlet {
 
         String ma = path.substring(1);
 
-        if (ma.isBlank() || ma.contains("/")) {
+        if (ma.trim().isEmpty() || ma.contains("/")) {
             throw new DomainException(404, "API không tồn tại.");
         }
 
-        if (ma.length() > 40) {
-            throw AccountException.invalid(
-                    "maKhuyenMai", "Mã tối đa 40 ký tự.");
-        }
-
         return ma;
-    }
-
-    private DomainException methodNotAllowed(
-            HttpServletResponse response,
-            boolean collection) {
-
-        response.setHeader(
-                "Allow",
-                collection
-                        ? "GET, HEAD, POST, OPTIONS"
-                        : "GET, HEAD, PUT, DELETE, OPTIONS"
-        );
-
-        return new DomainException(
-                405, "Phương thức không được hỗ trợ tại đường dẫn này.");
-    }
-
-    private void kiemTraQuery(
-            HttpServletRequest request,
-            Set<String> allowed) {
-
-        if (!allowed.containsAll(request.getParameterMap().keySet())) {
-            throw AccountException.invalid(
-                    "query", "Có tham số không được hỗ trợ.");
-        }
-    }
-
-    private String param(
-            HttpServletRequest request,
-            String name,
-            String defaultValue) {
-
-        String value = request.getParameter(name);
-        return value == null ? defaultValue : value;
-    }
-
-    private KhuyenMaiDto.Request readBody(
-            HttpServletRequest request,
-            boolean taoMoi) throws IOException {
-
-        try {
-            JsonNode body = json.readTree(request.getInputStream());
-
-            if (body == null || !body.isObject()) {
-                throw AccountException.invalid(
-                        "body", "Body phải là một JSON object.");
-            }
-
-            // PUT lấy mã từ URL, không nhận mã trong body, kể cả null.
-            if (!taoMoi && body.has("maKhuyenMai")) {
-                throw AccountException.invalid(
-                        "maKhuyenMai", "Khi sửa, mã chỉ lấy từ URL.");
-            }
-
-            // Tránh Jackson tự chuyển JSON number thành String.
-            for (String field : Set.of(
-                    "maKhuyenMai", "tenKhuyenMai", "moTa",
-                    "loaiGiam", "giamToiDa", "donToiThieu",
-                    "ngayBatDau", "ngayKetThuc")) {
-
-                JsonNode value = body.get(field);
-
-                if (value != null
-                        && !value.isNull()
-                        && !value.isTextual()) {
-
-                    throw AccountException.invalid(
-                            field, "Trường này phải là chuỗi.");
-                }
-            }
-
-            JsonNode soLuong = body.get("soLuong");
-
-            if (soLuong != null
-                    && !soLuong.isNull()
-                    && !soLuong.isIntegralNumber()) {
-
-                throw AccountException.invalid(
-                        "soLuong", "Số lượng phải là JSON số nguyên.");
-            }
-
-            return json.treeToValue(body, KhuyenMaiDto.Request.class);
-
-        } catch (JsonProcessingException e) {
-            throw AccountException.invalid(
-                    "body",
-                    "JSON sai định dạng, kiểu dữ liệu hoặc tên trường."
-            );
-        }
     }
 
     private void writeJson(
