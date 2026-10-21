@@ -17,10 +17,9 @@ Giá, khuyến mãi, thanh toán, phát hành vé, QR, email và hoàn tiền.
 | File |
 |---|
 | [ChinhSachHoanVeController.java](backend/src/main/java/com/datvexe/controller/ChinhSachHoanVeController.java) |
-| [HoanTienController.java](backend/src/main/java/com/datvexe/controller/HoanTienController.java) |
+| [HoanVeController.java](backend/src/main/java/com/datvexe/controller/HoanVeController.java) |
 | [KhuyenMaiController.java](backend/src/main/java/com/datvexe/controller/KhuyenMaiController.java) |
 | [PhuongThucThanhToanController.java](backend/src/main/java/com/datvexe/controller/PhuongThucThanhToanController.java) |
-| [PublicPromotionController.java](backend/src/main/java/com/datvexe/controller/PublicPromotionController.java) |
 | [RefundHttp.java](backend/src/main/java/com/datvexe/controller/RefundHttp.java) |
 | [ThanhToanController.java](backend/src/main/java/com/datvexe/controller/ThanhToanController.java) |
 | [VeXeController.java](backend/src/main/java/com/datvexe/controller/VeXeController.java) |
@@ -31,6 +30,7 @@ Giá, khuyến mãi, thanh toán, phát hành vé, QR, email và hoàn tiền.
 | [PhuongThucThanhToanDto.java](backend/src/main/java/com/datvexe/dto/PhuongThucThanhToanDto.java) |
 | [PricingDto.java](backend/src/main/java/com/datvexe/dto/PricingDto.java) |
 | [ThanhToanDto.java](backend/src/main/java/com/datvexe/dto/ThanhToanDto.java) |
+| [VeXeDto.java](backend/src/main/java/com/datvexe/dto/VeXeDto.java) |
 | [BrevoClient.java](backend/src/main/java/com/datvexe/email/BrevoClient.java) |
 | [EmailDispatcher.java](backend/src/main/java/com/datvexe/email/EmailDispatcher.java) |
 | [EmailWorker.java](backend/src/main/java/com/datvexe/email/EmailWorker.java) |
@@ -53,8 +53,11 @@ Giá, khuyến mãi, thanh toán, phát hành vé, QR, email và hoàn tiền.
 | [PhuongThucThanhToanService.java](backend/src/main/java/com/datvexe/service/PhuongThucThanhToanService.java) |
 | [PriceCalculator.java](backend/src/main/java/com/datvexe/service/PriceCalculator.java) |
 | [ThanhToanService.java](backend/src/main/java/com/datvexe/service/ThanhToanService.java) |
-| [TicketCode.java](backend/src/main/java/com/datvexe/service/TicketCode.java) |
+| [VeXeService.java](backend/src/main/java/com/datvexe/service/VeXeService.java) |
+| [TicketCode.java](backend/src/main/java/com/datvexe/ticket/TicketCode.java) |
 | [TicketQr.java](backend/src/main/java/com/datvexe/ticket/TicketQr.java) |
+| [HoanVeControllerTest.java](backend/src/test/java/com/datvexe/controller/HoanVeControllerTest.java) |
+| [VeXeControllerTest.java](backend/src/test/java/com/datvexe/controller/VeXeControllerTest.java) |
 | [BrevoClientTest.java](backend/src/test/java/com/datvexe/email/BrevoClientTest.java) |
 | [EmailDispatcherTest.java](backend/src/test/java/com/datvexe/email/EmailDispatcherTest.java) |
 | [ReceiptTemplateTest.java](backend/src/test/java/com/datvexe/email/ReceiptTemplateTest.java) |
@@ -64,6 +67,6 @@ Giá, khuyến mãi, thanh toán, phát hành vé, QR, email và hoàn tiền.
 | [HoanVeServicePostgresTest.java](backend/src/test/java/com/datvexe/service/HoanVeServicePostgresTest.java) |
 | [PriceCalculatorTest.java](backend/src/test/java/com/datvexe/service/PriceCalculatorTest.java) |
 | [ThanhToanServiceTest.java](backend/src/test/java/com/datvexe/service/ThanhToanServiceTest.java) |
-| [TicketCodeTest.java](backend/src/test/java/com/datvexe/service/TicketCodeTest.java) |
+| [TicketCodeTest.java](backend/src/test/java/com/datvexe/ticket/TicketCodeTest.java) |
 | [TicketQrTest.java](backend/src/test/java/com/datvexe/ticket/TicketQrTest.java) |
 | [PaymentReturnPage.tsx](frontend/src/payment/pages/PaymentReturnPage.tsx) |

@@ -1,12 +1,12 @@
-package com.datvexe.service;
+package com.datvexe.ticket;
 
 import jakarta.persistence.EntityManager;
 
 /** A unique, compact public reference, not an authorization or QR token. */
-final class TicketCode {
+public final class TicketCode {
     private static final String ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     private TicketCode() {}
-    static String next(EntityManager em) {
+    public static String next(EntityManager em) {
         long sequence = ((Number) em.createNativeQuery("select nextval('ticket_public_code_seq')").getSingleResult()).longValue();
         return encode(sequence);
     }

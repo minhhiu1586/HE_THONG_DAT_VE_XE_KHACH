@@ -6,6 +6,9 @@ import com.datvexe.domain.States.*;
 import com.datvexe.dto.BookingDto.PassengerRequest;
 import com.datvexe.dto.PricingDto.PriceLine;
 import com.datvexe.dto.ThanhToanDto;
+import com.datvexe.dto.VeXeDto;
+import com.datvexe.dto.HoanVeDto;
+import com.datvexe.repository.HoanVeRepository;
 import com.datvexe.payment.PaymentContextStore;
 import com.datvexe.payment.VNPayClient;
 import com.datvexe.security.AccountException;
@@ -47,6 +50,9 @@ class ThanhToanServiceTest {
                 "jakarta.persistence.jdbc.url", "jdbc:h2:mem:" + db + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
                 "jakarta.persistence.jdbc.user", "sa",
                 "jakarta.persistence.jdbc.password", "",
+                // H2 dùng cột text; chỉ thay cast JSONB trong fixture giả lập PostgreSQL.
+                "hibernate.session_factory.statement_inspector",
+                (org.hibernate.resource.jdbc.spi.StatementInspector) sql -> sql.replace("cast(? as jsonb)", "?"),
                 "hibernate.hbm2ddl.auto", "create-drop"));
         contexts = new PaymentContextStore(Clock.fixed(instant(CREATED), ZONE));
         inTransaction(RefundSchemaFixture::create);
@@ -58,6 +64,145 @@ class ThanhToanServiceTest {
     void tearDown() {
         RequestIdentity.clear();
         if (factory != null) factory.close();
+    }
+
+    @Test
+    void freePaymentCommitsTicketsAndReplaysWithoutIssuingAgain() {
+        prepareCreateFixture();
+        inTransaction(em -> {
+            PhuongThucThanhToan method = new PhuongThucThanhToan();
+            method.maPhuongThuc = "MIEN_PHI";
+            method.tenPhuongThuc = "Miễn phí";
+            method.trangThai = TrangThaiPhuongThuc.HOAT_DONG;
+            em.persist(method);
+            em.find(DonDatVe.class, ORDER_ID).tienGiam = BigDecimal.valueOf(300000);
+        });
+        ThanhToanService service = serviceAt(CREATED.plusMinutes(5));
+        var request = new ThanhToanDto.CreateRequest("MIEN_PHI");
+        List<PassengerRequest> passengers = List.of(passenger("A"), passenger("B"), passenger("C"));
+        var first = service.create(ORDER_ID, request, "free-key", passengers, "127.0.0.1");
+        var payment = (ThanhToanDto.PaymentResponse) first.body();
+        assertEquals(201, first.status());
+        assertEquals(TrangThaiThanhToan.THANH_CONG, payment.trangThai());
+        assertNotNull(contexts.get(payment.maGiaoDich()));
+        assertEquals(201, service.create(ORDER_ID, request, "free-key", passengers, "127.0.0.1").status());
+        inTransaction(em -> {
+            assertEquals(1L, em.createQuery("select count(t) from ThanhToan t", Long.class).getSingleResult());
+            assertEquals(3L, em.createQuery("select count(v) from VeXe v", Long.class).getSingleResult());
+            assertEquals(TrangThaiDon.DA_THANH_TOAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
+        });
+    }
+
+    @Test
+    void createAtDeadlineCommitsExpiryBeforeReturningError() {
+        prepareCreateFixture();
+        AccountException error = assertThrows(AccountException.class, () -> serviceAt(EXPIRES).create(
+                ORDER_ID, new ThanhToanDto.CreateRequest("VNPAY"), "expired-key",
+                List.of(passenger("A"), passenger("B"), passenger("C")), "127.0.0.1"));
+        assertEquals("HOLD_EXPIRED", error.code());
+        inTransaction(em -> {
+            assertEquals(TrangThaiDon.HET_HAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
+            assertEquals(3L, em.createQuery("select count(h) from GiuCho h where h.trangThai=:state", Long.class)
+                    .setParameter("state", TrangThaiGiuCho.HET_HAN).getSingleResult());
+            assertEquals(0L, em.createQuery("select count(t) from ThanhToan t", Long.class).getSingleResult());
+        });
+    }
+
+    @Test
+    void failedIdempotencySaveRollsBackFreePaymentAndTickets() {
+        prepareCreateFixture();
+        inTransaction(em -> {
+            PhuongThucThanhToan method = new PhuongThucThanhToan();
+            method.maPhuongThuc = "MIEN_PHI";
+            method.tenPhuongThuc = "Miễn phí";
+            method.trangThai = TrangThaiPhuongThuc.HOAT_DONG;
+            em.persist(method);
+            em.find(DonDatVe.class, ORDER_ID).tienGiam = BigDecimal.valueOf(300000);
+            em.createNativeQuery("ALTER TABLE api_idempotency ADD CONSTRAINT reject_result CHECK (status < 0)").executeUpdate();
+        });
+        assertThrows(jakarta.persistence.PersistenceException.class, () -> serviceAt(CREATED.plusMinutes(5)).create(
+                ORDER_ID, new ThanhToanDto.CreateRequest("MIEN_PHI"), "rollback-key",
+                List.of(passenger("A"), passenger("B"), passenger("C")), "127.0.0.1"));
+        inTransaction(em -> {
+            assertEquals(TrangThaiDon.CHO_THANH_TOAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
+            assertEquals(0L, em.createQuery("select count(t) from ThanhToan t", Long.class).getSingleResult());
+            assertEquals(0L, em.createQuery("select count(v) from VeXe v", Long.class).getSingleResult());
+            assertEquals(3L, em.createQuery("select count(h) from GiuCho h where h.trangThai=:state", Long.class)
+                    .setParameter("state", TrangThaiGiuCho.DANG_GIU).getSingleResult());
+        });
+    }
+
+    private void prepareCreateFixture() {
+        inTransaction(em -> {
+            em.remove(em.find(ThanhToan.class, PAYMENT_ID));
+            createIdempotencyTable(em);
+        });
+        setRequest("POST", "/api/booking/" + ORDER_ID + "/thanh-toan");
+    }
+
+    private void createIdempotencyTable(EntityManager em) {
+            em.createNativeQuery("CREATE ALIAS PG_TRY_ADVISORY_XACT_LOCK FOR 'com.datvexe.service.ThanhToanServiceTest$TestLocks.tryLock'").executeUpdate();
+            em.createNativeQuery("""
+                    CREATE TABLE api_idempotency (
+                        user_id varchar(40), method varchar(10), path varchar(255), request_key varchar(128),
+                        request_hash varchar(64), status integer, response_body text,
+                        created_at timestamp with time zone, expires_at timestamp with time zone,
+                        PRIMARY KEY(user_id, method, path, request_key))
+                    """).executeUpdate();
+    }
+
+    private void prepareRefundFixture() {
+        contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
+        serviceAt(CREATED.plusMinutes(5)).receive(success());
+        inTransaction(em -> {
+            ChinhSachHoanVe policy = new ChinhSachHoanVe();
+            policy.maChinhSach = "REFUND_POLICY";
+            policy.tenChinhSach = "Hoàn 80% trước 24 giờ";
+            policy.soGioToiThieuTruocKhoiHanh = 24;
+            policy.tyLeHoan = new BigDecimal("80");
+            policy.phiHoan = BigDecimal.ZERO;
+            policy.choPhepHoanVeKhuyenMai = true;
+            em.persist(policy);
+            em.find(DonDatVe.class, ORDER_ID).chinhSachHoanVe = policy;
+            var metadata = new com.datvexe.repository.PaymentGatewayMetadataRepository(em);
+            metadata.save(PAYMENT_ID, "TESTCODE", instant(CREATED));
+            metadata.confirmed(PAYMENT_ID, "ORIGINAL-VNPAY");
+            createIdempotencyTable(em);
+        });
+        setRequest("POST", "/api/booking/" + ORDER_ID + "/hoan-tien");
+    }
+
+    /** H2 thay thế hàm PostgreSQL; các ca này không kiểm thử tranh khóa. */
+    public static final class TestLocks {
+        public static boolean tryLock(long ignored) { return true; }
+    }
+
+    @Test
+    void paymentHistorySupportsOptionalStateFilterAndPagination() {
+        inTransaction(em -> {
+            ThanhToan failed = new ThanhToan();
+            failed.maGiaoDich = "PAYMENT_FAILED";
+            failed.donDatVe = em.find(DonDatVe.class, ORDER_ID);
+            failed.phuongThucThanhToan = em.find(PhuongThucThanhToan.class, "VNPAY");
+            failed.soTien = BigDecimal.valueOf(290000);
+            failed.trangThai = TrangThaiThanhToan.THAT_BAI;
+            em.persist(failed);
+        });
+        setRequest("GET", "/api/booking/" + ORDER_ID + "/thanh-toan");
+        ThanhToanService service = serviceAt(CREATED.plusMinutes(5));
+
+        var firstPage = service.history(ORDER_ID, 1, 1, null, "maGiaoDich,asc");
+        assertEquals(2, firstPage.totalItems());
+        assertEquals(2, firstPage.totalPages());
+        assertEquals(PAYMENT_ID, firstPage.items().getFirst().maGiaoDich());
+
+        var secondPage = service.history(ORDER_ID, 2, 1, null, "maGiaoDich,asc");
+        assertEquals("PAYMENT_FAILED", secondPage.items().getFirst().maGiaoDich());
+
+        var filtered = service.history(ORDER_ID, 1, 20, " that_bai ", "maGiaoDich,desc");
+        assertEquals(1, filtered.totalItems());
+        assertEquals(1, filtered.items().size());
+        assertEquals("PAYMENT_FAILED", filtered.items().getFirst().maGiaoDich());
     }
 
     @Test
@@ -183,14 +328,16 @@ class ThanhToanServiceTest {
     }
 
     @Test
-    void invalidPassengerSnapshotRollsBackPaymentAndTicketIssuance() {
+    void missingPassengerSnapshotKeepsCollectedPaymentForReconciliation() {
         contexts.put(attempt(List.of(passenger("A"), passenger("B"))));
         ThanhToanService service = serviceAt(CREATED.plusMinutes(5));
 
-        assertThrows(AccountException.class, () -> service.receive(success()));
+        var result = service.receive(success());
+        assertTrue(result.payment().canDoiSoat());
+        assertEquals(TrangThaiThanhToan.THANH_CONG, result.payment().trangThai());
 
         inTransaction(em -> {
-            assertEquals(TrangThaiThanhToan.CHO_XU_LY, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
+            assertEquals(TrangThaiThanhToan.THANH_CONG, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
             assertEquals(TrangThaiDon.CHO_THANH_TOAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
             assertEquals(0L, em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon=:id", Long.class)
                     .setParameter("id", ORDER_ID).getSingleResult());
@@ -252,6 +399,318 @@ class ThanhToanServiceTest {
     }
 
     @Test
+    void refundCommitsSendMarkerBeforeGatewayAndReplaysWithoutSendingTwice() {
+        prepareRefundFixture();
+        List<String> ticketIds;
+        try (EntityManager em = factory.createEntityManager()) {
+            ticketIds = em.createQuery("select v.maVe from VeXe v order by v.maVe", String.class)
+                    .setMaxResults(2).getResultList();
+        }
+        int[] calls = {0};
+        HoanVeService.Gateway gateway = new HoanVeService.Gateway() {
+            public String merchantCode() { return "TESTCODE"; }
+            public VNPayClient.RefundResult refund(VNPayClient.RefundCommand command) {
+                calls[0]++;
+                try (EntityManager em = factory.createEntityManager()) {
+                    var requests = new HoanVeRepository(em).forOrder(ORDER_ID);
+                    assertEquals(1, requests.size());
+                    assertTrue(requests.getFirst().history().stream()
+                            .anyMatch(history -> "GUI_CONG".equals(history.thaoTac())));
+                    assertEquals(command.requestId(), requests.getFirst().requestId());
+                }
+                return new VNPayClient.RefundResult(command.requestId(), command.originalReference(),
+                        command.amountVnd(), "00", "00", "REFUND-ONE", instant(CREATED), true);
+            }
+            public VNPayClient.RefundResult query(VNPayClient.RefundCommand command, String expected) {
+                throw new AssertionError("Không cần QueryDR trong luồng này.");
+            }
+        };
+        HoanVeService refunds = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), gateway);
+        var request = new HoanVeDto.Request(ticketIds, "Test hoàn nhiều vé");
+        var accepted = refunds.create(ORDER_ID, request, "refund-once", "127.0.0.1");
+        assertEquals(202, accepted.status());
+        HoanVeDto.Response snapshot = (HoanVeDto.Response) accepted.body();
+        assertEquals("CHO_XU_LY", snapshot.trangThai());
+        assertEquals("THANH_CONG", refunds.get(snapshot.maHoanTien()).trangThai());
+        var replay = refunds.create(ORDER_ID, request, "refund-once", "127.0.0.1");
+        assertEquals(HoanVeRepository.json(accepted.body()), HoanVeRepository.json(replay.body()));
+        assertEquals(1, calls[0]);
+        inTransaction(em -> {
+            DonDatVe order = (DonDatVe) org.hibernate.Hibernate.unproxy(em.find(DonDatVe.class, ORDER_ID));
+            for (String ticketId : ticketIds) {
+                assertEquals(TrangThaiVe.DA_HOAN, em.find(VeXe.class, ticketId).trangThai);
+            }
+            assertEquals(1L, em.createQuery("select count(v) from VeXe v where v.trangThai=:state", Long.class)
+                    .setParameter("state", TrangThaiVe.DA_XUAT_VE).getSingleResult());
+            assertEquals(TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
+            assertEquals(0, new BigDecimal("300000").compareTo(order.tongTien));
+            assertEquals(0, new BigDecimal("10000").compareTo(order.tienGiam));
+        });
+    }
+
+    @Test
+    void zeroRefundCompletesWithoutGatewayOrPaymentMetadata() {
+        prepareRefundFixture();
+        String ticketId = firstTicketId();
+        inTransaction(em -> {
+            em.find(ChinhSachHoanVe.class, "REFUND_POLICY").tyLeHoan = BigDecimal.ZERO;
+            em.createNativeQuery("delete from payment_gateway_metadata").executeUpdate();
+        });
+        HoanVeService refunds = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), null);
+        var accepted = refunds.create(ORDER_ID, new HoanVeDto.Request(List.of(ticketId), "Hoàn 0 đồng"),
+                "refund-zero", "127.0.0.1");
+        String id = ((HoanVeDto.Response) accepted.body()).maHoanTien();
+        assertEquals("THANH_CONG", refunds.get(id).trangThai());
+        assertEquals("0", refunds.get(id).soTienHoan());
+        inTransaction(em -> {
+            assertEquals(TrangThaiVe.DA_HOAN, em.find(VeXe.class, ticketId).trangThai);
+            assertEquals(TrangThaiThanhToan.THANH_CONG, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
+        });
+    }
+
+    @Test
+    void refundRejectsDuplicateAndBoardedTicketsAndPreservesDeadlineBoundary() {
+        prepareRefundFixture();
+        String ticketId = firstTicketId();
+        HoanVeService refunds = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), null);
+        var request = new HoanVeDto.Request(List.of(ticketId), "Kiểm tra điều kiện");
+        assertEquals(400, assertThrows(AccountException.class, () -> refunds.create(ORDER_ID,
+                new HoanVeDto.Request(List.of(ticketId, ticketId), "Trùng vé"),
+                "refund-duplicate", "127.0.0.1")).status());
+        inTransaction(em -> em.find(VeXe.class, ticketId).trangThai = TrangThaiVe.DA_LEN_XE);
+        assertEquals("REFUND_NOT_ALLOWED", assertThrows(AccountException.class,
+                () -> refunds.create(ORDER_ID, request, "refund-boarded", "127.0.0.1")).code());
+        inTransaction(em -> em.find(VeXe.class, ticketId).trangThai = TrangThaiVe.DA_XUAT_VE);
+        Instant deadline;
+        try (EntityManager em = factory.createEntityManager()) {
+            ChuyenXe trip = em.find(ChuyenXe.class, TRIP_ID);
+            deadline = LocalDateTime.of(trip.ngayKhoiHanh, trip.gioKhoiHanh)
+                    .atZone(ZONE).toInstant().minus(Duration.ofHours(24));
+        }
+        HoanVeService atDeadline = new HoanVeService(factory, Clock.fixed(deadline, ZONE), null);
+        assertFalse(atDeadline.preview(ORDER_ID, request).chiTiet().isEmpty());
+        HoanVeService tooLate = new HoanVeService(factory, Clock.fixed(deadline.plusNanos(1), ZONE), null);
+        assertEquals("REFUND_NOT_ALLOWED", assertThrows(AccountException.class,
+                () -> tooLate.create(ORDER_ID, request, "refund-too-late", "127.0.0.1")).code());
+        try (EntityManager em = factory.createEntityManager()) {
+            assertTrue(new HoanVeRepository(em).forOrder(ORDER_ID).isEmpty());
+        }
+    }
+
+    @Test
+    void confirmedRefundFailureKeepsTicketActiveAndAdminRetrySendsOnlyOnce() {
+        prepareRefundFixture();
+        String ticketId = firstTicketId();
+        int[] calls = {0};
+        HoanVeService.Gateway gateway = new HoanVeService.Gateway() {
+            public String merchantCode() { return "TESTCODE"; }
+            public VNPayClient.RefundResult refund(VNPayClient.RefundCommand command) {
+                calls[0]++;
+                try (EntityManager em = factory.createEntityManager()) {
+                    var entry = new HoanVeRepository(em).forOrder(ORDER_ID).getFirst();
+                    assertEquals(command.requestId(), entry.requestId());
+                    assertTrue(entry.history().stream().anyMatch(history ->
+                            "GUI_CONG".equals(history.thaoTac())
+                            && command.requestId().equals(history.maRequestCong())));
+                }
+                if (calls[0] == 1) {
+                    return new VNPayClient.RefundResult(command.requestId(), command.originalReference(),
+                            command.amountVnd(), "95", "09", "REFUND-FAILED", instant(CREATED), true);
+                }
+                return new VNPayClient.RefundResult(command.requestId(), command.originalReference(),
+                        command.amountVnd(), "00", "00", "REFUND-RETRY", instant(CREATED), true);
+            }
+            public VNPayClient.RefundResult query(VNPayClient.RefundCommand command, String expected) {
+                throw new AssertionError("Thất bại xác định không cần truy vấn lại.");
+            }
+        };
+        HoanVeService refunds = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), gateway);
+        var accepted = refunds.create(ORDER_ID, new HoanVeDto.Request(List.of(ticketId), "Thất bại rồi thử lại"),
+                "refund-failed", "127.0.0.1");
+        String id = ((HoanVeDto.Response) accepted.body()).maHoanTien();
+        assertEquals("THAT_BAI", refunds.get(id).trangThai());
+        inTransaction(em -> {
+            assertEquals(TrangThaiVe.DA_XUAT_VE, em.find(VeXe.class, ticketId).trangThai);
+            assertEquals(TrangThaiThanhToan.THANH_CONG, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
+        });
+        assertEquals(403, assertThrows(AccountException.class,
+                () -> refunds.retry(id, "customer-retry", "127.0.0.1")).status());
+        inTransaction(em -> em.find(NguoiDung.class, USER_ID).loaiTaiKhoan = LoaiTaiKhoan.ADMIN);
+        RequestIdentity.set(new RequestIdentity.Context(
+                new CurrentUser(USER_ID, LoaiTaiKhoan.ADMIN, null, null, SESSION_ID),
+                "POST", "/api/hoan-tien/" + id + "/thu-lai", null));
+        var retried = refunds.retry(id, "admin-retry", "127.0.0.1");
+        assertEquals("THANH_CONG", refunds.get(id).trangThai());
+        var replay = refunds.retry(id, "admin-retry", "127.0.0.1");
+        assertEquals(HoanVeRepository.json(retried.body()), HoanVeRepository.json(replay.body()));
+        assertEquals(2, calls[0]);
+    }
+
+    @Test
+    void uncertainRefundVerifiesWithoutSendingAnotherRefund() {
+        prepareRefundFixture();
+        String ticketId = firstTicketId();
+        int[] refundsAndQueries = {0, 0};
+        HoanVeService.Gateway gateway = new HoanVeService.Gateway() {
+            public String merchantCode() { return "TESTCODE"; }
+            public VNPayClient.RefundResult refund(VNPayClient.RefundCommand command) {
+                refundsAndQueries[0]++;
+                throw new AccountException(502, "PAYMENT_PROVIDER_UNAVAILABLE", "Timeout");
+            }
+            public VNPayClient.RefundResult query(VNPayClient.RefundCommand command, String expected) {
+                refundsAndQueries[1]++;
+                return new VNPayClient.RefundResult(command.requestId(), command.originalReference(),
+                        command.amountVnd(), "00", "00", "REFUND-RECOVERED", instant(CREATED), true);
+            }
+        };
+        HoanVeService service = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), gateway);
+        var accepted = service.create(ORDER_ID, new HoanVeDto.Request(List.of(ticketId), "Timeout"),
+                "refund-timeout", "127.0.0.1");
+        String id = ((HoanVeDto.Response) accepted.body()).maHoanTien();
+        assertEquals("CAN_DOI_SOAT", service.get(id).trangThai());
+        HoanVeService restarted = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5).plusSeconds(31)), ZONE), gateway);
+        assertEquals("THANH_CONG", restarted.verify(id, "127.0.0.1").trangThai());
+        assertEquals(1, refundsAndQueries[0]);
+        assertEquals(1, refundsAndQueries[1]);
+    }
+
+    @Test
+    void savedRefundEvidenceRecoversAfterTicketUpdateFailureWithoutCallingGatewayAgain() {
+        prepareRefundFixture();
+        String ticketId = firstTicketId();
+        inTransaction(em -> em.createNativeQuery(
+                "ALTER TABLE ve_xe ADD CONSTRAINT reject_refunded_ticket CHECK (trang_thai <> 'DA_HOAN')")
+                .executeUpdate());
+        int[] calls = {0};
+        HoanVeService.Gateway gateway = new HoanVeService.Gateway() {
+            public String merchantCode() { return "TESTCODE"; }
+            public VNPayClient.RefundResult refund(VNPayClient.RefundCommand command) {
+                calls[0]++;
+                return new VNPayClient.RefundResult(command.requestId(), command.originalReference(),
+                        command.amountVnd(), "00", "00", "REFUND-EVIDENCE", instant(CREATED), true);
+            }
+            public VNPayClient.RefundResult query(VNPayClient.RefundCommand command, String expected) {
+                throw new AssertionError("Đã có bằng chứng thành công, không gọi cổng lại.");
+            }
+        };
+        HoanVeService service = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), gateway);
+        var accepted = service.create(ORDER_ID, new HoanVeDto.Request(List.of(ticketId), "DB failure"),
+                "refund-evidence", "127.0.0.1");
+        String id = ((HoanVeDto.Response) accepted.body()).maHoanTien();
+        assertEquals("CAN_DOI_SOAT", service.get(id).trangThai());
+        inTransaction(em -> {
+            var entry = new HoanVeRepository(em).find(id);
+            assertTrue(entry.history().stream().anyMatch(history -> "DA_XAC_MINH_CONG".equals(history.thaoTac())));
+            assertEquals(TrangThaiVe.DA_XUAT_VE, em.find(VeXe.class, ticketId).trangThai);
+            em.createNativeQuery("ALTER TABLE ve_xe DROP CONSTRAINT reject_refunded_ticket").executeUpdate();
+        });
+        HoanVeService restarted = new HoanVeService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5).plusSeconds(31)), ZONE), gateway);
+        assertEquals("THANH_CONG", restarted.verify(id, "127.0.0.1").trangThai());
+        assertEquals(1, calls[0]);
+    }
+
+    @Test
+    void refundReadsKeepHistoryPolicyAndQrBlocking() {
+        contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
+        serviceAt(CREATED.plusMinutes(5)).receive(success());
+        String ticketId = firstTicketId();
+        inTransaction(em -> em.createNativeQuery("""
+                        insert into refund_request (
+                            ma_hoan_tien, ma_don, ma_giao_dich_goc, ma_nguoi_yeu_cau,
+                            so_tien_hoan, trang_thai, chi_tiet, lich_su, loai_hoan_toan_phan, created_at)
+                        values ('REFUND_READ', :order, :payment, :user, 100, 'THAT_BAI',
+                            :lines, :history, false, :created)
+                        """)
+                .setParameter("order", ORDER_ID)
+                .setParameter("payment", PAYMENT_ID)
+                .setParameter("user", USER_ID)
+                .setParameter("lines", HoanVeRepository.json(List.of(
+                        new HoanVeDto.Line(ticketId, "96666", "80", "0", "100"))))
+                .setParameter("history", "[]")
+                .setParameter("created", instant(CREATED))
+                .executeUpdate());
+        Clock clock = Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE);
+        HoanVeService refunds = new HoanVeService(factory, clock, null);
+        setRequest("GET", "/api/hoan-tien/REFUND_READ");
+        HoanVeDto.Response detail = refunds.get("REFUND_READ");
+        assertEquals("THAT_BAI", detail.trangThai());
+        assertEquals("100", detail.soTienHoan());
+        assertNotNull(detail.thoiDiemTao());
+        var history = refunds.history(ticketId, 1, 20, null);
+        assertEquals(1, history.totalItems());
+        assertEquals("REFUND_READ", history.items().getFirst().maHoanTien());
+        assertTrue(refunds.history(ticketId, 2, 20, null).items().isEmpty());
+        assertFalse(refunds.policy(ticketId).duocYeuCauHoan());
+        AccountException missingPolicy = assertThrows(AccountException.class, () -> refunds.preview(
+                ORDER_ID, new HoanVeDto.Request(List.of(ticketId), "Test")));
+        assertEquals("REFUND_POLICY_MISSING", missingPolicy.code());
+
+        inTransaction(em -> em.createNativeQuery(
+                        "update refund_request set trang_thai='CAN_DOI_SOAT' where ma_hoan_tien='REFUND_READ'")
+                .executeUpdate());
+        VeXeDto.Response ticket = new VeXeService(factory, clock).chiTiet(ticketId);
+        assertTrue(ticket.dangHoan());
+        assertNull(ticket.qrToken());
+        RequestIdentity.clear();
+        assertEquals(401, assertThrows(AccountException.class, () -> refunds.get("REFUND_READ")).status());
+    }
+
+    @Test
+    void ticketOwnerCanReadActiveQrAndAnonymousRequestIsRejected() {
+        contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
+        serviceAt(CREATED.plusMinutes(5)).receive(success());
+        String ticketId = firstTicketId();
+        VeXeService tickets = new VeXeService(factory, Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE));
+        setRequest("GET", "/api/ve-xe/" + ticketId);
+        VeXeDto.Response result = tickets.chiTiet(ticketId);
+        assertEquals(ticketId, result.maVe());
+        assertNotNull(result.qrToken());
+        assertEquals("100000", result.giaGoc());
+        RequestIdentity.clear();
+        AccountException error = assertThrows(AccountException.class, () -> tickets.chiTiet(ticketId));
+        assertEquals(401, error.status());
+    }
+
+    @Test
+    void anotherCustomerCannotReadTicket() {
+        contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
+        serviceAt(CREATED.plusMinutes(5)).receive(success());
+        String ticketId = firstTicketId();
+        inTransaction(em -> {
+            NguoiDung other = new NguoiDung();
+            other.maNguoiDung = "OTHER";
+            other.hoTen = "Other customer";
+            other.email = "other@example.test";
+            other.soDienThoai = "0900000001";
+            other.matKhau = "hash";
+            other.loaiTaiKhoan = LoaiTaiKhoan.KHACH_HANG;
+            other.trangThai = TrangThaiTaiKhoan.HOAT_DONG;
+            em.persist(other);
+            AuthSession session = new AuthSession();
+            session.tokenHash = "OTHER_SESSION";
+            session.csrfToken = "CSRF";
+            session.nguoiDung = other;
+            session.taoLuc = instant(CREATED);
+            session.hetHan = instant(CREATED.plusDays(1));
+            em.persist(session);
+        });
+        RequestIdentity.set(new RequestIdentity.Context(
+                new CurrentUser("OTHER", LoaiTaiKhoan.KHACH_HANG, null, null, "OTHER_SESSION"),
+                "GET", "/api/ve-xe/" + ticketId, null));
+        VeXeService tickets = new VeXeService(factory, Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE));
+        AccountException error = assertThrows(AccountException.class, () -> tickets.chiTiet(ticketId));
+        assertEquals(403, error.status());
+    }
+
+    @Test
     void ticketReadKeepsOriginalFareAfterRoutePriceChangesAndCountsRefundedTicket() {
         contexts.put(attempt(List.of(passenger("A"), passenger("B"), passenger("C"))));
         ThanhToanService service = serviceAt(CREATED.plusMinutes(5));
@@ -266,7 +725,8 @@ class ThanhToanServiceTest {
         });
         setRequest("GET", "/api/ve-xe/" + ticketId);
 
-        ThanhToanDto.TicketResponse response = service.ticket(ticketId);
+        VeXeDto.Response response = new VeXeService(
+                factory, Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE)).chiTiet(ticketId);
 
         assertEquals("100000", response.giaGoc());
         assertEquals("96666", response.thanhTien());
@@ -274,6 +734,63 @@ class ThanhToanServiceTest {
         assertEquals(TrangThaiVe.DA_HOAN, response.trangThai());
         assertNull(response.qrToken(), "Refunded tickets must not expose a usable QR token");
         assertFalse(response.dangHoan());
+    }
+
+    @Test
+    void adminAndOperatorCanReadPaymentButCannotVerifyIt() {
+        FakeGateway gateway = new FakeGateway();
+        ThanhToanService service = new ThanhToanService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), contexts, gateway);
+
+        for (LoaiTaiKhoan role : List.of(LoaiTaiKhoan.ADMIN, LoaiTaiKhoan.NHA_XE)) {
+            inTransaction(em -> {
+                NguoiDung user = em.find(NguoiDung.class, USER_ID);
+                user.loaiTaiKhoan = role;
+                user.nhaXe = em.find(NhaXe.class, "OP");
+            });
+            RequestIdentity.set(new RequestIdentity.Context(
+                    new CurrentUser(USER_ID, role, "OP", null, SESSION_ID),
+                    "POST", "/api/thanh-toan/" + PAYMENT_ID + "/xac-minh", null));
+
+            assertEquals(PAYMENT_ID, service.get(PAYMENT_ID).maGiaoDich());
+            assertEquals(403, assertThrows(AccountException.class,
+                    () -> service.verify(PAYMENT_ID, "127.0.0.1")).status());
+        }
+        assertNull(gateway.queryCreatedAt, "Không gọi cổng khi người dùng sai quyền xác minh.");
+    }
+
+    @Test
+    void paymentReadAndVerifyKeepOwnerAuthenticationAndNotFoundChecks() {
+        FakeGateway gateway = new FakeGateway();
+        ThanhToanService service = new ThanhToanService(factory,
+                Clock.fixed(instant(CREATED.plusMinutes(5)), ZONE), contexts, gateway);
+        setRequest("GET", "/api/thanh-toan/" + PAYMENT_ID);
+        assertEquals(PAYMENT_ID, service.get(PAYMENT_ID).maGiaoDich());
+
+        inTransaction(em -> {
+            NguoiDung owner = new NguoiDung();
+            owner.maNguoiDung = "OTHER_OWNER";
+            owner.hoTen = "Other owner";
+            owner.email = "owner@example.test";
+            owner.soDienThoai = "0900000001";
+            owner.matKhau = "hash";
+            owner.loaiTaiKhoan = LoaiTaiKhoan.KHACH_HANG;
+            owner.trangThai = TrangThaiTaiKhoan.HOAT_DONG;
+            em.persist(owner);
+            em.find(DonDatVe.class, ORDER_ID).nguoiDat = owner;
+        });
+        assertEquals(403, assertThrows(AccountException.class, () -> service.get(PAYMENT_ID)).status());
+        assertEquals(403, assertThrows(AccountException.class,
+                () -> service.verify(PAYMENT_ID, "127.0.0.1")).status());
+        assertEquals(404, assertThrows(AccountException.class, () -> service.get("MISSING")).status());
+        assertEquals(404, assertThrows(AccountException.class,
+                () -> service.verify("MISSING", "127.0.0.1")).status());
+
+        RequestIdentity.clear();
+        assertEquals(401, assertThrows(AccountException.class, () -> service.get(PAYMENT_ID)).status());
+        assertEquals(401, assertThrows(AccountException.class,
+                () -> service.verify(PAYMENT_ID, "127.0.0.1")).status());
+        assertNull(gateway.queryCreatedAt);
     }
 
     @Test
@@ -348,7 +865,7 @@ class ThanhToanServiceTest {
     }
 
     @Test
-    void sameAmountButWrongContextRollsBackPaymentFinalization() {
+    void wrongContextKeepsCollectedPaymentForReconciliation() {
         PaymentContextStore.Attempt wrongOrderContext = new PaymentContextStore.Attempt(
                 PAYMENT_ID, "OTHER_ORDER", USER_ID, "VNPAY", BigDecimal.valueOf(290000),
                 instant(CREATED), instant(EXPIRES), instant(EXPIRES.plusHours(24)),
@@ -357,13 +874,60 @@ class ThanhToanServiceTest {
                 attempt(List.of(passenger("A"), passenger("B"), passenger("C"))).chiTietGia());
         contexts.put(wrongOrderContext);
 
-        assertThrows(AccountException.class, () -> serviceAt(CREATED.plusMinutes(5)).receive(success()));
+        var result = serviceAt(CREATED.plusMinutes(5)).receive(success());
+        assertTrue(result.payment().canDoiSoat());
+        assertEquals(TrangThaiThanhToan.THANH_CONG, result.payment().trangThai());
 
         inTransaction(em -> {
-            assertEquals(TrangThaiThanhToan.CHO_XU_LY, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
+            assertEquals(TrangThaiThanhToan.THANH_CONG, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
             assertEquals(TrangThaiDon.CHO_THANH_TOAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
             assertEquals(0L, em.createQuery("select count(v) from VeXe v where v.donDatVe.maDon=:id", Long.class)
                     .setParameter("id", ORDER_ID).getSingleResult());
+        });
+    }
+
+    @Test
+    void missingPriceSnapshotKeepsPaymentForReconciliationWithoutIssuingTickets() {
+        List<PassengerRequest> passengers = List.of(passenger("A"), passenger("B"), passenger("C"));
+        PaymentContextStore.Attempt original = attempt(passengers);
+        contexts.put(new PaymentContextStore.Attempt(
+                original.maGiaoDich(), original.maDon(), original.userId(), original.maPhuongThuc(),
+                original.soTien(), original.createdAt(), original.expiresAt(), original.storedUntil(),
+                original.clientIp(), original.urlThanhToan(), original.maGhe(), passengers, List.of()));
+        ThanhToanService service = serviceAt(CREATED.plusMinutes(5));
+        var first = service.receive(success());
+        assertTrue(first.payment().canDoiSoat());
+        assertEquals(TrangThaiThanhToan.THANH_CONG, first.payment().trangThai());
+        assertTrue(service.receive(success()).duplicate());
+        inTransaction(em -> {
+            assertEquals(TrangThaiThanhToan.THANH_CONG, em.find(ThanhToan.class, PAYMENT_ID).trangThai);
+            assertEquals(TrangThaiDon.CHO_THANH_TOAN, em.find(DonDatVe.class, ORDER_ID).trangThai);
+            assertEquals(0L, em.createQuery("select count(v) from VeXe v", Long.class).getSingleResult());
+        });
+    }
+
+    @Test
+    void issuanceUsesSavedAllocationInsteadOfRecalculatingRemainder() {
+        List<PassengerRequest> passengers = List.of(passenger("A"), passenger("B"), passenger("C"));
+        PaymentContextStore.Attempt original = attempt(passengers);
+        List<PriceLine> savedPrices = List.of(
+                new PriceLine("A", "100000", "3333", "96667"),
+                new PriceLine("B", "100000", "3334", "96666"),
+                new PriceLine("C", "100000", "3333", "96667"));
+        contexts.put(new PaymentContextStore.Attempt(
+                original.maGiaoDich(), original.maDon(), original.userId(), original.maPhuongThuc(),
+                original.soTien(), original.createdAt(), original.expiresAt(), original.storedUntil(),
+                original.clientIp(), original.urlThanhToan(), original.maGhe(), passengers, savedPrices));
+        var result = serviceAt(CREATED.plusMinutes(5)).receive(success());
+        assertFalse(result.payment().canDoiSoat());
+        inTransaction(em -> {
+            DonDatVe order = em.find(DonDatVe.class, ORDER_ID);
+            assertEquals(TrangThaiDon.DA_THANH_TOAN, order.trangThai);
+            List<VeXe> tickets = em.createQuery("select v from VeXe v order by v.ghe.maGhe", VeXe.class)
+                    .getResultList();
+            assertEquals(3, tickets.size());
+            assertEquals(List.of("96667", "96666", "96667"), tickets.stream()
+                    .map(ticket -> ticket.giaVe.setScale(0).toPlainString()).toList());
         });
     }
 
@@ -380,9 +944,6 @@ class ThanhToanServiceTest {
         CountDownLatch ipnCommitted = new CountDownLatch(1);
         ThanhToanService.Gateway gateway = new ThanhToanService.Gateway() {
             @Override public String payUrl(String ref, BigDecimal amount, Instant created, Instant expiry, String ip) {
-                throw new UnsupportedOperationException();
-            }
-            @Override public VNPayClient.VerifiedPayment verifyCallback(Map<String, String> parameters) {
                 throw new UnsupportedOperationException();
             }
             @Override public VNPayClient.VerifiedPayment queryDr(String ref, BigDecimal amount, Instant created, String ip) {
@@ -590,10 +1151,6 @@ class ThanhToanServiceTest {
                     "00", "00", instant(CREATED.plusMinutes(1)), "VN-QUERY");
         }
 
-        @Override
-        public VNPayClient.VerifiedPayment verifyCallback(Map<String, String> parameters) {
-            throw new UnsupportedOperationException("Callback verification is not used by these service tests.");
-        }
     }
 
     private void inTransaction(java.util.function.Consumer<EntityManager> work) {

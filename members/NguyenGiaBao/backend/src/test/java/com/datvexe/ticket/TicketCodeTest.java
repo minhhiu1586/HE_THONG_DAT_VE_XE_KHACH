@@ -1,4 +1,4 @@
-package com.datvexe.service;
+package com.datvexe.ticket;
 import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import static org.junit.jupiter.api.Assertions.*;

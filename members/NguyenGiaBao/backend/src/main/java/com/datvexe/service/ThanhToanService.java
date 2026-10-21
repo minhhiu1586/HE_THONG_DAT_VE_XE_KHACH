@@ -1,6 +1,7 @@
 package com.datvexe.service;
 
 import com.datvexe.config.Jpa;
+import com.datvexe.ticket.TicketCode;
 import com.datvexe.domain.Entities.*;
 import com.datvexe.domain.States.*;
 import com.datvexe.dto.BookingDto;
@@ -12,10 +13,9 @@ import com.datvexe.payment.VNPayClient;
 import com.datvexe.payment.VNPayConfig;
 import com.datvexe.repository.IdempotencyRepository;
 import com.datvexe.repository.DonDatVeRepository;
-import com.datvexe.repository.GiuChoRepository;
 import com.datvexe.repository.ThanhToanRepository;
+import com.datvexe.repository.VeXeRepository;
 import com.datvexe.repository.PaymentGatewayMetadataRepository;
-import com.datvexe.repository.HoanVeRepository;
 import com.datvexe.security.AccessControl;
 import com.datvexe.security.AccountException;
 import com.datvexe.security.CurrentUser;
@@ -27,13 +27,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.*;
 import java.util.*;
-import java.util.function.Function;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-/** T18 payment orchestration. Provider calls happen before/after the DB transaction. */
+/** Điều phối thanh toán và phát hành vé; QueryDR được gọi ngoài transaction. */
 public final class ThanhToanService {
     private static final ZoneId ZONE = TripSaleRules.ZONE;
     private static final String VND = "VND";
@@ -53,10 +53,6 @@ public final class ThanhToanService {
         this(factory, Clock.system(ZONE), SHARED_CONTEXTS, defaultGateway());
     }
 
-    public ThanhToanService(EntityManagerFactory factory, Gateway gateway) {
-        this(factory, Clock.system(ZONE), SHARED_CONTEXTS, gateway);
-    }
-
     public ThanhToanService(EntityManagerFactory factory, Clock clock,
                             PaymentContextStore contexts, Gateway gateway) {
         this.factory = Objects.requireNonNull(factory);
@@ -70,7 +66,6 @@ public final class ThanhToanService {
         default String merchantCode() { return VNPayConfig.fromEnvironment().tmnCode(); }
         String payUrl(String reference, BigDecimal amount, Instant created, Instant expiry, String ip);
         VNPayClient.VerifiedPayment queryDr(String reference, BigDecimal expectedAmount, Instant originalCreateDate, String ip);
-        VNPayClient.VerifiedPayment verifyCallback(Map<String, String> parameters);
     }
 
     private static Gateway defaultGateway() {
@@ -82,266 +77,421 @@ public final class ThanhToanService {
             @Override public VNPayClient.VerifiedPayment queryDr(String reference, BigDecimal amount, Instant created, String ip) {
                 return client.queryDr(reference, amount, created, ip);
             }
-            @Override public VNPayClient.VerifiedPayment verifyCallback(Map<String, String> parameters) {
-                return client.verifyCallback(parameters);
-            }
         };
     }
 
-    public BookingDto.Result create(String orderId, ThanhToanDto.CreateRequest request,
-                                    String idempotencyKey, List<PassengerRequest> passengers, String clientIp) {
-        requireKey(idempotencyKey);
-        if (request == null || request.maPhuongThuc() == null || request.maPhuongThuc().isBlank())
-            throw AccountException.invalid("maPhuongThuc", "Phương thức thanh toán là bắt buộc.");
-        java.util.concurrent.atomic.AtomicReference<PaymentContextStore.Attempt> createdContext = new java.util.concurrent.atomic.AtomicReference<>();
-        BookingDto.Result result = transaction(em -> {
-            CurrentUser user = currentUser();
-            IdemContext idem = prepareIdempotency(em, user, orderId, request, idempotencyKey);
-            NguoiDung caller = AccessControl.authenticated(em, user, clock.instant());
-            AccessControl.role(caller, LoaiTaiKhoan.KHACH_HANG);
-            IdempotencyRepository.Saved saved = idem.repository().find(idem.scope(), clock.instant());
-            if (saved != null) {
-                if (!saved.hash().equals(idem.hash()))
-                    throw new AccountException(409, "IDEMPOTENCY_KEY_REUSED", "Khóa đã được dùng cho nội dung khác.");
-                return replay(em, saved);
-            }
-            OrderTrip pair = lockOrderTrip(em, orderId, caller);
-            DonDatVe order = pair.order();
-            ensurePayable(order, pair.holds());
-            if (!em.createQuery("select t.maGiaoDich from ThanhToan t where t.donDatVe = :order and t.trangThai in :states", String.class)
-                    .setParameter("order", order).setParameter("states", List.of(TrangThaiThanhToan.THANH_CONG,
-                            TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN,TrangThaiThanhToan.DA_HOAN_TIEN)).getResultList().isEmpty())
-                throw new AccountException(409, "PAYMENT_PROCESSING", "Đơn đã có giao dịch thành công cần xử lý, không tạo lần thu tiền mới.");
+    public BookingDto.Result create(
+            String orderId,
+            ThanhToanDto.CreateRequest request,
+            String idempotencyKey,
+            List<PassengerRequest> passengers,
+            String clientIp) {
 
-            ThanhToanRepository payments = new ThanhToanRepository(em);
-            ThanhToan pending = payments.pendingForOrder(order.maDon);
-            if (pending != null) {
-                PaymentContextStore.Attempt old = contexts.get(pending.maGiaoDich);
-                if (old == null && "VNPAY".equalsIgnoreCase(pending.phuongThucThanhToan.maPhuongThuc))
-                    throw new AccountException(409, "PAYMENT_CONTEXT_MISSING", "Không còn dữ liệu thanh toán tạm; cần đối soát giao dịch hiện có.");
-                return remember(em, idem, new BookingDto.Result(202, toPayment(pending, old, false)));
-            }
+        if (idempotencyKey == null || idempotencyKey.isBlank()
+                || idempotencyKey.length() > 128
+                || !idempotencyKey.matches("[!-~]+")) {
+            throw new DomainException(400, "Cần Idempotency-Key hợp lệ.");
+        }
+        if (request == null || request.maPhuongThuc() == null
+                || request.maPhuongThuc().isBlank()) {
+            throw new DomainException(400, "Phương thức thanh toán là bắt buộc.");
+        }
 
-            PhuongThucThanhToan method = em.find(PhuongThucThanhToan.class, request.maPhuongThuc().trim().toUpperCase(Locale.ROOT));
-            if (method == null) throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED", "Phương thức thanh toán chưa được hỗ trợ.");
-            if (method.trangThai != TrangThaiPhuongThuc.HOAT_DONG)
-                throw new AccountException(409, "PAYMENT_METHOD_INACTIVE", "Phương thức thanh toán hiện không khả dụng.");
-            if (!Set.of("VNPAY", "MIEN_PHI").contains(method.maPhuongThuc))
-                throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED", "Phương thức này chưa được tích hợp.");
+        PaymentContextStore.Attempt attempt;
+        BookingDto.Result result;
 
-            BigDecimal amount = payable(order);
-            String reference = "PAY-" + UUID.randomUUID();
-            Instant created = clock.instant();
-            Instant expiry = holdExpiry(pair.holds());
-            ThanhToan payment = new ThanhToan();
-            payment.maGiaoDich = reference;
-            payment.donDatVe = order;
-            payment.phuongThucThanhToan = method;
-            payment.soTien = amount;
-            payment.noiDungThanhToan = "maDon=" + order.maDon + ";phuongThuc=" + method.maPhuongThuc;
-            payment.trangThai = TrangThaiThanhToan.CHO_XU_LY;
-            List<PassengerRequest> copy = copyPassengers(passengers);
-            validatePassengers(active(pair.holds()), copy);
-            String url = null;
-            if ("MIEN_PHI".equalsIgnoreCase(method.maPhuongThuc)) {
-                if (amount.signum() != 0) throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED", "Đơn có tiền không thể dùng phương thức miễn phí.");
-            } else {
-                if (!"VNPAY".equalsIgnoreCase(method.maPhuongThuc) || gateway == null)
-                    throw new AccountException(503, "PAYMENT_NOT_CONFIGURED", "Cổng thanh toán hiện chưa được cấu hình.");
-                url = gateway.payUrl(reference, amount, created, expiry, clientIp);
-            }
-            PaymentContextStore.Attempt attempt = new PaymentContextStore.Attempt(reference, order.maDon,
-                    caller.maNguoiDung, method.maPhuongThuc, amount, created, expiry,
-                    created.plus(PaymentContextStore.RETENTION), clientIp, url, seatIds(active(pair.holds())),
-                    copy, frozenLines(order, pair.holds()));
-            ensurePayable(order, pair.holds());
-            em.persist(payment);
-            em.flush();
-            if ("VNPAY".equals(method.maPhuongThuc))
-                new PaymentGatewayMetadataRepository(em).save(reference,gateway.merchantCode(),created);
-            if ("MIEN_PHI".equalsIgnoreCase(method.maPhuongThuc)) {
-                BookingDto.Result done = finish(em, payment, new VNPayClient.VerifiedPayment(reference, 0, "00", "00", created, "FREE"), attempt);
-                if (((ThanhToanDto.PaymentResponse) done.body()).canDoiSoat()) {
-                    // There is no external money to reconcile on the internal zero-value path.
-                    em.remove(payment);
-                    if (order.trangThai == TrangThaiDon.HET_HAN) throw new ExpiredOrder();
-                    throw new AccountException(409, "INVALID_STATE_TRANSITION", "Đơn không còn đủ điều kiện phát hành vé miễn phí.");
+        try (EntityManager em = factory.createEntityManager()) {
+            EntityTransaction tx = em.getTransaction();
+            tx.begin();
+            try {
+                // Kiểm tra yêu cầu gửi lặp.
+                CurrentUser user = currentUser();
+                RequestIdentity.Context requestContext = RequestIdentity.get();
+                String path = "/api/booking/" + orderId + "/thanh-toan";
+                if (requestContext != null && requestContext.path() != null) {
+                    path = requestContext.path();
                 }
-                createdContext.set(attempt);
-                return remember(em, idem, new BookingDto.Result(201, done.body()));
+
+                IdempotencyRepository idempotency = new IdempotencyRepository(em);
+                IdempotencyRepository.Scope scope = new IdempotencyRepository.Scope(
+                        user.maNguoiDung(), "POST", path, idempotencyKey);
+                idempotency.lock(scope);
+                String hash = IdempotencyRepository.hash(
+                        orderId + "|" + request.maPhuongThuc());
+
+                NguoiDung caller = AccessControl.authenticated(em, user, clock.instant());
+                AccessControl.role(caller, LoaiTaiKhoan.KHACH_HANG);
+                IdempotencyRepository.Saved saved = idempotency.find(scope, clock.instant());
+                if (saved != null) {
+                    if (!saved.hash().equals(hash)) {
+                        throw new AccountException(409, "IDEMPOTENCY_KEY_REUSED",
+                                "Khóa đã được dùng cho nội dung khác.");
+                    }
+                    result = replay(em, saved);
+                    tx.commit();
+                    return result;
+                }
+
+                // Kiểm tra đơn và giao dịch hiện có.
+                OrderTrip pair = lockOrderTrip(em, orderId, caller);
+                DonDatVe order = pair.order();
+                ensurePayable(order, pair.holds());
+
+                List<GiuCho> activeHolds = active(pair.holds());
+                ThanhToanRepository payments = new ThanhToanRepository(em);
+                if (payments.hasCollectedForOrder(order.maDon)) {
+                    throw new AccountException(409, "PAYMENT_PROCESSING",
+                            "Đơn đã có giao dịch thành công cần xử lý, không tạo lần thu tiền mới.");
+                }
+
+                ThanhToan pending = payments.pendingForOrder(order.maDon);
+                if (pending != null) {
+                    PaymentContextStore.Attempt pendingContext = contexts.get(pending.maGiaoDich);
+                    if (pendingContext == null && "VNPAY".equalsIgnoreCase(
+                            pending.phuongThucThanhToan.maPhuongThuc)) {
+                        throw new AccountException(409, "PAYMENT_CONTEXT_MISSING",
+                                "Không còn dữ liệu thanh toán tạm; cần đối soát giao dịch hiện có.");
+                    }
+                    result = new BookingDto.Result(202, toPayment(pending, pendingContext, false));
+                    remember(idempotency, scope, hash, result);
+                    tx.commit();
+                    return result;
+                }
+
+                // Kiểm tra phương thức, hành khách và số tiền.
+                String methodId = request.maPhuongThuc().trim().toUpperCase(Locale.ROOT);
+                PhuongThucThanhToan method = payments.findMethod(methodId);
+                if (method == null) {
+                    throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED",
+                            "Phương thức thanh toán chưa được hỗ trợ.");
+                }
+                if (method.trangThai != TrangThaiPhuongThuc.HOAT_DONG) {
+                    throw new AccountException(409, "PAYMENT_METHOD_INACTIVE",
+                            "Phương thức thanh toán hiện không khả dụng.");
+                }
+                if (!Set.of("VNPAY", "MIEN_PHI").contains(method.maPhuongThuc)) {
+                    throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED",
+                            "Phương thức này chưa được tích hợp.");
+                }
+
+                boolean freePayment = "MIEN_PHI".equals(method.maPhuongThuc);
+                BigDecimal amount = payable(order);
+                List<PassengerRequest> passengerList = passengers == null ? List.of() : passengers;
+                validatePassengers(activeHolds, passengerList);
+
+                if (freePayment && amount.signum() != 0) {
+                    throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED",
+                            "Đơn có tiền không thể dùng phương thức miễn phí.");
+                }
+                if (!freePayment && gateway == null) {
+                    throw new AccountException(503, "PAYMENT_NOT_CONFIGURED",
+                            "Cổng thanh toán hiện chưa được cấu hình.");
+                }
+
+                // Chuẩn bị dữ liệu thanh toán.
+                String reference = "PAY-" + UUID.randomUUID();
+                Instant created = clock.instant();
+                Instant expiry = activeHolds.stream()
+                        .map(hold -> hold.thoiDiemHetHan.atZone(ZONE).toInstant())
+                        .min(Comparator.naturalOrder())
+                        .orElseThrow();
+
+                List<String> seats = seatIds(activeHolds);
+                List<PriceLine> priceLines = PriceCalculator.calculateFromFrozenTotals(
+                        seats, order.tongTien, order.tienGiam).chiTietGia();
+
+                String url = null;
+                if (!freePayment) {
+                    url = gateway.payUrl(reference, amount, created, expiry, clientIp);
+                }
+                attempt = new PaymentContextStore.Attempt(
+                        reference, order.maDon, caller.maNguoiDung,
+                        method.maPhuongThuc, amount, created, expiry,
+                        created.plus(PaymentContextStore.RETENTION),
+                        clientIp, url, seats, passengerList, priceLines);
+
+                // Thời gian có thể đã trôi qua trong lúc chuẩn bị thanh toán.
+                ensurePayable(order, pair.holds());
+
+                ThanhToan payment = new ThanhToan();
+                payment.maGiaoDich = reference;
+                payment.donDatVe = order;
+                payment.phuongThucThanhToan = method;
+                payment.soTien = amount;
+                payment.noiDungThanhToan = "maDon=" + order.maDon
+                        + ";phuongThuc=" + method.maPhuongThuc;
+                payment.trangThai = TrangThaiThanhToan.CHO_XU_LY;
+                payments.save(payment);
+                em.flush();
+
+                if (!freePayment) {
+                    new PaymentGatewayMetadataRepository(em).save(
+                            reference, gateway.merchantCode(), created);
+                }
+
+                ThanhToanDto.PaymentResponse paymentResult;
+                if (freePayment) {
+                    VNPayClient.VerifiedPayment verified = new VNPayClient.VerifiedPayment(
+                            reference, 0, "00", "00", created, "FREE");
+                    paymentResult = finish(em, payment, verified, attempt);
+                    if (paymentResult.canDoiSoat()) {
+                        payments.delete(payment);
+                        if (order.trangThai == TrangThaiDon.HET_HAN) {
+                            throw new ExpiredOrder();
+                        }
+                        throw new AccountException(409, "INVALID_STATE_TRANSITION",
+                                "Đơn không còn đủ điều kiện phát hành vé miễn phí.");
+                    }
+                } else {
+                    paymentResult = toPayment(payment, attempt, false);
+                }
+
+                result = new BookingDto.Result(201, paymentResult);
+                remember(idempotency, scope, hash, result);
+                tx.commit();
+            } catch (ExpiredOrder expired) {
+                tx.commit();
+                throw new AccountException(409, "HOLD_EXPIRED", "Đơn đã hết thời gian giữ ghế.");
+            } catch (RuntimeException e) {
+                if (tx.isActive()) {
+                    tx.rollback();
+                }
+                throw e;
             }
-            createdContext.set(attempt);
-            return remember(em, idem, new BookingDto.Result(201, toPayment(payment, attempt, url, false)));
-        });
-        // Publish volatile data only after the durable payment/idempotency commit succeeds.
-        if (createdContext.get() != null) contexts.put(createdContext.get());
+        }
+
+        // Chỉ lưu context khi dữ liệu DB đã commit thành công.
+        contexts.put(attempt);
         return result;
     }
 
     public ThanhToanDto.PaymentResponse get(String id) {
-        return transaction(em -> {
-            NguoiDung caller = authenticate(em);
-            ThanhToan payment = new ThanhToanRepository(em).find(id);
-            if (payment == null) throw notFound();
-            lockOrderTrip(em, payment.donDatVe.maDon, caller);
-            payment = new ThanhToanRepository(em).lockById(id);
-            return toPayment(payment, contexts.get(payment.maGiaoDich), false);
-        });
+        return readPayment(id, false);
     }
 
     public ThanhToanDto.PageResponse history(String orderId, int page, int size, String state, String sort) {
-        if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE)
-            throw AccountException.invalid("page", "page >= 1 và size trong khoảng 1..100, không vượt giới hạn phân trang.");
-        if (sort != null && !sort.isBlank() && !Set.of("maGiaoDich", "maGiaoDich,asc", "maGiaoDich,desc").contains(sort))
-            throw AccountException.invalid("sort", "Chỉ hỗ trợ sắp xếp theo maGiaoDich.");
-        return transaction(em -> {
-            NguoiDung caller = authenticate(em);
-            lockOrderTrip(em, orderId, caller);
-            TrangThaiThanhToan filter = parseState(state);
-            ThanhToanRepository repository = new ThanhToanRepository(em);
-            long total = repository.countForOrder(orderId, filter);
-            boolean descending = sort == null || sort.isBlank() || "maGiaoDich,desc".equals(sort);
-            List<ThanhToanDto.PaymentResponse> items = new ArrayList<>(repository.pageForOrder(orderId, filter, (page - 1) * size, size, descending)
-                    .stream().map(payment -> toPayment(payment, contexts.get(payment.maGiaoDich), false)).toList());
-            return new ThanhToanDto.PageResponse(items, page, size, total,
-                    (int) Math.ceil(total / (double) size));
-        });
+        if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
+            throw new DomainException(400, "page >= 1 và size trong khoảng 1..100, không vượt giới hạn phân trang.");
+        }
+        if (sort != null && !sort.isBlank()
+                && !Set.of("maGiaoDich", "maGiaoDich,asc", "maGiaoDich,desc").contains(sort)) {
+            throw new DomainException(400, "Chỉ hỗ trợ sắp xếp theo maGiaoDich.");
+        }
+        try (EntityManager em = factory.createEntityManager()) {
+            EntityTransaction tx = em.getTransaction();
+            tx.begin();
+            try {
+                NguoiDung caller = authenticate(em);
+                lockOrderTrip(em, orderId, caller);
+                TrangThaiThanhToan filter = null;
+                if (state != null && !state.isBlank()) {
+                    try {
+                        filter = TrangThaiThanhToan.valueOf(state.trim().toUpperCase(Locale.ROOT));
+                    } catch (IllegalArgumentException error) {
+                        throw new DomainException(400, "Trạng thái giao dịch không hợp lệ.");
+                    }
+                }
+                ThanhToanRepository repository = new ThanhToanRepository(em);
+                long total = repository.countForOrder(orderId, filter);
+                boolean descending = sort == null || sort.isBlank() || "maGiaoDich,desc".equals(sort);
+                List<ThanhToanDto.PaymentResponse> items = repository.pageForOrder(orderId, filter, (page - 1) * size, size, descending)
+                        .stream().map(payment -> toPayment(payment, contexts.get(payment.maGiaoDich), false)).toList();
+                var response = new ThanhToanDto.PageResponse(items, page, size, total,
+                        (int) Math.ceil(total / (double) size));
+                tx.commit();
+                return response;
+            } catch (RuntimeException error) {
+                if (tx.isActive()) {
+                    tx.rollback();
+                }
+                throw error;
+            }
+        }
     }
 
-    /** QueryDR is deliberately outside the transaction; result is then processed atomically. */
+    /** Đọc giao dịch có kiểm tra quyền trước, rồi mới gọi QueryDR ngoài transaction. */
     public ThanhToanDto.PaymentResponse verify(String id, String clientIp) {
-        // Validate account and ownership before exposing volatile context or calling a provider.
-        ThanhToanDto.PaymentResponse current = getOwnedPayment(id);
-        if (current.trangThai() != TrangThaiThanhToan.CHO_XU_LY) return current;
+        ThanhToanDto.PaymentResponse current = readPayment(id, true);
+        if (current.trangThai() != TrangThaiThanhToan.CHO_XU_LY) {
+            return current;
+        }
+
         PaymentContextStore.Attempt context = contexts.get(id);
-        if (gateway == null) throw new AccountException(503, "PAYMENT_NOT_CONFIGURED", "Cổng thanh toán hiện chưa được cấu hình.");
-        if (context == null) throw new AccountException(409, "PAYMENT_CONTEXT_MISSING", "Không còn dữ liệu tạm để xác minh giao dịch; cần đối soát.");
-        VNPayClient.VerifiedPayment verified = gateway.queryDr(id, new BigDecimal(current.soTien()), context.createdAt(), clientIp);
+        if (gateway == null) {
+            throw new AccountException(503, "PAYMENT_NOT_CONFIGURED", "Cổng thanh toán hiện chưa được cấu hình.");
+        }
+        if (context == null) {
+            throw new AccountException(409, "PAYMENT_CONTEXT_MISSING", "Không còn dữ liệu tạm để xác minh giao dịch; cần đối soát.");
+        }
+
+        BigDecimal amount = new BigDecimal(current.soTien());
+        VNPayClient.VerifiedPayment verified = gateway.queryDr(id, amount, context.createdAt(), clientIp);
         return receive(verified).payment();
     }
 
     /** Called only after the controller/provider adapter has verified the callback signature. */
     public ProcessingResult receive(VNPayClient.VerifiedPayment verified) {
-        if (verified == null || verified.reference() == null) throw new AccountException(400, "INVALID_PAYMENT_RESULT", "Thiếu kết quả thanh toán từ cổng.");
-        return transaction(em -> {
-            ThanhToanRepository repository = new ThanhToanRepository(em);
-            ThanhToan raw = repository.find(verified.reference());
-            if (raw == null) throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy giao dịch.");
-            lockOrderTrip(em, raw.donDatVe.maDon, null);
-            ThanhToan payment = repository.lockById(verified.reference());
-            if (payment == null) throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy giao dịch.");
-            if (!"VNPAY".equals(payment.phuongThucThanhToan.maPhuongThuc))
-                throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED", "Giao dịch này không thuộc cổng VNPay.");
-            PaymentContextStore.Attempt context = contexts.get(payment.maGiaoDich);
-            if (verified.amountVnd() != payment.soTien.setScale(0, RoundingMode.UNNECESSARY).longValueExact())
-                throw new AccountException(409, "PAYMENT_AMOUNT_MISMATCH", "Số tiền từ cổng không khớp đơn.");
-            if (payment.trangThai != TrangThaiThanhToan.CHO_XU_LY)
-                return new ProcessingResult(toPayment(payment, context, false), true);
-            boolean success = "00".equals(verified.responseCode()) && "00".equals(verified.transactionStatus());
-            boolean explicitFailure = "02".equals(verified.transactionStatus());
-            if (!success && !explicitFailure) return new ProcessingResult(toPayment(payment, context, false), false);
-            if (explicitFailure) {
-                payment.trangThai = TrangThaiThanhToan.THAT_BAI;
-                return new ProcessingResult(toPayment(payment, context, false), false);
+        if (verified == null || verified.reference() == null) {
+            throw new AccountException(400, "INVALID_PAYMENT_RESULT", "Thiếu kết quả thanh toán từ cổng.");
+        }
+        try (EntityManager em = factory.createEntityManager()) {
+            EntityTransaction tx = em.getTransaction();
+            tx.begin();
+            try {
+                ThanhToanRepository repository = new ThanhToanRepository(em);
+                ThanhToan raw = repository.find(verified.reference());
+                if (raw == null) {
+                    throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy giao dịch.");
+                }
+                lockOrderTrip(em, raw.donDatVe.maDon, null);
+                ThanhToan payment = repository.lockById(verified.reference());
+                if (payment == null) {
+                    throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy giao dịch.");
+                }
+                if (!"VNPAY".equals(payment.phuongThucThanhToan.maPhuongThuc)) {
+                    throw new AccountException(409, "PAYMENT_METHOD_UNSUPPORTED", "Giao dịch này không thuộc cổng VNPay.");
+                }
+
+                PaymentContextStore.Attempt context = contexts.get(payment.maGiaoDich);
+                long expectedAmount = payment.soTien.setScale(0, RoundingMode.UNNECESSARY).longValueExact();
+                if (verified.amountVnd() != expectedAmount) {
+                    throw new AccountException(409, "PAYMENT_AMOUNT_MISMATCH", "Số tiền từ cổng không khớp đơn.");
+                }
+                boolean duplicate = payment.trangThai != TrangThaiThanhToan.CHO_XU_LY;
+                ProcessingResult response;
+                if (duplicate) {
+                    response = new ProcessingResult(toPayment(payment, context, false), true);
+                } else {
+                    boolean success = "00".equals(verified.responseCode())
+                            && "00".equals(verified.transactionStatus());
+                    boolean failed = "02".equals(verified.transactionStatus());
+                    if (success) {
+                        ThanhToanDto.PaymentResponse result = finish(em, payment, verified, context);
+                        response = new ProcessingResult(result, false);
+                    } else {
+                        if (failed) {
+                            payment.trangThai = TrangThaiThanhToan.THAT_BAI;
+                        }
+                        response = new ProcessingResult(toPayment(payment, context, false), false);
+                    }
+                }
+                tx.commit();
+                return response;
+            } catch (RuntimeException error) {
+                if (tx.isActive()) {
+                    tx.rollback();
+                }
+                throw error;
             }
-            BookingDto.Result result = finish(em, payment, verified, context);
-            return new ProcessingResult((ThanhToanDto.PaymentResponse) result.body(), false);
-        });
+        }
     }
 
     public record ProcessingResult(ThanhToanDto.PaymentResponse payment, boolean duplicate) {}
 
-    public ThanhToanDto.TicketResponse ticket(String ticketId) {
-        return transaction(em -> {
-            NguoiDung caller = authenticate(em);
-            VeXe ticket = em.find(VeXe.class, ticketId);
-            if (ticket == null) throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy vé.");
-            ticket.donDatVe = (DonDatVe) org.hibernate.Hibernate.unproxy(ticket.donDatVe);
-            lockOrderTrip(em, ticket.donDatVe.maDon, null);
-            AccessControl.ticketAccess(em, caller, ticketId);
-            ticket = em.find(VeXe.class, ticketId);
-            long originalCount = em.createQuery("select count(v) from VeXe v where v.donDatVe = :order", Long.class)
-                    .setParameter("order", ticket.donDatVe).getSingleResult();
-            BigDecimal gross = ticket.donDatVe.tongTien.divide(BigDecimal.valueOf(originalCount), 0, RoundingMode.UNNECESSARY);
-            BigDecimal net = ticket.giaVe == null ? BigDecimal.ZERO : ticket.giaVe;
-            boolean refundPending = new HoanVeRepository(em).ticketBlocked(ticket.maVe);
-            boolean showQr = !refundPending && (ticket.trangThai == TrangThaiVe.DA_XUAT_VE || ticket.trangThai == TrangThaiVe.DA_LEN_XE);
-            return new ThanhToanDto.TicketResponse(ticket.maVe, ticket.maTraCuu, ticket.donDatVe.maDon, ticket.chuyenXe.maChuyen,
-                    ticket.ghe.maGhe, ticket.hoTenKhachHang, ticket.soDienThoaiKhachHang, ticket.cccdHanhKhach,
-                    money(gross), money(gross.subtract(net).max(BigDecimal.ZERO)), money(net), VND,
-                    showQr ? ticket.maQR : null, offset(ticket.ngayXuatVe), ticket.trangThai,refundPending);
-        });
-    }
-
-    private BookingDto.Result finish(EntityManager em, ThanhToan payment, VNPayClient.VerifiedPayment verified,
+    private ThanhToanDto.PaymentResponse finish(EntityManager em, ThanhToan payment, VNPayClient.VerifiedPayment verified,
                                      PaymentContextStore.Attempt context) {
         DonDatVe order = payment.donDatVe;
-        List<GiuCho> holds = new GiuChoRepository(em).forOrder(order.maDon);
+        ThanhToanRepository repository = new ThanhToanRepository(em);
+        List<GiuCho> holds = repository.holdsForOrder(order.maDon);
+        List<GiuCho> activeHolds = active(holds);
         LocalDateTime serverNow = local(clock.instant());
         LocalDateTime paidAt = local(verified.paidAt() == null ? clock.instant() : verified.paidAt());
-        boolean expired = order.trangThai == TrangThaiDon.HET_HAN || holds.stream().anyMatch(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU && !serverNow.isBefore(h.thoiDiemHetHan));
+        boolean expired = order.trangThai == TrangThaiDon.HET_HAN
+                || hasExpiredHold(activeHolds, serverNow);
+
         payment.trangThai = TrangThaiThanhToan.THANH_CONG;
         payment.thoiGianThanhToan = paidAt;
-        if ("VNPAY".equals(payment.phuongThucThanhToan.maPhuongThuc))
-            new PaymentGatewayMetadataRepository(em).confirmed(payment.maGiaoDich,verified.providerTransaction());
+        if ("VNPAY".equals(payment.phuongThucThanhToan.maPhuongThuc)) {
+            new PaymentGatewayMetadataRepository(em).confirmed(payment.maGiaoDich, verified.providerTransaction());
+        }
         if (expired && order.trangThai != TrangThaiDon.DA_THANH_TOAN) {
-            order.trangThai = TrangThaiDon.HET_HAN;
-            holds.stream().filter(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU)
-                    .forEach(h -> h.trangThai = TrangThaiGiuCho.HET_HAN);
+            expireOrder(order, activeHolds);
         }
         if (expired || context == null || context.passengers().isEmpty()) {
-            return new BookingDto.Result(200, toPayment(payment, context, true));
+            return toPayment(payment, context, true);
         }
-        // Collected money remains true even if the order was cancelled while the gateway was processing.
-        if (order.trangThai != TrangThaiDon.CHO_THANH_TOAN || !order.danhSachVe.isEmpty())
-            return new BookingDto.Result(200, toPayment(payment, context, true));
-        List<GiuCho> active = holds.stream().filter(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU).toList();
-        if (active.isEmpty()) return new BookingDto.Result(200, toPayment(payment, context, true));
+        // Vẫn ghi nhận tiền đã thu nếu đơn bị hủy trong lúc cổng đang xử lý.
+        if (order.trangThai != TrangThaiDon.CHO_THANH_TOAN || !order.danhSachVe.isEmpty()) {
+            return toPayment(payment, context, true);
+        }
+        if (activeHolds.isEmpty()) {
+            return toPayment(payment, context, true);
+        }
         if (!context.maDon().equals(order.maDon)
                 || !context.userId().equals(order.nguoiDat.maNguoiDung)
                 || context.soTien().compareTo(payment.soTien) != 0
-                || context.soTien().compareTo(payable(order)) != 0)
-            throw new AccountException(409, "PAYMENT_CONTEXT_MISMATCH", "Dữ liệu giá hoặc chủ đơn không khớp giao dịch.");
-        if (!new HashSet<>(context.maGhe()).equals(new HashSet<>(seatIds(active))))
-            throw new AccountException(409, "PAYMENT_CONTEXT_MISMATCH", "Ghế giữ đã thay đổi; không thể phát hành vé.");
-        validatePassengers(active, context.passengers());
-        List<PriceLine> lines = frozenLines(order, active);
-        if (!context.chiTietGia().isEmpty() && !context.chiTietGia().equals(lines))
-            throw new AccountException(409, "PAYMENT_CONTEXT_MISMATCH", "Phân bổ giá không khớp giá đã chốt.");
-        Set<String> seats = new HashSet<>(seatIds(active));
-        ChuyenXe trip = active.getFirst().chuyenXe;
-        boolean invalidSeat = active.stream().anyMatch(h -> trip.xe == null
-                || !h.ghe.xe.maXe.equals(trip.xe.maXe) || h.ghe.trangThai != TrangThaiGhe.HOAT_DONG);
-        long sold = em.createQuery("select count(v) from VeXe v where v.chuyenXe = :trip and v.ghe.maGhe in :seats and v.trangThai in :states", Long.class)
-                .setParameter("trip", trip).setParameter("seats", seats)
-                .setParameter("states", List.of(TrangThaiVe.DA_XUAT_VE, TrangThaiVe.DA_LEN_XE)).getSingleResult();
-        long competingHolds = em.createQuery("select count(h) from GiuCho h where h.chuyenXe = :trip and h.ghe.maGhe in :seats "
-                + "and h.trangThai = :state and h.thoiDiemHetHan > :now and (h.donDatVe is null or h.donDatVe <> :order)", Long.class)
-                .setParameter("trip", trip).setParameter("seats", seats).setParameter("state", TrangThaiGiuCho.DANG_GIU)
-                .setParameter("now", serverNow).setParameter("order", order).getSingleResult();
-        if (invalidSeat || sold > 0 || competingHolds > 0
-                || Set.of(TrangThaiChuyen.DA_HUY, TrangThaiChuyen.DANG_CHAY, TrangThaiChuyen.HOAN_TAT).contains(trip.trangThai))
-            return new BookingDto.Result(200, toPayment(payment, context, true));
+                || context.soTien().compareTo(payable(order)) != 0) {
+            return toPayment(payment, context, true);
+        }
+
+        Set<String> seats = new HashSet<>(seatIds(activeHolds));
+        if (!new HashSet<>(context.maGhe()).equals(seats)) {
+            return toPayment(payment, context, true);
+        }
+
+        // Context do backend tạo đã được kiểm tra khi tạo thanh toán.
+        // Chỉ kiểm tra đủ dữ liệu cho đúng tập ghế trước khi phát hành.
+        Map<String, PassengerRequest> passengersBySeat = new HashMap<>();
+        for (PassengerRequest passenger : context.passengers()) {
+            if (passenger == null || passenger.maGhe() == null
+                    || passenger.hoTen() == null || passenger.soDienThoai() == null
+                    || passengersBySeat.put(passenger.maGhe(), passenger) != null) {
+                return toPayment(payment, context, true);
+            }
+        }
+        if (!passengersBySeat.keySet().equals(seats)) {
+            return toPayment(payment, context, true);
+        }
+
+        Map<String, PriceLine> pricesBySeat = new HashMap<>();
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        for (PriceLine line : context.chiTietGia()) {
+            if (line == null || line.maGhe() == null || line.thanhTien() == null
+                    || pricesBySeat.put(line.maGhe(), line) != null) {
+                return toPayment(payment, context, true);
+            }
+            totalPaid = totalPaid.add(new BigDecimal(line.thanhTien()));
+        }
+        if (!pricesBySeat.keySet().equals(seats)
+                || totalPaid.compareTo(payment.soTien) != 0) {
+            return toPayment(payment, context, true);
+        }
+
+        ChuyenXe trip = activeHolds.getFirst().chuyenXe;
+        boolean invalidSeat = false;
+        for (GiuCho hold : activeHolds) {
+            if (trip.xe == null || !hold.ghe.xe.maXe.equals(trip.xe.maXe)
+                    || hold.ghe.trangThai != TrangThaiGhe.HOAT_DONG) {
+                invalidSeat = true;
+                break;
+            }
+        }
+        VeXeRepository tickets = new VeXeRepository(em);
+        long sold = tickets.countSoldForTripSeats(trip.maChuyen, seats);
+        long competingHolds = repository.countCompetingHolds(trip.maChuyen, seats, order.maDon, serverNow);
+        boolean tripClosed = Set.of(TrangThaiChuyen.DA_HUY, TrangThaiChuyen.DANG_CHAY,
+                TrangThaiChuyen.HOAN_TAT).contains(trip.trangThai);
+        if (invalidSeat || sold > 0 || competingHolds > 0 || tripClosed) {
+            return toPayment(payment, context, true);
+        }
 
         KhuyenMai promotion = null;
         if (order.maKhuyenMaiDaApDung != null) {
-            promotion = em.find(KhuyenMai.class, order.maKhuyenMaiDaApDung, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
-            if (promotion != null) em.refresh(promotion, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+            promotion = repository.lockPromotion(order.maKhuyenMaiDaApDung);
             long otherReservations = new DonDatVeRepository(em).reservedPromotionUses(order.maKhuyenMaiDaApDung, order.maDon, serverNow);
-            if (promotion == null || promotion.soLuong - (long) promotion.soLuongDaDung - otherReservations <= 0)
-                return new BookingDto.Result(200, toPayment(payment, context, true));
+            if (promotion == null || promotion.soLuong - (long) promotion.soLuongDaDung - otherReservations <= 0) {
+                return toPayment(payment, context, true);
+            }
         }
         LocalDateTime issuedAt = local(clock.instant());
-        if (active.stream().anyMatch(h -> !issuedAt.isBefore(h.thoiDiemHetHan))) {
-            order.trangThai = TrangThaiDon.HET_HAN;
-            active.forEach(h -> h.trangThai = TrangThaiGiuCho.HET_HAN);
-            return new BookingDto.Result(200, toPayment(payment, context, true));
+        if (hasExpiredHold(activeHolds, issuedAt)) {
+            expireOrder(order, activeHolds);
+            return toPayment(payment, context, true);
         }
-        Map<String, PriceLine> bySeat = new HashMap<>();
-        lines.forEach(line -> bySeat.put(line.maGhe(), line));
-        for (GiuCho hold : active) {
-            PassengerRequest passenger = context.passengers().stream().filter(p -> p.maGhe().equals(hold.ghe.maGhe)).findFirst().orElseThrow();
-            PriceLine line = bySeat.get(hold.ghe.maGhe);
+
+        for (GiuCho hold : activeHolds) {
+            PassengerRequest passenger = passengersBySeat.get(hold.ghe.maGhe);
+            PriceLine line = pricesBySeat.get(hold.ghe.maGhe);
             VeXe ticket = new VeXe();
             ticket.maVe = "TKT-" + UUID.randomUUID();
             ticket.maTraCuu = TicketCode.next(em);
@@ -355,130 +505,191 @@ public final class ThanhToanService {
             ticket.ngayXuatVe = issuedAt;
             ticket.trangThai = TrangThaiVe.DA_XUAT_VE;
             ticket.maQR = UUID.randomUUID().toString();
-            em.persist(ticket);
+            tickets.save(ticket);
             hold.trangThai = TrangThaiGiuCho.DA_XAC_NHAN;
         }
         order.trangThai = TrangThaiDon.DA_THANH_TOAN;
-        if (promotion != null) promotion.soLuongDaDung++;
+        if (promotion != null) {
+            promotion.soLuongDaDung++;
+        }
         em.flush();
         com.datvexe.email.ReceiptQueue.enqueue(em, order, payment);
-        return new BookingDto.Result(200, toPayment(payment, context, false));
+        return toPayment(payment, context, false);
     }
 
     private ThanhToanDto.PaymentResponse toPayment(ThanhToan payment, PaymentContextStore.Attempt context, boolean reconcile) {
-        return toPayment(payment, context, (String) null, reconcile);
-    }
-
-    private ThanhToanDto.PaymentResponse toPayment(ThanhToan payment, PaymentContextStore.Attempt context, String url, boolean reconcile) {
-        String actualUrl = url == null && context != null ? context.urlThanhToan() : url;
+        String actualUrl = context == null ? null : context.urlThanhToan();
         if (payment.trangThai != TrangThaiThanhToan.CHO_XU_LY
                 || payment.donDatVe.trangThai != TrangThaiDon.CHO_THANH_TOAN
-                || context == null || !clock.instant().isBefore(context.expiresAt())) actualUrl = null;
+                || context == null || !clock.instant().isBefore(context.expiresAt())) {
+            actualUrl = null;
+        }
+
+        boolean resultKnown = payment.trangThai != TrangThaiThanhToan.CHO_XU_LY;
+        boolean collected = payment.trangThai == TrangThaiThanhToan.THANH_CONG
+                || payment.trangThai == TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN
+                || payment.trangThai == TrangThaiThanhToan.DA_HOAN_TIEN;
+        boolean needsReconciliation = reconcile
+                || (collected && payment.donDatVe.trangThai != TrangThaiDon.DA_THANH_TOAN);
+
         return new ThanhToanDto.PaymentResponse(payment.maGiaoDich, payment.donDatVe.maDon,
                 payment.phuongThucThanhToan.maPhuongThuc, VND, money(payment.soTien), payment.trangThai,
-                payment.trangThai == TrangThaiThanhToan.CHO_XU_LY ? false : true,
+                resultKnown,
                 context == null ? null : offset(context.createdAt()), actualUrl,
                 context == null ? null : offset(context.expiresAt()), offset(payment.thoiGianThanhToan),
-                reconcile || (Set.of(TrangThaiThanhToan.THANH_CONG,TrangThaiThanhToan.HOAN_TIEN_MOT_PHAN,TrangThaiThanhToan.DA_HOAN_TIEN).contains(payment.trangThai)
-                        && payment.donDatVe.trangThai != TrangThaiDon.DA_THANH_TOAN));
+                needsReconciliation);
     }
 
-    private ThanhToanDto.PaymentResponse getOwnedPayment(String id) {
-        return transaction(em -> {
-            NguoiDung caller = authenticate(em);
-            AccessControl.role(caller, LoaiTaiKhoan.KHACH_HANG);
-            ThanhToan payment = new ThanhToanRepository(em).find(id);
-            if (payment == null) throw notFound();
-            lockOrderTrip(em, payment.donDatVe.maDon, caller);
-            em.refresh(payment);
-            return toPayment(payment, contexts.get(id), false);
-        });
+    private ThanhToanDto.PaymentResponse readPayment(String id, boolean customerOnly) {
+        try (EntityManager em = factory.createEntityManager()) {
+            EntityTransaction tx = em.getTransaction();
+            tx.begin();
+            try {
+                NguoiDung caller = authenticate(em);
+                if (customerOnly) {
+                    AccessControl.role(caller, LoaiTaiKhoan.KHACH_HANG);
+                }
+                ThanhToan payment = new ThanhToanRepository(em).find(id);
+                if (payment == null) {
+                    throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy giao dịch.");
+                }
+                lockOrderTrip(em, payment.donDatVe.maDon, caller);
+                payment = new ThanhToanRepository(em).lockById(id);
+                var response = toPayment(payment, contexts.get(payment.maGiaoDich), false);
+                tx.commit();
+                return response;
+            } catch (RuntimeException error) {
+                if (tx.isActive()) {
+                    tx.rollback();
+                }
+                throw error;
+            }
+        }
     }
 
     private OrderTrip lockOrderTrip(EntityManager em, String orderId, NguoiDung caller) {
-        String id = required(orderId, "maDon");
-        DonDatVe initial = em.find(DonDatVe.class, id);
-        if (initial == null) throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy đơn.");
-        Set<String> trips = new HashSet<>(em.createQuery("select distinct h.chuyenXe.maChuyen from GiuCho h where h.donDatVe.maDon = :id", String.class)
-                .setParameter("id", id).getResultList());
-        trips.addAll(em.createQuery("select distinct v.chuyenXe.maChuyen from VeXe v where v.donDatVe.maDon = :id", String.class)
-                .setParameter("id", id).getResultList());
-        List<String> tripIds = new ArrayList<>(trips);
-        if (tripIds.size() != 1) throw new AccountException(409, "INVALID_STATE_TRANSITION", "Đơn phải thuộc đúng một chuyến.");
-        ChuyenXe initialTrip = em.find(ChuyenXe.class, tripIds.getFirst());
+        if (orderId == null || orderId.isBlank()) {
+            throw new DomainException(400, "Mã đơn là bắt buộc.");
+        }
+        String id = orderId.trim();
+        ThanhToanRepository repository = new ThanhToanRepository(em);
+        DonDatVe initial = repository.findOrder(id);
+        if (initial == null) {
+            throw new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy đơn.");
+        }
+        Set<String> trips = new HashSet<>(repository.tripIdsFromHolds(id));
+        trips.addAll(new VeXeRepository(em).tripIdsForOrder(id));
+        if (trips.size() != 1) {
+            throw new AccountException(409, "INVALID_STATE_TRANSITION", "Đơn phải thuộc đúng một chuyến.");
+        }
+        String tripId = trips.iterator().next();
+        ChuyenXe initialTrip = repository.findTrip(tripId);
         String operatorId = initialTrip.tuyenXe.nhaXe == null ? null : initialTrip.tuyenXe.nhaXe.maNhaXe;
-        if (operatorId != null) AccessControl.resource(em, NhaXe.class, operatorId);
-        ChuyenXe trip = AccessControl.resource(em, ChuyenXe.class, tripIds.getFirst());
-        DonDatVe order = AccessControl.resource(em, DonDatVe.class, id);
-        if (caller != null) AccessControl.orderAccess(em, caller, id);
-        List<GiuCho> holds = new GiuChoRepository(em).forOrder(id);
-        holds.forEach(em::refresh);
-        return new OrderTrip(order, trip, holds);
+        if (operatorId != null) {
+            AccessControl.resource(em, NhaXe.class, operatorId);
+        }
+        AccessControl.resource(em, ChuyenXe.class, tripId);
+        DonDatVe order;
+        if (caller != null) {
+            AccessControl.orderAccess(em, caller, id);
+            order = repository.findOrder(id);
+        } else {
+            order = AccessControl.resource(em, DonDatVe.class, id);
+        }
+        List<GiuCho> holds = repository.refreshedHoldsForOrder(id);
+        return new OrderTrip(order, holds);
     }
 
     private void ensurePayable(DonDatVe order, List<GiuCho> holds) {
         LocalDateTime now = local(clock.instant());
-        List<GiuCho> active = active(holds);
-        if (order.trangThai == TrangThaiDon.HET_HAN
+        List<GiuCho> activeHolds = active(holds);
+        boolean expired = order.trangThai == TrangThaiDon.HET_HAN
                 || (order.trangThai == TrangThaiDon.CHO_THANH_TOAN
-                && active.stream().anyMatch(h -> !now.isBefore(h.thoiDiemHetHan)))) {
-            order.trangThai = TrangThaiDon.HET_HAN;
-            active.forEach(h -> h.trangThai = TrangThaiGiuCho.HET_HAN);
+                    && hasExpiredHold(activeHolds, now));
+        if (expired) {
+            expireOrder(order, activeHolds);
             throw new ExpiredOrder();
         }
-        if (order.trangThai != TrangThaiDon.CHO_THANH_TOAN)
+        if (order.trangThai != TrangThaiDon.CHO_THANH_TOAN) {
             throw new AccountException(409, "INVALID_STATE_TRANSITION", "Đơn chưa chốt giá để thanh toán.");
-        if (active.isEmpty()) throw new AccountException(409, "HOLD_EXPIRED", "Đơn không còn ghế đang giữ.");
+        }
+        if (activeHolds.isEmpty()) {
+            throw new AccountException(409, "HOLD_EXPIRED", "Đơn không còn ghế đang giữ.");
+        }
+    }
+
+    private static boolean hasExpiredHold(List<GiuCho> holds, LocalDateTime now) {
+        for (GiuCho hold : holds) {
+            if (hold.trangThai == TrangThaiGiuCho.DANG_GIU
+                    && !now.isBefore(hold.thoiDiemHetHan)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void expireOrder(DonDatVe order, List<GiuCho> holds) {
+        order.trangThai = TrangThaiDon.HET_HAN;
+        for (GiuCho hold : holds) {
+            if (hold.trangThai == TrangThaiGiuCho.DANG_GIU) {
+                hold.trangThai = TrangThaiGiuCho.HET_HAN;
+            }
+        }
     }
 
     private static void validatePassengers(List<GiuCho> holds, List<PassengerRequest> passengers) {
         Set<String> seats = new HashSet<>();
-        holds.forEach(h -> { if (h.trangThai == TrangThaiGiuCho.DANG_GIU) seats.add(h.ghe.maGhe); });
-        Set<String> supplied = new HashSet<>();
-        for (PassengerRequest passenger : passengers == null ? List.<PassengerRequest>of() : passengers) {
-            if (passenger == null || passenger.maGhe() == null || passenger.hoTen() == null || passenger.hoTen().isBlank()
-                    || passenger.hoTen().length() > 120 || passenger.soDienThoai() == null || passenger.soDienThoai().isBlank()
-                    || passenger.soDienThoai().length() > 20 || (passenger.cccd() != null && passenger.cccd().length() > 20)
-                    || !supplied.add(passenger.maGhe()))
-                throw new AccountException(409, "PASSENGER_REQUIRED", "Hành khách phải đủ và không trùng ghế.");
+        for (GiuCho hold : holds) {
+            if (hold.trangThai == TrangThaiGiuCho.DANG_GIU) {
+                seats.add(hold.ghe.maGhe);
+            }
         }
-        if (seats.isEmpty() || !seats.equals(supplied)) throw new AccountException(409, "PASSENGER_REQUIRED", "Thông tin hành khách chưa khớp các ghế giữ.");
+
+        Set<String> supplied = new HashSet<>();
+        String message = "Hành khách phải đủ và không trùng ghế.";
+        if (passengers == null) {
+            passengers = List.of();
+        }
+        for (PassengerRequest passenger : passengers) {
+            if (passenger == null || passenger.maGhe() == null) {
+                throw new AccountException(409, "PASSENGER_REQUIRED", message);
+            }
+
+            String name = passenger.hoTen();
+            if (name == null || name.isBlank() || name.length() > 120) {
+                throw new AccountException(409, "PASSENGER_REQUIRED", message);
+            }
+            String phone = passenger.soDienThoai();
+            if (phone == null || phone.isBlank() || phone.length() > 20) {
+                throw new AccountException(409, "PASSENGER_REQUIRED", message);
+            }
+            String identityNumber = passenger.cccd();
+            if (identityNumber != null && identityNumber.length() > 20) {
+                throw new AccountException(409, "PASSENGER_REQUIRED", message);
+            }
+            if (!supplied.add(passenger.maGhe())) {
+                throw new AccountException(409, "PASSENGER_REQUIRED", message);
+            }
+        }
+        if (seats.isEmpty() || !seats.equals(supplied)) {
+            throw new AccountException(409, "PASSENGER_REQUIRED", "Thông tin hành khách chưa khớp các ghế giữ.");
+        }
     }
 
-    private static List<PassengerRequest> copyPassengers(List<PassengerRequest> values) {
-        return values == null ? List.of() : List.copyOf(values);
+    private static List<String> seatIds(List<GiuCho> holds) {
+        return holds.stream().map(hold -> hold.ghe.maGhe).sorted().toList();
     }
 
-    private static List<String> seatIds(List<GiuCho> holds) { return holds.stream().map(h -> h.ghe.maGhe).sorted().toList(); }
-
-    private static List<PriceLine> frozenLines(DonDatVe order, List<GiuCho> holds) {
-        List<GiuCho> active = holds.stream().filter(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU).sorted(Comparator.comparing(h -> h.ghe.maGhe)).toList();
-        if (active.isEmpty()) return List.of();
-        BigDecimal fare = order.tongTien.divide(BigDecimal.valueOf(active.size()), 0, RoundingMode.UNNECESSARY);
-        BigDecimal discount = order.tienGiam == null ? BigDecimal.ZERO : order.tienGiam;
-        return PriceCalculator.calculate(active.stream()
-                        .map(hold -> new PriceCalculator.SeatPrice(hold.ghe.maGhe, fare.setScale(0, RoundingMode.UNNECESSARY)))
-                .toList(), discount.setScale(0, RoundingMode.UNNECESSARY))
-                .chiTietGia();
+    private NguoiDung authenticate(EntityManager em) {
+        return AccessControl.authenticated(em, currentUser(), clock.instant());
     }
 
-    private NguoiDung authenticate(EntityManager em) { return AccessControl.authenticated(em, currentUser(), clock.instant()); }
     private CurrentUser currentUser() {
         RequestIdentity.Context context = RequestIdentity.get();
-        if (context == null || context.user() == null) throw new AccountException(401, "UNAUTHENTICATED", "Vui lòng đăng nhập.");
+        if (context == null || context.user() == null) {
+            throw new AccountException(401, "UNAUTHENTICATED", "Vui lòng đăng nhập.");
+        }
         return context.user();
-    }
-
-    private IdemContext prepareIdempotency(EntityManager em, CurrentUser caller, String orderId,
-                                           ThanhToanDto.CreateRequest request, String key) {
-        RequestIdentity.Context requestContext = RequestIdentity.get();
-        String path = requestContext == null || requestContext.path() == null
-                ? "/api/booking/" + orderId + "/thanh-toan" : requestContext.path();
-        IdempotencyRepository.Scope scope = new IdempotencyRepository.Scope(caller.maNguoiDung(), "POST", path, key);
-        IdempotencyRepository repository = new IdempotencyRepository(em);
-        repository.lock(scope);
-        String hash = IdempotencyRepository.hash(orderId + "|" + request.maPhuongThuc());
-        return new IdemContext(repository, scope, hash);
     }
 
     private BookingDto.Result replay(EntityManager em, IdempotencyRepository.Saved saved) {
@@ -488,12 +699,14 @@ public final class ThanhToanService {
             ThanhToan payment = new ThanhToanRepository(em).find(paymentId);
             if (payment != null && "VNPAY".equals(payment.phuongThucThanhToan.maPhuongThuc)) {
                 PaymentContextStore.Attempt context = contexts.get(paymentId);
-                if (context == null && payment.trangThai == TrangThaiThanhToan.CHO_XU_LY)
+                if (context == null && payment.trangThai == TrangThaiThanhToan.CHO_XU_LY) {
                     throw new AccountException(409, "PAYMENT_CONTEXT_MISSING", "Không còn dữ liệu thanh toán tạm; cần xử lý giao dịch hiện có.");
+                }
                 if (context == null || payment.trangThai != TrangThaiThanhToan.CHO_XU_LY
                         || payment.donDatVe.trangThai != TrangThaiDon.CHO_THANH_TOAN
-                        || !clock.instant().isBefore(context.expiresAt()))
+                        || !clock.instant().isBefore(context.expiresAt())) {
                     ((com.fasterxml.jackson.databind.node.ObjectNode) body).putNull("urlThanhToan");
+                }
             }
             return new BookingDto.Result(saved.status(), body);
         } catch (AccountException error) {
@@ -503,50 +716,45 @@ public final class ThanhToanService {
         }
     }
 
-    private BookingDto.Result remember(EntityManager em, IdemContext context, BookingDto.Result result) {
+    private BookingDto.Result remember(IdempotencyRepository repository,
+                                       IdempotencyRepository.Scope scope, String hash,
+                                       BookingDto.Result result) {
+        String body;
         try {
-            context.repository().save(context.scope(), context.hash(), result.status(),
-                    JSON.writeValueAsString(result.body()), clock.instant());
-            return result;
-        } catch (Exception error) {
-            throw new AccountException(500, "INTERNAL_ERROR", "Không lưu được kết quả yêu cầu.");
+            body = JSON.writeValueAsString(result.body());
+        } catch (JsonProcessingException error) {
+            throw new AccountException(500, "INTERNAL_ERROR", "Không chuyển được kết quả yêu cầu sang JSON.");
         }
+        repository.save(scope, hash, result.status(), body, clock.instant());
+        return result;
     }
 
-    private <T> T transaction(Function<EntityManager, T> action) {
-        try (EntityManager em = factory.createEntityManager()) {
-            EntityTransaction tx = em.getTransaction(); tx.begin();
-            try { T result = action.apply(em); em.flush(); tx.commit(); return result; }
-            catch (ExpiredOrder expired) {
-                tx.commit();
-                throw new AccountException(409, "HOLD_EXPIRED", "Đơn đã hết thời gian giữ ghế.");
-            }
-            catch (RuntimeException error) { if (tx.isActive()) tx.rollback(); throw error; }
-        }
-    }
-
-    private static TrangThaiThanhToan parseState(String state) {
-        if (state == null || state.isBlank()) return null;
-        try { return TrangThaiThanhToan.valueOf(state.trim().toUpperCase(Locale.ROOT)); }
-        catch (IllegalArgumentException error) { throw AccountException.invalid("trangThai", "Trạng thái giao dịch không hợp lệ."); }
-    }
-
-    private static void requireKey(String key) { if (key == null || key.isBlank() || key.length() > 128 || !key.matches("[!-~]+")) throw AccountException.invalid("Idempotency-Key", "Cần Idempotency-Key hợp lệ."); }
-    private static String required(String value, String field) { if (value == null || value.isBlank()) throw AccountException.invalid(field, "Trường bắt buộc."); return value.trim(); }
     private static BigDecimal payable(DonDatVe order) {
         BigDecimal value = Objects.requireNonNull(order.tongTien).subtract(Objects.requireNonNull(order.tienGiam));
-        if (value.signum() < 0) throw new AccountException(409, "PRICE_CHANGED", "Giá đã chốt không hợp lệ.");
+        if (value.signum() < 0) {
+            throw new AccountException(409, "PRICE_CHANGED", "Giá đã chốt không hợp lệ.");
+        }
         return value.setScale(0, RoundingMode.UNNECESSARY);
     }
-    private static LocalDateTime local(Instant value) { return LocalDateTime.ofInstant(value, ZONE); }
-    private static OffsetDateTime offset(LocalDateTime value) { return value == null ? null : value.atZone(ZONE).toOffsetDateTime(); }
-    private static OffsetDateTime offset(Instant value) { return value == null ? null : value.atZone(ZONE).toOffsetDateTime(); }
-    private static String money(BigDecimal value) { return value == null ? "0" : value.setScale(0, RoundingMode.UNNECESSARY).toPlainString(); }
-    private static AccountException notFound() { return new AccountException(404, "RESOURCE_NOT_FOUND", "Không tìm thấy giao dịch."); }
-    private static List<GiuCho> active(List<GiuCho> holds) { return holds.stream().filter(h -> h.trangThai == TrangThaiGiuCho.DANG_GIU).toList(); }
-    private static Instant holdExpiry(List<GiuCho> holds) { return active(holds).stream().map(h -> h.thoiDiemHetHan.atZone(ZONE).toInstant()).min(Comparator.naturalOrder()).orElseThrow(); }
-    private record OrderTrip(DonDatVe order, ChuyenXe trip, List<GiuCho> holds) {}
-    private record IdemContext(IdempotencyRepository repository, IdempotencyRepository.Scope scope,
-                               String hash) {}
+    private static LocalDateTime local(Instant value) {
+        return LocalDateTime.ofInstant(value, ZONE);
+    }
+
+    private static OffsetDateTime offset(LocalDateTime value) {
+        return value == null ? null : value.atZone(ZONE).toOffsetDateTime();
+    }
+
+    private static OffsetDateTime offset(Instant value) {
+        return value == null ? null : value.atZone(ZONE).toOffsetDateTime();
+    }
+
+    private static String money(BigDecimal value) {
+        return value == null ? "0" : value.setScale(0, RoundingMode.UNNECESSARY).toPlainString();
+    }
+
+    private static List<GiuCho> active(List<GiuCho> holds) {
+        return holds.stream().filter(hold -> hold.trangThai == TrangThaiGiuCho.DANG_GIU).toList();
+    }
+    private record OrderTrip(DonDatVe order, List<GiuCho> holds) {}
     private static final class ExpiredOrder extends RuntimeException {}
 }
