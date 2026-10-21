@@ -34,14 +34,57 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
-@WebServlet(urlPatterns = {"/api/booking", "/api/booking/*"})
+/**
+ * Controller tiếp nhận và điều phối toàn bộ các yêu cầu HTTP liên quan đến Đặt
+ * Vé (Booking API).
+ * <p>
+ * Ánh xạ URL:
+ * {@code @WebServlet(urlPatterns = {"/api/booking", "/api/booking/*"})}
+ * </p>
+ * <p>
+ * Danh sách Endpoint chính:
+ * <ul>
+ * <li>{@code POST /api/booking/hold} - Giữ ghế và khởi tạo đơn đặt vé tạm thời
+ * (15 phút)</li>
+ * <li>{@code GET  /api/booking/me} - Xem danh sách các đơn đặt vé của người
+ * dùng hiện tại</li>
+ * <li>{@code GET  /api/booking/{maDon}} - Xem thông tin chi tiết đơn đặt
+ * vé</li>
+ * <li>{@code PATCH /api/booking/{maDon}} - Cập nhật thông tin liên hệ người đặt
+ * vé</li>
+ * <li>{@code PUT  /api/booking/{maDon}/hanh-khach} - Cập nhật thông tin hành
+ * khách theo từng ghế</li>
+ * <li>{@code PUT  /api/booking/{maDon}/doi-ghe} - Đổi ghế trong đơn hàng</li>
+ * <li>{@code DELETE /api/booking/{maDon}/ghe/{maGhe}} - Hủy bớt ghế đã giữ
+ * trong đơn</li>
+ * <li>{@code PUT  /api/booking/{maDon}/khuyen-mai} - Áp dụng mã khuyến mãi vào
+ * đơn</li>
+ * <li>{@code DELETE /api/booking/{maDon}/khuyen-mai} - Hủy bỏ mã khuyến mãi
+ * đang áp dụng</li>
+ * <li>{@code POST /api/booking/{maDon}/bao-gia} - Lấy báo giá tạm tính (kèm
+ * chiết khấu khuyến mãi)</li>
+ * <li>{@code POST /api/booking/{maDon}/chot-gia} - Chốt giá đơn hàng để chuyển
+ * sang bước thanh toán</li>
+ * <li>{@code POST /api/booking/{maDon}/huy} - Hủy bỏ đơn đặt vé</li>
+ * <li>{@code POST /api/booking/{maDon}/thanh-toan} - Khởi tạo giao dịch thanh
+ * toán (phối hợp ThanhToanService)</li>
+ * <li>{@code POST /api/booking/{maDon}/hoan-tien} - Gửi yêu cầu hoàn vé/tiền
+ * (phối hợp HoanVeService)</li>
+ * </ul>
+ * </p>
+ * Thiết kế kiến trúc theo chuẩn Controller của Cinema-main: phân tách handler
+ * rõ ràng,
+ * UTF-8 JSON response, quản lý idempotency và session lock an toàn luồng.
+ */
+@WebServlet(urlPatterns = { "/api/booking", "/api/booking/*" })
 public class BookingController extends HttpServlet {
     private static final String ROOT = "/api/booking";
     private static final String SESSION_REQUEST_ATTRIBUTE = BookingController.class.getName() + ".session";
     private static final String USER_REQUEST_ATTRIBUTE = BookingController.class.getName() + ".userId";
     private static final Set<String> HOLD_FIELDS = Set.of("maChuyen", "danhSachMaGhe");
     private static final Set<String> PASSENGER_FIELDS = Set.of("maGhe", "hoTen", "soDienThoai", "cccd");
-    private static final Set<String> PATCH_FIELDS = Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail", "ghiChu");
+    private static final Set<String> PATCH_FIELDS = Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail",
+            "ghiChu");
 
     private final ObjectMapper json = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -62,7 +105,10 @@ public class BookingController extends HttpServlet {
         refunds = new HoanVeService(Jpa.factory());
     }
 
-    /** HttpServlet has no PATCH hook, so route and dispatch the supported verbs here. */
+    /*
+     * HttpServlet has no PATCH hook, so route and dispatch the supported verbs
+     * here.
+     */
     @Override
     protected void service(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -75,10 +121,13 @@ public class BookingController extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             return;
         }
-        if (!route.allows(method)) throw methodNotAllowed(response, route);
-        if (route.kind() != Kind.PAYMENT) requireNoQuery(request);
+        if (!route.allows(method))
+            throw methodNotAllowed(response, route);
+        if (route.kind() != Kind.PAYMENT)
+            requireNoQuery(request);
 
-        // Holding seats has its own idempotency lock. Do not serialize these requests on the session.
+        // Holding seats has its own idempotency lock. Do not serialize these requests
+        // on the session.
         if (route.kind() == Kind.HOLD || route.kind() == Kind.REFUND || route.kind() == Kind.REFUND_PREVIEW) {
             doPost(request, response);
             return;
@@ -115,102 +164,162 @@ public class BookingController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Route route = route(request);
-        if (route.kind() == Kind.HISTORY) {
-            requireNoQuery(request);
-            write(response, service.getMyOrders());
-            return;
+        switch (route.kind()) {
+            case HISTORY -> handleGetHistory(request, response);
+            case PAYMENT -> handleGetPaymentHistory(request, response, route);
+            default -> handleGetOrderDetail(request, response, route);
         }
-        if (route.kind() == Kind.PAYMENT) {
-            Set<String> allowed = Set.of("page", "size", "trangThai", "sort");
-            request.getParameterMap().forEach((name, values) -> {
-                if (!allowed.contains(name) || values.length != 1)
-                    throw invalid("query", "Tham số lịch sử thanh toán không hợp lệ hoặc bị lặp.");
-            });
-            int page = integerQuery(request, "page", 1);
-            int size = integerQuery(request, "size", 20);
-            writeJson(response, 200, payments.history(route.maDon(), page, size,
-                    request.getParameter("trangThai"), request.getParameter("sort")));
-            return;
-        }
-        List<PassengerRequest> passengers = passengers(request, route.maDon());
-        writeOrder(request, response, route, service.getOrder(route.maDon(), passengers));
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Route route = route(request);
-        if (route.kind() == Kind.REFUND || route.kind() == Kind.REFUND_PREVIEW) {
-            HoanVeDto.Request body = RefundHttp.body(request,HoanVeDto.Request.class);
-            if (route.kind() == Kind.REFUND_PREVIEW) writeJson(response,200,refunds.preview(route.maDon(),body));
-            else {
-                var result = refunds.create(route.maDon(),body,request.getHeader("Idempotency-Key"),request.getRemoteAddr());
-                JsonNode output = json.valueToTree(result.body());
-                response.setHeader("Location",request.getContextPath()+"/api/hoan-tien/"+output.path("maHoanTien").asText());
-                write(response,result);
+        switch (route.kind()) {
+            case HOLD -> handleHoldSeats(request, response);
+            case QUOTE -> handleQuote(request, response, route);
+            case FREEZE -> handleFreeze(request, response, route);
+            case PAYMENT -> handleCreatePayment(request, response, route);
+            case REFUND, REFUND_PREVIEW -> handleRefund(request, response, route);
+            default -> handleCancelOrder(request, response, route);
+        }
+    }
+
+    protected void doPatch(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Route route = route(request);
+        handleUpdateContact(request, response, route);
+    }
+
+    @Override
+    protected void doPut(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Route route = route(request);
+        switch (route.kind()) {
+            case PASSENGERS -> handleSavePassengers(request, response, route);
+            case CHANGE_SEAT -> handleChangeSeat(request, response, route);
+            case PROMOTION -> handleApplyPromotion(request, response, route);
+            default -> throw methodNotAllowed(response, route);
+        }
+    }
+
+    @Override
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Route route = route(request);
+        requireEmptyBody(request, "Đường dẫn này không nhận body.");
+        switch (route.kind()) {
+            case SEAT -> handleRemoveSeat(request, response, route);
+            case PROMOTION -> handleRemovePromotion(request, response, route);
+            default -> throw methodNotAllowed(response, route);
+        }
+    }
+
+    /* ── HTTP Request Handlers (Cinema-main Pattern) ───────────────────────── */
+
+    private void handleGetHistory(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        requireNoQuery(request);
+        write(response, service.getMyOrders());
+    }
+
+    private void handleGetPaymentHistory(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        Set<String> allowed = Set.of("page", "size", "trangThai", "sort");
+        request.getParameterMap().forEach((name, values) -> {
+            if (!allowed.contains(name) || values.length != 1) {
+                throw invalid("query", "Tham số lịch sử thanh toán không hợp lệ hoặc bị lặp.");
             }
-            return;
-        }
-        if (route.kind() == Kind.PAYMENT) {
-            requireNoQuery(request);
-            JsonNode body = readObject(request, Set.of("maPhuongThuc"));
-            checkStrings(body, "maPhuongThuc");
-            BookingDto.Result result = payments.create(route.maDon(),
-                    convert(body, ThanhToanDto.CreateRequest.class), request.getHeader("Idempotency-Key"),
-                    passengers(request, route.maDon()), request.getRemoteAddr());
-            if (result.status() == 201) {
-                JsonNode output = json.valueToTree(result.body());
-                response.setHeader("Location", request.getContextPath() + "/api/thanh-toan/"
-                        + output.path("maGiaoDich").asText());
+        });
+        int page = integerQuery(request, "page", 1);
+        int size = integerQuery(request, "size", 20);
+        writeJson(response, 200, payments.history(route.maDon(), page, size,
+                request.getParameter("trangThai"), request.getParameter("sort")));
+    }
+
+    private void handleGetOrderDetail(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        List<PassengerRequest> passengers = passengers(request, route.maDon());
+        writeOrder(request, response, route, service.getOrder(route.maDon(), passengers));
+    }
+
+    private void handleHoldSeats(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        JsonNode body = readObject(request, HOLD_FIELDS);
+        checkStrings(body, "maChuyen");
+        JsonNode seats = body.get("danhSachMaGhe");
+        if (seats != null && !seats.isNull()) {
+            if (!seats.isArray())
+                throw invalid("danhSachMaGhe", "Danh sách ghế phải là một mảng.");
+            for (JsonNode seat : seats) {
+                if (!seat.isTextual())
+                    throw invalid("danhSachMaGhe", "Mỗi mã ghế phải là chuỗi.");
             }
+        }
+        HoldSeatRequest input = convert(body, HoldSeatRequest.class);
+        BookingDto.Result result = service.holdSeats(input, request.getHeader("Idempotency-Key"));
+        setHoldLocation(request, response, result);
+        write(response, result);
+    }
+
+    private void handleQuote(HttpServletRequest request, HttpServletResponse response, Route route) throws IOException {
+        JsonNode body = readObject(request, Set.of("maKhuyenMai"));
+        checkStrings(body, "maKhuyenMai");
+        PricingDto.QuoteSnapshot snapshot = service.baoGia(
+                route.maDon(),
+                convert(body, PricingDto.QuoteRequest.class),
+                passengers(request, route.maDon()));
+        BookingSession.saveQuote(session(request), userId(request), route.maDon(), snapshot);
+        writeJson(response, HttpServletResponse.SC_OK, snapshot.response());
+    }
+
+    private void handleFreeze(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        JsonNode body = readObject(request, Set.of("maBaoGia"));
+        checkStrings(body, "maBaoGia");
+        BookingDto.Result result = service.chotGia(
+                route.maDon(),
+                convert(body, PricingDto.FreezeRequest.class),
+                request.getHeader("Idempotency-Key"),
+                passengers(request, route.maDon()),
+                BookingSession.quote(session(request), userId(request), route.maDon()));
+        write(response, result);
+    }
+
+    private void handleCreatePayment(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        requireNoQuery(request);
+        JsonNode body = readObject(request, Set.of("maPhuongThuc"));
+        checkStrings(body, "maPhuongThuc");
+        BookingDto.Result result = payments.create(route.maDon(),
+                convert(body, ThanhToanDto.CreateRequest.class), request.getHeader("Idempotency-Key"),
+                passengers(request, route.maDon()), request.getRemoteAddr());
+        if (result.status() == 201) {
+            JsonNode output = json.valueToTree(result.body());
+            response.setHeader("Location", request.getContextPath() + "/api/thanh-toan/"
+                    + output.path("maGiaoDich").asText());
+        }
+        write(response, result);
+    }
+
+    private void handleRefund(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        HoanVeDto.Request body = RefundHttp.body(request, HoanVeDto.Request.class);
+        if (route.kind() == Kind.REFUND_PREVIEW) {
+            writeJson(response, 200, refunds.preview(route.maDon(), body));
+        } else {
+            var result = refunds.create(route.maDon(), body, request.getHeader("Idempotency-Key"),
+                    request.getRemoteAddr());
+            JsonNode output = json.valueToTree(result.body());
+            response.setHeader("Location",
+                    request.getContextPath() + "/api/hoan-tien/" + output.path("maHoanTien").asText());
             write(response, result);
-            return;
         }
-        if (route.kind() == Kind.HOLD) {
-            JsonNode body = readObject(request, HOLD_FIELDS);
-            checkStrings(body, "maChuyen");
-            JsonNode seats = body.get("danhSachMaGhe");
-            if (seats != null && !seats.isNull()) {
-                if (!seats.isArray()) throw invalid("danhSachMaGhe", "Danh sách ghế phải là một mảng.");
-                for (JsonNode seat : seats) {
-                    if (!seat.isTextual()) throw invalid("danhSachMaGhe", "Mỗi mã ghế phải là chuỗi.");
-                }
-            }
-            HoldSeatRequest input = convert(body, HoldSeatRequest.class);
-            BookingDto.Result result = service.holdSeats(input, request.getHeader("Idempotency-Key"));
-            setHoldLocation(request, response, result);
-            write(response, result);
-            return;
-        }
-        if (route.kind() == Kind.QUOTE) {
-            JsonNode body = readObject(request, Set.of("maKhuyenMai"));
-            checkStrings(body, "maKhuyenMai");
-            PricingDto.QuoteSnapshot snapshot = service.baoGia(
-                    route.maDon(),
-                    convert(body, PricingDto.QuoteRequest.class),
-                    passengers(request, route.maDon()));
-            BookingSession.saveQuote(session(request), userId(request), route.maDon(), snapshot);
-            writeJson(response, HttpServletResponse.SC_OK, snapshot.response());
-            return;
-        }
-        if (route.kind() == Kind.FREEZE) {
-            JsonNode body = readObject(request, Set.of("maBaoGia"));
-            checkStrings(body, "maBaoGia");
-            BookingDto.Result result = service.chotGia(
-                    route.maDon(),
-                    convert(body, PricingDto.FreezeRequest.class),
-                    request.getHeader("Idempotency-Key"),
-                    passengers(request, route.maDon()),
-                    BookingSession.quote(session(request), userId(request), route.maDon()));
-            write(response, result);
-            return;
-        }
+    }
+
+    private void handleCancelOrder(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
         requireEmptyBody(request, "Hủy đơn chỉ nhận body vắng hoặc object rỗng.");
         writeOrder(request, response, route,
                 service.cancelOrder(route.maDon(), request.getHeader("Idempotency-Key")));
     }
 
-    protected void doPatch(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Route route = route(request);
+    private void handleUpdateContact(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
         JsonNode body = readObject(request, PATCH_FIELDS);
         checkStrings(body, "khachDatTen", "khachDatSoDienThoai", "khachDatEmail", "ghiChu");
         for (String field : Set.of("khachDatTen", "khachDatSoDienThoai", "khachDatEmail")) {
@@ -224,65 +333,69 @@ public class BookingController extends HttpServlet {
         writePatchOrder(request, response, route, result);
     }
 
-    @Override
-    protected void doPut(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Route route = route(request);
-        switch (route.kind()) {
-            case PASSENGERS -> {
-                JsonNode body = readObject(request, Set.of("hanhKhach"));
-                JsonNode passengers = body.get("hanhKhach");
-                if (passengers != null && !passengers.isNull()) {
-                    if (!passengers.isArray()) throw invalid("hanhKhach", "Danh sách hành khách phải là một mảng.");
-                    for (JsonNode passenger : passengers) {
-                        if (!passenger.isObject()) throw invalid("hanhKhach", "Mỗi hành khách phải là một object.");
-                        requireAllowed(passenger, PASSENGER_FIELDS);
-                        checkStrings(passenger, "maGhe", "hoTen", "soDienThoai", "cccd");
-                    }
-                }
-                writeOrder(request, response, route, service.savePassengers(
-                        route.maDon(), convert(body, BookingDto.PassengersRequest.class)));
+    private void handleSavePassengers(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        JsonNode body = readObject(request, Set.of("hanhKhach"));
+        JsonNode passengers = body.get("hanhKhach");
+        if (passengers != null && !passengers.isNull()) {
+            if (!passengers.isArray())
+                throw invalid("hanhKhach", "Danh sách hành khách phải là một mảng.");
+            for (JsonNode passenger : passengers) {
+                if (!passenger.isObject())
+                    throw invalid("hanhKhach", "Mỗi hành khách phải là một object.");
+                requireAllowed(passenger, PASSENGER_FIELDS);
+                checkStrings(passenger, "maGhe", "hoTen", "soDienThoai", "cccd");
             }
-            case CHANGE_SEAT -> {
-                JsonNode body = readObject(request, Set.of("maGheCu", "maGheMoi"));
-                checkStrings(body, "maGheCu", "maGheMoi");
-                writeOrder(request, response, route, service.changeSeat(
-                        route.maDon(), convert(body, BookingDto.ChangeSeatRequest.class),
-                        passengers(request, route.maDon())));
-            }
-            case PROMOTION -> {
-                JsonNode body = readObject(request, Set.of("maKhuyenMai"));
-                checkStrings(body, "maKhuyenMai");
-                writeOrder(request, response, route, service.applyPromotion(
-                        route.maDon(), convert(body, BookingDto.PromotionRequest.class),
-                        passengers(request, route.maDon())));
-            }
-            default -> throw methodNotAllowed(response, route);
         }
+        writeOrder(request, response, route, service.savePassengers(
+                route.maDon(), convert(body, BookingDto.PassengersRequest.class)));
     }
 
-    @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Route route = route(request);
-        requireEmptyBody(request, "Đường dẫn này không nhận body.");
-        switch (route.kind()) {
-            case SEAT -> writeOrder(request, response, route,
-                    service.removeSeat(route.maDon(), route.maGhe(), passengers(request, route.maDon())));
-            case PROMOTION -> writeOrder(request, response, route,
-                    service.removePromotion(route.maDon(), passengers(request, route.maDon())));
-            default -> throw methodNotAllowed(response, route);
-        }
+    private void handleChangeSeat(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        JsonNode body = readObject(request, Set.of("maGheCu", "maGheMoi"));
+        checkStrings(body, "maGheCu", "maGheMoi");
+        writeOrder(request, response, route, service.changeSeat(
+                route.maDon(), convert(body, BookingDto.ChangeSeatRequest.class),
+                passengers(request, route.maDon())));
+    }
+
+    private void handleApplyPromotion(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        JsonNode body = readObject(request, Set.of("maKhuyenMai"));
+        checkStrings(body, "maKhuyenMai");
+        writeOrder(request, response, route, service.applyPromotion(
+                route.maDon(), convert(body, BookingDto.PromotionRequest.class),
+                passengers(request, route.maDon())));
+    }
+
+    private void handleRemoveSeat(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        writeOrder(request, response, route,
+                service.removeSeat(route.maDon(), route.maGhe(), passengers(request, route.maDon())));
+    }
+
+    private void handleRemovePromotion(HttpServletRequest request, HttpServletResponse response, Route route)
+            throws IOException {
+        writeOrder(request, response, route,
+                service.removePromotion(route.maDon(), passengers(request, route.maDon())));
     }
 
     private Route route(HttpServletRequest request) {
         String path = request.getServletPath();
-        if (!ROOT.equals(path)) throw notFound();
+        if (!ROOT.equals(path))
+            throw notFound();
         String info = request.getPathInfo();
-        if (info == null || info.isEmpty() || info.equals("/")) throw notFound();
+        if (info == null || info.isEmpty() || info.equals("/"))
+            throw notFound();
         String[] part = info.substring(1).split("/", -1);
 
-        if (part.length == 1 && part[0].equals("hold")) return new Route(Kind.HOLD, null, null);
-        if (part.length == 1 && part[0].equals("me")) return new Route(Kind.HISTORY, null, null);
-        if (part.length == 1 && resourceCode(part[0])) return new Route(Kind.ORDER, part[0], null);
+        if (part.length == 1 && part[0].equals("hold"))
+            return new Route(Kind.HOLD, null, null);
+        if (part.length == 1 && part[0].equals("me"))
+            return new Route(Kind.HISTORY, null, null);
+        if (part.length == 1 && resourceCode(part[0]))
+            return new Route(Kind.ORDER, part[0], null);
         if (part.length == 2 && resourceCode(part[0])) {
             Kind kind = switch (part[1]) {
                 case "hanh-khach" -> Kind.PASSENGERS;
@@ -295,10 +408,11 @@ public class BookingController extends HttpServlet {
                 case "hoan-tien" -> Kind.REFUND;
                 default -> null;
             };
-            if (kind != null) return new Route(kind, part[0], null);
+            if (kind != null)
+                return new Route(kind, part[0], null);
         }
         if (part.length == 3 && resourceCode(part[0]) && part[1].equals("hoan-tien") && part[2].equals("du-kien")) {
-            return new Route(Kind.REFUND_PREVIEW,part[0],null);
+            return new Route(Kind.REFUND_PREVIEW, part[0], null);
         }
         if (part.length == 3 && resourceCode(part[0]) && part[1].equals("ghe") && resourceCode(part[2])) {
             return new Route(Kind.SEAT, part[0], part[2]);
@@ -311,25 +425,32 @@ public class BookingController extends HttpServlet {
     }
 
     private void requireNoQuery(HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty()) throw invalid("query", "Đường dẫn này không hỗ trợ tham số query.");
+        if (!request.getParameterMap().isEmpty())
+            throw invalid("query", "Đường dẫn này không hỗ trợ tham số query.");
     }
 
     private int integerQuery(HttpServletRequest request, String name, int fallback) {
         String value = request.getParameter(name);
-        if (value == null) return fallback;
-        try { return Integer.parseInt(value); }
-        catch (NumberFormatException error) { throw invalid(name, "Tham số phải là số nguyên."); }
+        if (value == null)
+            return fallback;
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException error) {
+            throw invalid(name, "Tham số phải là số nguyên.");
+        }
     }
 
     private void requireAllowed(JsonNode body, Set<String> allowed) {
         body.fieldNames().forEachRemaining(field -> {
-            if (!allowed.contains(field)) throw invalid(field, "Trường này không được hỗ trợ.");
+            if (!allowed.contains(field))
+                throw invalid(field, "Trường này không được hỗ trợ.");
         });
     }
 
     private JsonNode readObject(HttpServletRequest request, Set<String> allowed) throws IOException {
         JsonNode body = readTree(request);
-        if (body == null || !body.isObject()) throw invalid("body", "Body phải là một JSON object.");
+        if (body == null || !body.isObject())
+            throw invalid("body", "Body phải là một JSON object.");
         requireAllowed(body, allowed);
         return body;
     }
@@ -345,7 +466,8 @@ public class BookingController extends HttpServlet {
 
     private void requireEmptyBody(HttpServletRequest request, String message) throws IOException {
         JsonNode body = readTree(request);
-        if (body != null && (!body.isObject() || body.size() != 0)) throw invalid("body", message);
+        if (body != null && (!body.isObject() || body.size() != 0))
+            throw invalid("body", message);
     }
 
     private void checkStrings(JsonNode body, String... fields) {
@@ -371,7 +493,8 @@ public class BookingController extends HttpServlet {
 
     private HttpSession session(HttpServletRequest request) {
         Object value = request.getAttribute(SESSION_REQUEST_ATTRIBUTE);
-        if (value instanceof HttpSession session) return session;
+        if (value instanceof HttpSession session)
+            return session;
         throw new IllegalStateException("Booking session was not initialized for this request.");
     }
 
@@ -432,11 +555,15 @@ public class BookingController extends HttpServlet {
     private void storePassengers(HttpServletRequest request, Route route, OrderResponse order) {
         List<PassengerRequest> passengers = Set.of(TrangThaiDon.CHO_XU_LY, TrangThaiDon.CHO_THANH_TOAN)
                 .contains(order.trangThaiDon())
-                ? order.hanhKhach() : List.of();
+                        ? order.hanhKhach()
+                        : List.of();
         BookingSession.update(session(request), userId(request), route.maDon(), passengers);
     }
 
-    /** A successful real mutation invalidates the volatile quote after its transaction commits. */
+    /**
+     * A successful real mutation invalidates the volatile quote after its
+     * transaction commits.
+     */
     private void clearQuoteAfterMutation(HttpServletRequest request, Route route) {
         if (route.kind() == Kind.PASSENGERS
                 || route.kind() == Kind.CHANGE_SEAT
@@ -448,13 +575,15 @@ public class BookingController extends HttpServlet {
     }
 
     private void setHoldLocation(HttpServletRequest request, HttpServletResponse response, BookingDto.Result result) {
-        if (result.status() != HttpServletResponse.SC_CREATED) return;
+        if (result.status() != HttpServletResponse.SC_CREATED)
+            return;
         String orderId = null;
         if (result.body() instanceof HoldSeatResponse hold) {
             orderId = hold.maDon();
         } else if (result.body() instanceof JsonNode body && body.isObject()) {
             JsonNode value = body.get("maDon");
-            if (value != null && value.isTextual()) orderId = value.asText();
+            if (value != null && value.isTextual())
+                orderId = value.asText();
         }
         if (resourceCode(orderId)) {
             response.setHeader("Location", request.getContextPath() + ROOT + "/" + orderId);
@@ -463,13 +592,15 @@ public class BookingController extends HttpServlet {
 
     private void write(HttpServletResponse response, BookingDto.Result result) throws IOException {
         response.setStatus(result.status());
-        if (result.status() == HttpServletResponse.SC_NO_CONTENT || result.body() == null) return;
+        if (result.status() == HttpServletResponse.SC_NO_CONTENT || result.body() == null)
+            return;
         writeJson(response, result.status(), result.body());
     }
 
     private void writeJson(HttpServletResponse response, int status, Object body) throws IOException {
         response.setStatus(status);
-        if (status == HttpServletResponse.SC_NO_CONTENT || body == null) return;
+        if (status == HttpServletResponse.SC_NO_CONTENT || body == null)
+            return;
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
         json.writeValue(response.getOutputStream(), body);
@@ -477,7 +608,8 @@ public class BookingController extends HttpServlet {
 
     private void writeSerializedJson(HttpServletResponse response, int status, String body) throws IOException {
         response.setStatus(status);
-        if (status == HttpServletResponse.SC_NO_CONTENT || body == null) return;
+        if (status == HttpServletResponse.SC_NO_CONTENT || body == null)
+            return;
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json");
         response.getWriter().write(body);
@@ -496,7 +628,10 @@ public class BookingController extends HttpServlet {
         return AccountException.invalid(field, message);
     }
 
-    private enum Kind { HOLD, HISTORY, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL, QUOTE, FREEZE, PAYMENT, REFUND, REFUND_PREVIEW }
+    private enum Kind {
+        HOLD, HISTORY, ORDER, PASSENGERS, CHANGE_SEAT, SEAT, PROMOTION, CANCEL, QUOTE, FREEZE, PAYMENT, REFUND,
+        REFUND_PREVIEW
+    }
 
     private record Route(Kind kind, String maDon, String maGhe) {
         boolean allows(String method) {
